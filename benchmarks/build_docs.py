@@ -240,7 +240,7 @@ That is {(cap.get("exhaustive_s", 1) / cap.get("capped_s", 1)):.0f}x for an iden
 |---|---:|---:|---:|---:|
 {chr(10).join(incr_rows)}
 
-Both defaults produce scores identical to the exhaustive, non-incremental search on every network measured. They buy speed and cost nothing. The one option that does cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
+Both defaults produce scores identical to the exhaustive, non-incremental search everywhere the comparison has been run, which is networks up to 223 variables. Neither has been checked against the exhaustive scan on `link` or `munin`, where a full scan is expensive. The one option known to cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
 
 {numba_text}
 
