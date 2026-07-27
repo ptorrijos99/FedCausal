@@ -32,7 +32,7 @@ pip install "fedcausal[accel]"       # numba, for large graphs
 
 Two reasons, and scale is the first one.
 
-Discrete-variable structure learning in Python tends to fall over somewhere between 100 and 500 variables. fedcausal finishes `munin` (1041 variables, 5000 rows) in about 25 minutes, single-threaded, in pure Python. The optional numba extra speeds up the dominant path check by roughly 4x on large graphs, but nothing needs compiling for the base install to work.
+Score-based structure learning over discrete data gets expensive fast. causal-learn, the closest Python comparison, does not finish `andes` at 223 variables inside half an hour. fedcausal gets through the whole size ladder up to `munin` at 1041 variables, single-threaded and in pure Python, with numbers in [Benchmarks](docs/benchmarks.md). The optional numba extra speeds up the dominant path check, but nothing needs compiling for the base install to work.
 
 The second is federation. Plenty of data cannot leave the institution that holds it, while a graph usually can. fedcausal is built for that case, which is why the server never touches client data at any point: each site scores its own model and reports one number, and anything that needs a ground-truth network to evaluate against happens outside the loop, through an observer.
 

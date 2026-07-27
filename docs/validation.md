@@ -9,7 +9,7 @@ pip install -e ".[dev,flower]"
 pytest
 ```
 
-No downloads, no environment variables, no JVM. Everything the tests need ships with the package. Expect 418 passed and 4 xfailed; the xfails are explained below.
+No downloads, no environment variables, no JVM. Everything the tests need ships with the package. Four xfails are expected; they are explained below.
 
 ## What is checked
 
