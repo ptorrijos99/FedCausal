@@ -6,7 +6,7 @@
 pip install git+https://github.com/ptorrijos99/fedcausal
 ```
 
-Nothing else is required. The extras add the Flower transport (`[flower]`), numba acceleration for large graphs (`[accel]`), and causal-learn for the comparison benchmark (`[compare]`).
+Nothing else is required. The extras add the Flower transport (`[flower]`), Flower's simulation engine (`[flower-simulation]`), numba acceleration for large graphs (`[accel]`), and causal-learn for the comparison benchmark (`[compare]`).
 
 ## Learn a structure from one table
 

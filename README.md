@@ -24,9 +24,12 @@ pip install git+https://github.com/ptorrijos99/fedcausal
 Optional extras:
 
 ```bash
-pip install "fedcausal[flower]"      # the Flower transport
-pip install "fedcausal[accel]"       # numba, for large graphs
+pip install "fedcausal[flower]"             # the Flower transport, for deployment
+pip install "fedcausal[flower-simulation]"  # adds Ray, needed by `flwr run`
+pip install "fedcausal[accel]"              # numba, worth it past a few hundred variables
 ```
+
+Ray has no wheel for every Python version and platform, which is why simulation is a separate extra from the transport. Deploying against a real SuperLink needs only `[flower]`.
 
 ## Why this exists
 
@@ -74,6 +77,7 @@ Pass `truth` and each row of `stats` carries SHD and SMHD for that round. `clien
 Over Flower, with each site loading its own data:
 
 ```bash
+pip install "fedcausal[flower-simulation]"
 flwr run .                       # the bundled example, on synthetic data
 ```
 

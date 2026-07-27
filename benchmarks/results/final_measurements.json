@@ -1,0 +1,118 @@
+{
+  "central_5samples": {
+    "asia": {
+      "n_vars": 8,
+      "shd": 2.4,
+      "smhd": 1.4
+    },
+    "cancer": {
+      "n_vars": 5,
+      "shd": 0.4,
+      "smhd": 0.6
+    },
+    "child": {
+      "n_vars": 20,
+      "shd": 2.0,
+      "smhd": 0.0
+    },
+    "insurance": {
+      "n_vars": 27,
+      "shd": 22.4,
+      "smhd": 21.6
+    },
+    "alarm": {
+      "n_vars": 37,
+      "shd": 10.2,
+      "smhd": 11.2
+    },
+    "hepar2": {
+      "n_vars": 70,
+      "shd": 65.6,
+      "smhd": 72.2
+    }
+  },
+  "hailfinder_cap": {
+    "capped_s": 0.5285872998647392,
+    "exhaustive_s": 4.8292315998114645,
+    "same_bdeu": true
+  },
+  "incremental": {
+    "alarm": {
+      "n_vars": 37,
+      "incremental_s": 0.21710749994963408,
+      "full_scan_s": 0.49641790008172393,
+      "speedup": 2.286507376285416,
+      "same_bdeu": true
+    },
+    "hepar2": {
+      "n_vars": 70,
+      "incremental_s": 0.6275728999171406,
+      "full_scan_s": 1.9765526000410318,
+      "speedup": 3.1495187257161663,
+      "same_bdeu": true
+    },
+    "win95pts": {
+      "n_vars": 76,
+      "incremental_s": 1.0902395998127759,
+      "full_scan_s": 3.9606617998797446,
+      "speedup": 3.6328361220413377,
+      "same_bdeu": true
+    }
+  },
+  "numba": {
+    "available": true,
+    "pure_s": 1.1546954999212176,
+    "numba_s": 1.1134403999894857,
+    "speedup": 1.0370519157847347
+  },
+  "scale": {
+    "link": {
+      "n_vars": 724,
+      "seconds": 316.47233320004307,
+      "edges": 1807
+    },
+    "munin": {
+      "n_vars": 1041,
+      "seconds": 981.9339256999083,
+      "edges": 1446
+    }
+  },
+  "federated_replay": [
+    {
+      "net": "asia",
+      "n_clients": 5,
+      "recorded": 5,
+      "now": 5
+    },
+    {
+      "net": "asia",
+      "n_clients": 10,
+      "recorded": 2,
+      "now": 2
+    },
+    {
+      "net": "asia",
+      "n_clients": 20,
+      "recorded": 5,
+      "now": 5
+    },
+    {
+      "net": "cancer",
+      "n_clients": 5,
+      "recorded": 1,
+      "now": 1
+    },
+    {
+      "net": "cancer",
+      "n_clients": 10,
+      "recorded": 2,
+      "now": 2
+    },
+    {
+      "net": "cancer",
+      "n_clients": 20,
+      "recorded": 2,
+      "now": 2
+    }
+  ]
+}
