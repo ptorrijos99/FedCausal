@@ -12,7 +12,7 @@ sink, where the original picked an arbitrary element of an unordered set. Docume
 as
 a deliberate substitution; where it can change the intermediate ``beta`` the
 final union (:func:`~fedcausal.fusion.consensus.consensus_union`) is the
-binding cross-language oracle (spec §7).
+binding reference.
 """
 
 from __future__ import annotations

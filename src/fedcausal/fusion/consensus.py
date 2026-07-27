@@ -1,17 +1,16 @@
-"""Consensus-union fusion and its limited-budget variants (ConsensusUnion port).
+"""Consensus-union fusion and its budgeted variants.
 
-Ported from ``consensusBN/ConsensusUnion.java``. The canonical fusion computes
-a consensus order (:func:`~fedcausal.fusion.alpha.alpha_order`), transforms
-every input into it (:func:`~fedcausal.fusion.beta.beta_to_alpha`), and unions
-the transformed parent sets -- acyclic by construction because all transformed
-inputs share the one order. The four limited variants rank the transformed
-edges by cross-client frequency and add them under a budget.
+The canonical fusion computes a consensus order
+(:func:`~fedcausal.fusion.alpha.alpha_order`), transforms every input into it
+(:func:`~fedcausal.fusion.beta.beta_to_alpha`), and unions the transformed
+parent sets. The result is acyclic by construction, since every transformed
+input shares the one order. The budgeted variants rank the transformed edges by
+cross-client frequency and add them under a cap.
 
-The genetic, MinCut, and treewidth-bounded fusion modes
-switch are out of scope for phase 3 (spec §2). Determinism: the edge-frequency
-ranking breaks ties lexicographically by ``(child, parent)``, replacing the reference
-implementation's
-``HashMap`` iteration order.
+The genetic, MinCut, and treewidth-bounded fusion modes are not implemented.
+
+Ties in the frequency ranking break lexicographically by ``(child, parent)``,
+so the result does not depend on dictionary iteration order.
 """
 
 from __future__ import annotations

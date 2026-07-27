@@ -109,7 +109,7 @@ def test_asia_dysp_cpt_values_pin_parent_order() -> None:
     # convention -- a transposed convention would swap those two rows and
     # fail the assertions below. (Verified by temporarily reversing the
     # parent tuple used in the row-index computation and confirming this
-    # test fails; see task-8-report.md.)
+    # test fails.)
     parents = bn.parent_order[dysp_idx]
     cards = [len(bn.outcomes[p]) for p in parents]
 

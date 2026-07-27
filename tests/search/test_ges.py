@@ -79,7 +79,7 @@ class _OvershootScore:
     leaving {0-1, 0-2}.
 
     Values obtained by running `run_fes`/`run_bes` directly against this
-    table once implemented (see the exploration in the task-5 report) and
+    table once implemented, and
     recorded here as the fixture's contract, not derived from first
     principles in this docstring.
     """

@@ -196,9 +196,8 @@ def dag_to_cpdag(dag: DAG) -> PDAG:
 
     Notes
     -----
-    This mirrors Tetrad's pattern-from-DAG construction; Task 8 golden tests
-    pin
-    it against the Java output.
+    This mirrors Tetrad's pattern-from-DAG construction, pinned against
+    reference output by the regression tests.
     """
     from fedcausal.graph.pdag import PDAG
 

@@ -18,7 +18,7 @@ class FusionOperator(Protocol):
 
     Every consensus method in :mod:`fedcausal.fusion` -- the full union and
     each limited variant -- implements this single method, so the federated
-    server and client fusion (phase 4) can consume them interchangeably.
+    the server and the clients can use them interchangeably.
     """
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:

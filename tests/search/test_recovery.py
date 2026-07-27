@@ -2,7 +2,7 @@
 
 These pin *quality* (does the search recover something close to the true
 network from forward-sampled data?), not exact Java equivalence -- that is
-Task 8's job. Each threshold below was set by running the test once,
+not this test's job. Each threshold below was set by running it once,
 observing the actual value, and setting the bound just above it (the exact
 observed value is recorded in a comment next to each threshold).
 """
