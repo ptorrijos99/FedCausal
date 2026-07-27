@@ -2,6 +2,8 @@
 
 What each knob does and when to touch it. For the numbers, see [Benchmarks](benchmarks.md).
 
+The federated method is [FedGES](https://doi.org/10.1007/s10994-025-06939-2); the local search is Chickering (2002) greedy equivalence search; the fusion is Puerta et al. (2021) structural consensus.
+
 ## What happens when you call `fit`
 
 `GES` searches over equivalence classes, not individual DAGs. A forward phase adds the highest-scoring valid edge until none improves the score, then a backward phase removes edges the same way. Both re-close the graph to a canonical CPDAG after every step.
@@ -36,13 +38,13 @@ All of them transform the input graphs into one shared topological order, then u
 | `ConsensusUnion()` | Everything | You want maximum recall, and density is not a problem |
 | `Consensus(pct)` | Edges in at least `pct`% of sites | The general-purpose choice; `Consensus(50)` is the server default |
 | `MaxFrequency(k)` | Edges in at least `k` sites | You think in absolute counts rather than percentages |
-| `MaxEdges(k)` | The `k` most-agreed edges | You have a hard budget on total edges |
+| `MaxEdges(k)` | The `k` most-agreed edges | You have a hard budget on total edges. `k` may also be `"Mean"`, `"Max"` or `"Min"` of the inputs' own edge counts |
 | `MaxParents(k)` | Under a per-node cap | You need bounded in-degree for downstream inference |
 | `Intersection()` | Only what every site has | You want maximum precision and can afford to miss edges |
 
 Anything with a `fuse(dags)` method works in their place.
 
-**A caveat on `MaxParents`.** It caps the *source* node's parent count rather than the target's in-degree, which is not what the name suggests. This reproduces FedGES so results stay comparable. If you need a genuine in-degree cap, this is not the operator.
+**A caveat on `MaxParents`.** It caps the *source* node's parent count rather than the target's in-degree, which is not what the name suggests. This reproduces a quirk of the original Java implementation so that published results stay comparable. If you need a genuine in-degree cap, this is not the operator.
 
 ## Convergence criteria
 
