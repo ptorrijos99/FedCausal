@@ -1,79 +1,119 @@
 # Benchmarks
 
-All numbers below are single-threaded, pure Python unless stated, measured on one developer machine. Treat them as orders of magnitude, not specifications.
+Measured on one machine, single-threaded, with the default settings. Treat them as orders of magnitude.
 
-## Does it scale
+## How fast, and how large
 
-The target was roughly a thousand variables, which is where most Python structure learners stop being usable.
+5000 rows per network. Times are search only.
 
-| Network | Variables | Rows | Time | Edges found |
-|---|---:|---:|---:|---:|
-| hepar2 | 70 | 5 000 | ~3 s | |
-| andes | 223 | 5 000 | ~3 min | |
-| pigs | 441 | 5 000 | ~9 min | |
-| link | 724 | 5 000 | ~7 min | |
-| munin | 1 041 | 5 000 | ~25 min | 1 446 |
+| Network | Variables | Seconds | Edges found | SHD | SMHD |
+|---|---:|---:|---:|---:|---:|
+| cancer | 5 | < 0.01 | 3 | 1 | 2 |
+| asia | 8 | < 0.01 | 8 | 3 | 2 |
+| child | 20 | 0.05 | 25 | 2 | 0 |
+| insurance | 27 | 0.12 | 45 | 16 | 18 |
+| water | 32 | 0.13 | 35 | 55 | 81 |
+| mildew | 35 | 0.21 | 33 | 22 | 40 |
+| alarm | 37 | 0.21 | 47 | 10 | 11 |
+| hailfinder | 56 | 0.75 | 66 | 62 | 73 |
+| hepar2 | 70 | 0.74 | 85 | 64 | 66 |
+| win95pts | 76 | 1.41 | 153 | 74 | 117 |
+| pathfinder | 109 | 3.56 | 198 | 237 | 303 |
+| andes | 223 | 14.2 | 366 | 101 | 178 |
+| diabetes | 413 | 86.6 | 613 | 332 | 239 |
+| pigs | 441 | 51.1 | 592 | 0 | 0 |
+| link | 724 | 436 | 1807 | 1628 | 3243 |
+| munin | 1041 | 1073 | 1446 | 1603 | 2453 |
 
-`link` finishing faster than `pigs` is not a typo. Runtime tracks neighbourhood width and edge density more than node count.
+Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 51 s against 87 s.
 
 ## Against causal-learn
 
-Search time in seconds, same data, same machine, both single-threaded:
+The same data through both, same machine.
 
-| Network | Variables | fedcausal | causal-learn |
-|---|---:|---:|---:|
-| child | 20 | 0.12 | 4.32 |
-| insurance | 27 | 0.32 | 12.78 |
-| water | 32 | 0.34 | 8.58 |
-| mildew | 35 | 0.40 | 79.64 |
-| alarm | 37 | 0.57 | 23.07 |
-| hailfinder | 56 | 1.86 | 1 062.46 |
-| hepar2 | 70 | 2.98 | 58.31 |
-| win95pts | 76 | 6.40 | 107.81 |
-| pathfinder | 109 | 22.00 | 575.89 |
-| andes | 223 | 172.15 | >1 800 |
-| diabetes | 413 | 1 465.39 | >1 800 |
-| pigs | 441 | 564.22 | >1 800 |
+| Network | Variables | fedcausal | causal-learn | Ratio |
+|---|---:|---:|---:|---:|
+| cancer | 5 | < 0.01 | 0.06 |  |
+| asia | 8 | < 0.01 | 0.20 |  |
+| child | 20 | 0.05 | 7.45 | 141x |
+| insurance | 27 | 0.12 | 31.8 | 257x |
+| water | 32 | 0.13 | 18.1 | 140x |
+| mildew | 35 | 0.21 | 209 | 985x |
+| alarm | 37 | 0.21 | 52.9 | 251x |
+| hailfinder | 56 | 0.75 | 1459 | 1941x |
+| hepar2 | 70 | 0.74 | 53.2 | 72x |
+| win95pts | 76 | 1.41 | 97.5 | 69x |
+| pathfinder | 109 | 3.56 | 552 | 155x |
+| andes | 223 | 14.2 | > 30 min |  |
+| diabetes | 413 | 86.6 | > 30 min |  |
+| pigs | 441 | 51.1 | > 30 min |  |
+| link | 724 | 436 | not run |  |
+| munin | 1041 | 1073 | not run |  |
 
-causal-learn is 30-40x slower on the small networks and does not finish the large ones within a 30-minute budget. The `hailfinder` figure for fedcausal is with the default `max_t_size=2`; the exhaustive scan takes 24.81 s there and recovers an identical graph, which is why the cap is the default.
+## What federating costs you
 
-## Where the time goes
+Mean SMHD against the true network, over five sampled datasets per cell. Lower is better. The first column learns from everything at once; the rest split the same data across that many sites.
 
-Profiling `link` (724 variables) puts the ranking beyond doubt, even though cProfile inflates absolutes:
+| Network | Variables | Centralised | 5 sites | 10 sites | 20 sites |
+|---|---:|---:|---:|---:|---:|
+| cancer | 5 | 0.6 | 1.8 | 1.8 | 2.6 |
+| asia | 8 | 1.4 | 2.6 | 1.2 | 2.6 |
+| child | 20 | 0.0 | 6.4 | 9.4 | 9.4 |
+| insurance | 27 | 21.6 | 29.0 | 33.8 | 39.0 |
+| alarm | 37 | 11.2 | 11.6 | 8.0 | 12.2 |
+| hepar2 | 70 | 72.2 | 119.6 | 123.8 | 217.8 |
 
-| Function | Calls | Time |
-|---|---:|---:|
-| `is_semidirected_blocked` | 8.26 M | 544 s |
-| set and list churn inside that traversal | ~1.5 B | ~190 s |
-| CPDAG re-closure after each step | 1 951 | ~95 s |
-| the BDeu counting kernel | 2.03 M | 91 s |
+Splitting the same data across more sites costs accuracy, because each site sees less of it. How much depends on the network rather than on its size. The largest cost here is `hepar2`: 72 structural errors learning centrally against 218 across twenty sites. On the smallest networks the gap is a couple of edges either way, which is within the spread between samples.
 
-The bottleneck is graph traversal in the interpreter, not arithmetic. The score cache absorbs about 97% of local-score calls, which is why kernel-level optimisation moves the total so little.
+## What the options buy
 
-Two byte-exact optimisations follow from that profile. Storing the dataset column-major makes the kernel's per-column gathers contiguous, worth 1.64x on the kernel in isolation but only 1.085x end to end, for the reason above. Skipping the path traversal when the na-only check is already blocked exploits its monotonicity in the conditioning set, and cuts calls on `diabetes` by 34.5% (2 238 363 to 1 465 798) for identical output.
+`max_t_size=2`, the default, against the exhaustive scan on `hailfinder`, measured back to back:
 
-The `accel` extra JITs that traversal with numba, worth about 4x on it at 400-700 variables. It is selected automatically above a node-count threshold and returns a bit-identical result either way.
+| | Seconds | Same BDeu |
+|---|---:|---|
+| `max_t_size=2` (default) | 0.53 | |
+| `max_t_size=None` | 4.8 | yes |
 
-## A caveat about wall-clock on this machine
+That is 9x for an identical result on this network. The cap is not free in theory, since it forfeits the optimality guarantee, but it has not changed a recovered structure on anything measured.
 
-The development machine keeps the repository in a OneDrive-synced folder, and the same run varied between 70 s and 100 s across separate invocations. That 40% swing swamps anything smaller than it.
+`incremental=True`, the default, against the full scan:
 
-So the ratios above come from within-process, back-to-back, minimum-of-N comparisons, and the headline for the traversal optimisation is its deterministic call-count reduction, which no amount of disk-sync noise can move. Anything reported as wall-clock across processes is labelled indicative. If you re-run these, do it outside a synced folder.
+| Network | Variables | Incremental | Full scan | Speedup |
+|---|---:|---:|---:|---:|
+| alarm | 37 | 0.22 | 0.5 | 2.3x |
+| hepar2 | 70 | 0.63 | 2.0 | 3.1x |
+| win95pts | 76 | 1.09 | 4.0 | 3.6x |
+| andes | 223 | 7.98 | 71.1 | 8.9x |
+
+Both defaults produce scores identical to the exhaustive, non-incremental search on every network measured. They buy speed and cost nothing. The one option that does cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
+
+The `accel` extra JITs the semi-directed path check, the dominant cost on large graphs. Measured back to back on `link` (724 variables) it is 1.67x end to end, for a bit-identical result. Below a variable-count threshold the pure-Python walk wins and is used instead, so on small networks the extra changes nothing.
+
+## Regenerating this page
+
+The tables above are generated, not written:
+
+```bash
+python benchmarks/build_docs.py
+```
+
+Every number comes from `benchmarks/results/`, so re-running the benchmarks and then this script keeps the page honest. The prose describing each table is derived from it too, so an observation cannot outlive the data behind it.
 
 ## Running them yourself
-
-The harnesses live in `benchmarks/` and assert nothing.
 
 ```bash
 export FEDCAUSAL_NETWORKS=/path/to/networks
 python benchmarks/scale_ges.py                    # the size ladder
-python benchmarks/scale_ges.py --profile link     # cProfile one network
 python benchmarks/compare_ges.py                  # fedcausal vs causal-learn
 python benchmarks/report_ges.py                   # render the results
-python benchmarks/compare_fedges.py               # federated quality vs sites
+python benchmarks/compare_fedges.py               # quality against site count
 python benchmarks/report_fedges.py
 ```
 
-`FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks are available from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/). The five smallest ship with the package under `tests/fixtures/networks/`, but the benchmarks want the larger ones.
+`FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks come from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/); the five smallest ship with the package under `tests/fixtures/networks/`.
 
-`compare_ges.py` runs one subprocess per cell and appends results as they finish, so a hang costs you one cell and the run resumes where it stopped.
+`compare_ges.py` runs one subprocess per cell and appends results as they finish, so a hang costs one cell and the run resumes where it stopped.
+
+## A note on timing
+
+Wall-clock on a machine with a sync client running varied by 40% between invocations of the same job, which is enough to swamp most differences worth measuring. The numbers here were taken with it off, and the ratios come from back-to-back runs in one process. If you re-run these, do it outside a synced folder.

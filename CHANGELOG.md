@@ -8,9 +8,9 @@ First public release.
 
 ### Structure learning
 
-- `GES`, greedy equivalence search over CPDAGs, with an incremental engine that re-scores only the candidate pairs whose neighbourhood changed. Verified byte-identical to the full scan on every benchmark network, and roughly 13x faster at 223 variables.
+- `GES`, greedy equivalence search over CPDAGs, with an incremental engine that re-scores only the candidate pairs whose neighbourhood changed. Verified byte-identical to the full scan on every benchmark network, and 8.9x faster on `andes` at 223 variables.
 - `BDeuScore` with a vectorised counting kernel and a memoised local-score cache.
-- Completes `munin` (1041 variables, 5000 rows) in about 25 minutes, single-threaded and in pure Python. The optional `accel` extra adds numba for roughly 4x on the dominant path check.
+- Completes `munin` (1041 variables, 5000 rows) in about 18 minutes, single-threaded and in pure Python. The optional `accel` extra adds numba, worth 1.67x end to end on `link` at 724 variables.
 
 ### Federation
 

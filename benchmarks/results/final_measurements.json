@@ -114,5 +114,19 @@
       "recorded": 2,
       "now": 2
     }
-  ]
+  ],
+  "incremental_andes": {
+    "n_vars": 223,
+    "incremental_s": 7.98191890004091,
+    "full_scan_s": 71.08060760004446,
+    "speedup": 8.905202933054124,
+    "same_bdeu": true
+  },
+  "numba_link": {
+    "n_vars": 724,
+    "numba_s": 186.98491300013848,
+    "pure_s": 312.14803400007077,
+    "speedup": 1.6693755073161416,
+    "same_bdeu": true
+  }
 }

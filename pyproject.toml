@@ -69,6 +69,8 @@ pydocstyle.convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
+# Embeds the Markdown it generates, which is deliberately not hard-wrapped.
+"benchmarks/build_docs.py" = ["E501"]
 
 [tool.mypy]
 strict = true
