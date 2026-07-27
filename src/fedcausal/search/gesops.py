@@ -57,6 +57,34 @@ __all__ = [
 # is independent of the threshold -- both paths return the identical boolean.
 _NUMBA_MIN_NODES = 50
 
+_REL_TOL = 1e-11
+"""Relative tolerance below which a score difference is treated as exactly zero.
+
+Both operator evaluations subtract two local scores of similar magnitude, so
+the result loses most of the significance the inputs had. The summed ``lgamma``
+terms behind each score contribute rounding of their own, and on a large
+network with wide parent sets the residue reaches tens of ulps: on ``link``,
+differences of 7e-12 were observed between families whose true difference is
+exactly zero, against scores of magnitude 7e3.
+
+An absolute threshold cannot separate that from a real improvement, because the
+noise floor scales with the scores while the threshold does not. Anything below
+this relative tolerance is therefore snapped to zero, which keeps the search
+from inserting edges that only exist in the rounding, and keeps results
+reproducible across platforms whose ``lgamma`` rounds differently.
+
+The bound is many orders of magnitude below any score difference that carries
+information: a meaningful edge moves a log-likelihood by at least a fraction of
+a nat.
+"""
+
+
+def _denoise(delta: float, first: float, second: float) -> float:
+    """Return `delta`, or exactly zero when it is indistinguishable from rounding."""
+    if abs(delta) <= _REL_TOL * max(abs(first), abs(second), 1.0):
+        return 0.0
+    return delta
+
 
 def na_yx(pdag: PDAG, x: int, y: int) -> frozenset[int]:
     """Return `NaYX(x, y)`: undirected neighbours of `y` also adjacent to `x`."""
@@ -159,7 +187,7 @@ def insert_eval(
     base = na | t | pdag.parents_set(y)
     with_x = score.local_score(y, base | {x})
     without_x = score.local_score(y, base)
-    return with_x - without_x
+    return _denoise(with_x - without_x, with_x, without_x)
 
 
 def apply_insert(pdag: PDAG, x: int, y: int, t: frozenset[int]) -> None:
@@ -212,7 +240,7 @@ def delete_eval(
     before = (na - h) | (pdag.parents_set(y) - {x})
     without_x = score.local_score(y, before)
     with_x = score.local_score(y, before | {x})
-    return without_x - with_x
+    return _denoise(without_x - with_x, without_x, with_x)
 
 
 def apply_delete(pdag: PDAG, x: int, y: int, h: frozenset[int]) -> None:
