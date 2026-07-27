@@ -7,7 +7,7 @@ arithmetic is cheap, but the per-step Python-level rescan (validity tests,
 GES on larger graphs (see the profile in ``docs/benchmarks.md``). This module
 keeps a persistent cache of the best improving operator per candidate pair and,
 after each applied operator, re-scores only the pairs whose neighbourhood
-changed. The reference implementation has an equivalent path but does not use it by
+changed. The original Java implementation has an equivalent path but does not use it by
 default, so this is an optimisation over the faithful full scan rather than a
 port of it.
 

@@ -7,7 +7,7 @@ the transformed parent sets -- acyclic by construction because all transformed
 inputs share the one order. The four limited variants rank the transformed
 edges by cross-client frequency and add them under a budget.
 
-The genetic, MinCut, and treewidth-bounded modes of the reference implementation
+The genetic, MinCut, and treewidth-bounded fusion modes
 switch are out of scope for phase 3 (spec §2). Determinism: the edge-frequency
 ranking breaks ties lexicographically by ``(child, parent)``, replacing the reference
 implementation's
@@ -135,7 +135,7 @@ def max_edges(dags: Sequence[DAG], limit: int | str = "Max") -> DAG:
         Input DAGs over the same node set.
     limit : int | str, optional
         The budget: an int, or ``"Mean"``/``"Max"``/``"Min"`` of the
-        transformed inputs' edge counts (the reference implementation). Default
+        transformed inputs' edge counts (as in the original implementation). Default
         ``"Max"``.
 
     Returns
@@ -167,7 +167,7 @@ def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
     """Union every edge appearing in at least `percent`% of inputs.
 
     The threshold is ``lim = percent * len(dags) // 100`` (truncating, exactly
-    as the reference implementation's ``Consensus`` mode), then a frequency filter at ``lim``.
+    as the original ``Consensus`` mode), then a frequency filter at ``lim``.
 
     Parameters
     ----------
@@ -186,22 +186,22 @@ def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
 
 
 def max_parents(dags: Sequence[DAG], limit: int) -> DAG:
-    """Union edges in frequency order under the reference implementation's (buggy) parent cap.
+    """Union edges in frequency order under the original (buggy) parent cap.
 
-    the reference implementation intends to cap each node's in-degree at
+    The operator intends to cap each node's in-degree at
     `limit`,
     but reads ``edge.getNode1()`` as the "child" whenever ``endpoint1`` is
     ``TAIL`` -- which, for a ``TAIL -> ARROW`` arc ``a -> b``, is the *source*
     ``a``. It therefore caps the **source's** parent count, not the target's.
-    This is a real the reference implementation bug; it is replicated verbatim (not fixed) so this
-    fusion matches the reference implementation for the cross-implementation study, and documented
+    This is a real bug in the Java implementation; it is replicated verbatim (not fixed) so this
+    fusion matches published results, and documented
     so
     the divergence from the intended semantics is on record.
     """
     _alpha, transformed = _transform_all(dags)
     out = DAG(dags[0].num_nodes)
     for (parent, child), _count in edge_frequency(transformed):
-        # the reference implementation caps the source's in-degree, not the target's (see above).
+        # Caps the source's in-degree, not the target's, reproducing the original.
         if len(out.parents(parent)) < limit:
             out.add_edge(parent, child)
     return out

@@ -24,7 +24,7 @@ Two behaviours look like bugs and are not. Both :func:`apply_insert` and
 operator's set, whatever edge currently sits between `w` and `y` is replaced
 outright, even one pointing the wrong way. The `x` side of :func:`apply_delete`
 is guarded instead, and only flips `x - w` when no directed edge already exists
-either way. Both match the reference implementation deliberately; see
+either way. Both reproduce the original Java implementation deliberately; see
 ``docs/algorithms.md``.
 """
 

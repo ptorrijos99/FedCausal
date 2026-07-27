@@ -1,7 +1,7 @@
 """XMLBIF (``.xbif``) reader for discrete Bayesian networks.
 
 This module parses the XMLBIF v0.3 dialect produced by SamIam (the format
-used for the ground-truth networks in ``the reference implementation/res/networks``) using only
+used for the ground-truth networks in the standard network repository) using only
 the standard library's :mod:`xml.etree.ElementTree`. It builds a
 :class:`DiscreteBN`: a :class:`~fedcausal.graph.DAG` plus, per variable, its
 declared outcome labels and conditional probability table.

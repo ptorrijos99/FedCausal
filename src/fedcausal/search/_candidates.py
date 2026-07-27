@@ -44,7 +44,7 @@ HPool = Literal["nayx", "bayesfl"]
 
 ``"nayx"`` (default) draws `H` from `NaYX(x, y)`, matching Chickering (2002)
 Definition 13. ``"bayesfl"`` draws it from `T0(x, y)` for compatibility with the
-reference implementation, where the pool is disjoint from `NaYX` and the search
+original Java implementation, where the pool is disjoint from `NaYX` and the search
 therefore only ever applies ``Delete(x, y, empty)``. See ``docs/algorithms.md``.
 """
 

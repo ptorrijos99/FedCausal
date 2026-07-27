@@ -7,7 +7,7 @@ every input DAG, :func:`_compute_next`), prepends it to the order, and peels
 it from every working copy (:func:`_peel`).
 
 Determinism: candidate nodes are scanned in ascending index and ties are kept
-first-seen, so the lowest index wins -- this replaces the reference implementation's ``nodes``-list
+first-seen, so the lowest index wins. This replaces the original's ``nodes``-list
 order, which is the same ascending order. No RNG.
 
 ``_peel`` is a verbatim port of ``AlphaOrder.removeNode``: it reverses each

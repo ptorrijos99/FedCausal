@@ -1,18 +1,12 @@
 """The local structure learner each federated client runs.
 
-A client learns its local model with GES, warm-started from its previous local
-model. After server fusion,
-an optional refinement runs FES/BES on the *edge differences* between the
-pre-fusion and fused models restricting the candidate scan the way the reference implementation
-does.
+A client learns its local model with GES, warm-started from the model it
+produced last round. After the server broadcasts a global structure, an
+optional refinement re-runs FES or BES over just the edges the fused and
+pre-fusion models disagree on, which is far cheaper than a full re-search.
 
-The Python learner scores every model it produces eagerly (build, fuse, refine),
-whereas the reference implementation fills ``BN.score`` lazily in ``saveStats``. This is
-functionally
-equivalent inside the loop: the reference implementation's ``LocalExperiment`` always runs with
-build
-stats on, so the models the convergence criteria inspect always carry their
-BDeu score there too.
+Every model is scored as it is produced, so the convergence criteria always
+have a score to inspect.
 """
 
 from __future__ import annotations

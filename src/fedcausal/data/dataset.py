@@ -74,14 +74,10 @@ class DiscreteDataset:
     documented convention chosen for reproducibility across Python
     clients.
 
-    The reference the reference implementation implementation (built on the reference
-    implementation's
-    ``DiscreteVariable``) assigns level codes based on first-appearance
-    order in its own data loader, which need not match the sorted order
-    used here. Level *indices* are therefore **not** expected to agree
-    between the two implementations — only aggregate quantities computed
-    from those indices (e.g. per-cell contingency-table counts, BDeu
-    sufficient statistics) are required to match, since those are
+    Other tools assign level codes by first appearance instead, so level
+    *indices* are not expected to agree across implementations. Only
+    quantities computed from them (contingency-table counts, BDeu
+    sufficient statistics) need to match, and those are
     invariant to which integer label is assigned to which level.
 
     **Memory layout.** `values` is stored **column-major** (Fortran order)
@@ -292,11 +288,10 @@ class DiscreteDataset:
         (``keep_default_na=False, na_filter=False``), so literal strings
         such as ``"None"``, ``"NA"``, ``"NULL"``, or ``"NaN"`` are read
         back as ordinary category labels rather than being coerced to a
-        missing value — this matters because some reference networks
-        (e.g. ``child``'s ``DuctFlow``, ``insurance``'s ``ThisCarDam``)
-        use ``None`` as a genuine category, exactly as Weka/the reference implementation read
-        it. A field that is empty or contains only whitespace is still
-        treated as genuinely missing data and rejected with a
+        missing value. This matters because some benchmark networks use
+        ``None`` as a genuine level (``child``'s ``DuctFlow``,
+        ``insurance``'s ``ThisCarDam``). A field that is empty or holds
+        only whitespace is still treated as missing and rejected with a
         `ValueError`, since fedcausal requires fully-observed data.
 
         Parameters

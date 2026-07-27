@@ -1,31 +1,51 @@
 cff-version: 1.2.0
-title: "fedcausal: federated causal structure learning for Bayesian networks"
-message: "If you use this software in your research, please cite it."
+title: "fedcausal: federated Bayesian network structure learning"
+message: "If you use this software, please cite the FedGES paper below."
 type: software
 authors:
-  - family-names: "Torrijos Arenas"
+  - family-names: "Torrijos"
     given-names: "Pablo"
     affiliation: "Universidad de Castilla-La Mancha"
 repository-code: "https://github.com/ptorrijos99/fedcausal"
 license: MIT
 version: 0.1.0
 abstract: >-
-  fedcausal learns the structure of a discrete Bayesian network across several
-  sites without moving data between them. Each site runs greedy equivalence
-  search locally, a coordinator combines the resulting graphs by structural
-  consensus fusion, and only graphs and scores cross the network. It runs
-  in-process for experiments and over Flower for deployment.
+  A Python implementation of FedGES, a federated approach to Bayesian network
+  structure learning. Each site runs greedy equivalence search on the data it
+  holds, a coordinator combines the resulting graphs by structural consensus
+  fusion, and only graphs and scores cross the network. Runs in-process for
+  experiments and over Flower for deployment.
 keywords:
   - causal discovery
   - structure learning
   - Bayesian networks
   - federated learning
   - greedy equivalence search
+
+preferred-citation:
+  type: article
+  title: "FedGES: A Federated Learning Approach for Bayesian Network Structure Learning"
+  authors:
+    - family-names: "Torrijos"
+      given-names: "Pablo"
+    - family-names: "Gámez"
+      given-names: "José A."
+    - family-names: "Puerta"
+      given-names: "José M."
+  journal: "Machine Learning"
+  volume: 115
+  issue: 1
+  start: 9
+  year: 2026
+  month: 12
+  doi: "10.1007/s10994-025-06939-2"
+  url: "https://doi.org/10.1007/s10994-025-06939-2"
+
 references:
   - type: article
     title: "Optimal structure identification with greedy search"
     authors:
-      - family-names: Chickering
+      - family-names: "Chickering"
         given-names: "David Maxwell"
     journal: "Journal of Machine Learning Research"
     volume: 3

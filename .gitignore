@@ -13,3 +13,4 @@ dist/
 htmlcov/
 .DS_Store
 *.class
+benchmarks/results/compare_ges_current.jsonl

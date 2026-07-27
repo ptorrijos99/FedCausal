@@ -1,14 +1,14 @@
 """BDeu (Bayesian Dirichlet equivalent uniform) score with a counting cache.
 
-This module ports the reference implementation's ``BdeuScore.localScore`` (tetrad-lib 7.6.5, see
+This module ports Tetrad's ``BdeuScore.localScore`` (tetrad-lib 7.6.5, see
 ``tools/java-golden/reference-src/BdeuScore.java``) to a vectorized NumPy
 kernel, wrapped in :class:`BDeuScore`. It is the numerically critical inner
 loop of GES-style search: at ~1000 variables the local score is evaluated
 millions of times, so a fast counting kernel and a memoizing cache matter.
 
 The score is the log marginal likelihood of a node given its parents under a
-BDeu prior, plus the reference implementation's structure-prior term. Higher is more dependence;
-negative indicates independence (the reference implementation's convention).
+BDeu prior, plus Tetrad's structure-prior term. Higher is more dependence;
+negative indicates independence (Tetrad's convention).
 
 Prior term (ported verbatim from ``BdeuScore.getPriorForStructure``)::
 
@@ -17,7 +17,7 @@ Prior term (ported verbatim from ``BdeuScore.getPriorForStructure``)::
     vm = N - 1                       # N = number of complete rows (== n_rows here)
     return num_parents * log(e / vm) + (vm - num_parents) * log(1 - e / vm)
 
-Note that the reference implementation passes the *row count* ``N`` (not the variable count) as the
+Note that Tetrad passes the *row count* ``N`` (not the variable count) as the
 second argument, so ``vm = n_rows - 1``. Because it depends only on
 ``num_parents`` and the (constant) sample size, the structure-prior term is
 identical for any two parent sets of the same size and therefore cancels in
@@ -76,7 +76,7 @@ def _counts(
     ``lgamma(a_j) - lgamma(a_j) = 0`` to the row term and, per child level,
     ``lgamma(a_jk) - lgamma(a_jk) = 0`` to the cell term, so absent
     configurations add nothing to the likelihood. Summing over the realized
-    configurations alone therefore reproduces the reference implementation's sum over the full
+    configurations alone therefore reproduces the full sum over
     ``q`` configurations exactly. **The caller must still use the full ``q``
     (product of parent cardinalities), not ``q_realized``, when forming the
     Dirichlet pseudocounts** ``a_j = ess / q`` and ``a_jk = ess / (q * r)``.
@@ -115,17 +115,17 @@ class BDeuScore:
 
     The score of
     a family ``(node, parents)`` is the BDeu log marginal likelihood plus
-    the reference implementation's structure-prior term (see the module docstring).
+    Tetrad's structure-prior term (see the module docstring).
 
     Parameters
     ----------
     dataset : DiscreteDataset
         The discrete data to score against.
     sample_prior : float, optional
-        The equivalent sample size (ESS), the reference implementation's ``samplePrior``. Default
+        The equivalent sample size (ESS). Default
         ``1.0``.
     structure_prior : float, optional
-        the reference implementation's ``structurePrior``; ``0.0`` disables the structure-prior
+        Penalises parent count; ``0.0`` disables the structure-prior
         term. Default ``0.0``.
     cache : bool, optional
         If ``True`` (default), memoize local scores keyed by
@@ -133,14 +133,12 @@ class BDeuScore:
 
     Notes
     -----
-    The defaults (``sample_prior=1.0``, ``structure_prior=0.0``) reproduce
-    the reference implementation's *effective* behavior: the reference implementation declares
-    ``structurePrior = 0.001`` and ``samplePrior = 10.0`` on ``Problem`` but
-    never propagates them — it scores through ``new BdeuScore(data)``, i.e.
-    the reference implementation's defaults (verified in ``Problem.java:112`` and
-    ``GESThread.java:480``; the cross-language golden files record these
-    actual values). ``BDeuScore(ds)`` therefore matches the reference implementation
-    results out of the box; pass the priors explicitly for anything else.
+    The defaults reproduce what the original Java implementation actually
+    does. It declares ``structurePrior = 0.001`` and ``samplePrior = 10.0``
+    but never propagates them to the score object, so it scores with Tetrad's
+    own defaults of 1.0 and 0.0. The committed reference outputs record the
+    values actually used, so ``BDeuScore(ds)`` reproduces published results
+    out of the box. Pass the priors explicitly for anything else.
 
     **Full vs. realized configurations.** The counting kernel returns one
     row per *realized* parent configuration, but the Dirichlet pseudocounts
@@ -168,7 +166,7 @@ class BDeuScore:
         self._misses = 0
 
     def _prior_term(self, num_parents: int) -> float:
-        """Return the reference implementation's structure-prior term for ``num_parents`` parents.
+        """Return Tetrad's structure-prior term for ``num_parents`` parents.
 
         Verbatim port of ``BdeuScore.getPriorForStructure`` with ``N`` equal
         to the (constant) number of complete rows, i.e. ``vm = n_rows - 1``.
@@ -196,7 +194,7 @@ class BDeuScore:
             (gammaln(a_jk + n_jk) - gammaln(a_jk)).sum() + (gammaln(a_j) - gammaln(a_j + n_j)).sum()
         )
         score = lik + self._prior_term(len(parents))
-        # Port of the reference implementation's final guard: non-finite scores collapse to NaN.
+        # Final guard: non-finite scores collapse to NaN.
         if not math.isfinite(score):
             return math.nan
         return score

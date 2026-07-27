@@ -1,6 +1,6 @@
 """Undirected graph utilities: moralization, triangulation, cliques, treewidth.
 
-This module ports the junction-tree helpers from the reference implementation
+The junction-tree helpers follow Tetrad
 (``org.albacete.simd.utils.Utils``): moralizing a DAG into an undirected moral
 graph, triangulating it via maximum cardinality search (MCS) and the Tarjan
 and Yannakakis (1984) fill-in algorithm, extracting its maximal cliques, and
@@ -35,7 +35,7 @@ def moralize(dag: DAG) -> np.ndarray:
 
     The moral graph consists of the DAG's skeleton (every directed edge
     becomes undirected) plus an edge between every pair of nodes that share
-    a common child (i.e. every pair of co-parents), mirroring the reference implementation
+    a common child (i.e. every pair of co-parents), mirroring Tetrad
     reference's ``Utils.moralize``.
 
     Parameters
@@ -66,8 +66,8 @@ def mcs_order(adj: np.ndarray) -> list[int]:
 
     Repeatedly selects the unnumbered node adjacent to the most already
     numbered nodes, breaking ties by choosing the lowest node index. This
-    mirrors the reference implementation's ``Utils.getMaximumCardinalityOrdering``,
-    made deterministic per the task's tie-breaking convention (the reference implementation
+    mirrors Tetrad's ``Utils.getMaximumCardinalityOrdering``,
+    made deterministic per the task's tie-breaking convention (Tetrad
     priority-queue implementation does not guarantee a specific tie order).
 
     Parameters
@@ -105,7 +105,7 @@ def fill_in(adj: np.ndarray, order: list[int]) -> np.ndarray:
     Processes nodes in reverse of `order`. For each node `v`, the set of its
     neighbours that appear earlier in `order` is computed, and every
     non-adjacent pair within that set is connected ("filled in"). This
-    mirrors the reference implementation's ``Utils.fillIn``.
+    mirrors Tetrad's ``Utils.fillIn``.
 
     Parameters
     ----------
@@ -145,7 +145,7 @@ def maximal_cliques(adj: np.ndarray, order: list[int]) -> list[frozenset[int]]:
     `order`. On a chordal graph (e.g. the output of :func:`fill_in` with a
     matching ordering), these candidates are exactly the graph's cliques;
     candidates that are subsets of another candidate are discarded, leaving
-    only the maximal cliques. This mirrors the reference implementation's
+    only the maximal cliques. This mirrors Tetrad's
     ``Utils.getCliques``.
 
     Parameters
@@ -196,7 +196,7 @@ def treewidth_java(dag: DAG) -> int:
 
     Moralizes `dag`, triangulates the moral graph (MCS ordering followed by
     fill-in), recomputes an MCS ordering on the triangulated graph, and
-    returns the size of its largest maximal clique. This mirrors the reference implementation
+    returns the size of its largest maximal clique. This mirrors Tetrad
     reference's ``Utils.getTreeWidth`` **exactly**, including its
     off-by-one convention: it returns the maximum clique **size**, not
     ``size - 1``. Use :func:`treewidth` for the standard graph-theoretic

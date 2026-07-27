@@ -1,98 +1,60 @@
 # Validation
 
-How correctness is checked, and where it stops.
+What is checked, so you can decide how much to trust it.
 
-## Regression against committed reference outputs
-
-`tests/regression/` pins behaviour against reference outputs stored as JSON.
-They cover the BDeu score family by family, full search runs, the fusion
-operators, and the graph operations underneath both (SHD, SMHD, moralisation,
-treewidth, CPDAG conversion).
-
-The reference outputs came from the implementation fedcausal was developed
-against. The five networks they need ship with the package as gzipped fixtures,
-so the whole suite runs with no downloads and no environment variables.
-
-Search runs are compared on BDeu, not on raw directed edge sets. A search
-returns one arbitrary member of a Markov equivalence class, so comparing edges
-would be comparing two arbitrary choices. BDeu is identical across every DAG
-extension of a CPDAG, which makes it the quantity that means something. The
-CPDAG itself is compared separately, in CPDAG space.
-
-### The four expected xfails
-
-Two networks fail on purpose, marked `strict` so the suite goes red if they
-ever start passing.
-
-On `child`, fedcausal reaches a strictly better optimum. The reference gates
-each candidate edge on the `T = {}` case before it will consider a non-empty
-`T`; fedcausal enumerates every subset independently. Emulating that gate
-reproduces the reference's result bit for bit, which is what identifies it as
-the cause.
-
-On `alarm`, fedcausal also reaches a better optimum, and the reason is not
-established. What is verified: the reference's returned graph is not a local
-optimum of its own operator, since an admissible `Insert(VENTLUNG, INTUBATION,
-T={})` with delta +749.05 is still available in it, and that delta is exactly
-the reported BDeu gap. Tie-break direction and single-orientation candidate
-sets have been ruled out by experiment. The honest statement is that the cause
-is unknown, and it is recorded that way rather than borrowing `child`'s
-explanation.
-
-In both cases fedcausal's score is higher, not lower, so neither is a defect
-here. Both are counted twice because each is checked at two levels.
-
-## Independent cross-checks
-
-Pinning against one implementation only proves the two agree. Three other
-things are checked.
-
-Recovery tests learn from data forward-sampled out of a known network and
-assert the learned structure is close to it. On `cancer` and `child` the
-recovered CPDAG equals the true one exactly; the others assert bounds on SHD
-and SMHD.
-
-A cross-check against [causal-learn](https://causal-learn.readthedocs.io) runs
-both implementations on the same data and compares. It needs the `compare`
-extra and skips without it.
-
-Property-based tests over randomly generated DAGs assert the invariants the
-fusion operators must satisfy whatever the tie-breaking: the result is acyclic,
-the union contains every input edge in transformed form, and the budgeted
-variants respect their budgets.
-
-## Both transports produce the same models
-
-The strongest claim in the project is that the Flower transport and the
-in-process engine produce identical global models, round by round, for the same
-seed and configuration. `tests/flower/test_transport_equivalence.py` asserts
-exactly that, on `BNModel` equality per round rather than only at the end.
-
-It runs everywhere, not only where Flower's simulation engine installs: the
-loop is driven over a stub grid that routes messages to the real client
-handler in-process. Nothing is faked but the wire. Where Ray is available the
-same check runs again through a genuine simulation, which additionally
-exercises Flower's own serialization.
-
-## What is not validated
-
-The federated loop as a whole is checked against fedcausal's own in-process
-engine, and its pieces are pinned individually, but no end-to-end comparison of
-a full federated run against another implementation exists.
-
-The incremental search engine is validated empirically rather than proven; see
-[Algorithms](algorithms.md).
-
-SHD is not invariant across a Markov equivalence class, so it is asserted as a
-tolerant bound rather than pinned exactly. SMHD is invariant and is pinned.
-
-## Running it
+## Run it yourself
 
 ```bash
-pytest                      # everything self-contained
-pytest -m "not slow"        # skip the long-running tests
-pytest -m regression        # only the reference comparisons
+pip install -e ".[dev,flower]"
+pytest
 ```
 
-`bigdata` tests need networks too large to ship and skip unless
-`FEDCAUSAL_NETWORKS` points at a directory holding them.
+No downloads, no environment variables, no JVM. Everything the tests need ships with the package. Expect 418 passed and 4 xfailed; the xfails are explained below.
+
+## What is checked
+
+| Layer | How |
+|---|---|
+| BDeu score | Every family's local score pinned against reference values |
+| GES search | Full runs pinned on BDeu and on the resulting CPDAG |
+| Fusion operators | Pinned by edge set, plus property tests over random DAGs |
+| Graph operations | SHD, SMHD, moralisation, treewidth, CPDAG conversion all pinned |
+| Structure recovery | Learn from data sampled out of a known network, compare to it |
+| Against causal-learn | Same data through both, results compared |
+| Flower transport | Identical models to the in-process engine, round by round |
+| Incremental engine | Byte-identical to the full scan on every benchmark network |
+
+The transport check is the one worth knowing about. It asserts `BNModel` equality per round rather than only at the end, and it runs on every platform rather than only where Flower's Ray-based simulation installs, because the loop is driven over a stub grid that routes messages to the real client handler in-process. Nothing is faked but the wire.
+
+## Why search runs are compared on score, not on edges
+
+A search returns one arbitrary member of a Markov equivalence class. Comparing directed edge sets would be comparing two arbitrary choices, and would fail for reasons that have nothing to do with correctness.
+
+BDeu is identical across every DAG extension of a CPDAG, so it is the quantity that means something. The CPDAG itself is compared separately, in CPDAG space.
+
+The same reasoning applies to metrics. SMHD moralises both graphs and is invariant across an equivalence class, so it is pinned exactly. SHD is not invariant, so it is asserted as a tolerant bound.
+
+## The four expected xfails
+
+On `child` and `alarm`, fedcausal reaches a strictly *better* optimum than the original Java implementation. Both are marked `strict`, so the suite goes red if that ever stops being true. Each is counted twice because it is checked at two levels.
+
+On `child` the cause is identified: the Java implementation skips a candidate edge unless it already scores positively with an empty neighbour subset, where fedcausal considers every subset. Turning that gate on reproduces the Java result bit for bit, which is what pins the diagnosis.
+
+On `alarm` the cause is not identified, and the tests say so rather than borrowing `child`'s explanation. What is verified is that the Java result is not a local optimum of its own operator: an admissible `Insert(VENTLUNG, INTUBATION, T={})` worth +749.05 remains available in it, which is exactly the score gap. Tie-break direction and single-orientation candidate sets have been ruled out.
+
+In both cases fedcausal scores higher, so neither is a defect here.
+
+## Limits
+
+The incremental search engine is validated empirically rather than proven. Score deltas are local to the two endpoints, but operator validity is not, so equivalence to the full scan is asserted by a differential test on every benchmark network rather than derived. `incremental=False` gives you the exact-by-construction scan.
+
+The federated loop is checked against fedcausal's own in-process engine, and its pieces are pinned individually, but there is no end-to-end comparison of a full federated run against another implementation.
+
+## Test selection
+
+```bash
+pytest -m "not slow"        # skip the long-running ones
+pytest -m regression        # only the pinned comparisons
+```
+
+`bigdata` tests need networks too large to ship and skip unless `FEDCAUSAL_NETWORKS` points at a directory holding them. See [Benchmarks](benchmarks.md).

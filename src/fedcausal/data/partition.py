@@ -3,8 +3,8 @@
 This module splits a :class:`~fedcausal.data.dataset.DiscreteDataset` into
 per-client datasets under two regimes:
 
-- :func:`contiguous_split` — a direct port of the reference implementation's
-  ``BN_DataSet.divideDataSet``: contiguous row blocks in original order.
+- :func:`contiguous_split` — contiguous row blocks in original order, with
+  the block boundaries the original Java implementation uses.
 - :func:`dirichlet_split` — a Dirichlet-distribution-based partitioner for
   simulating non-IID federated clients, either by overall row-count skew
   ("quantity skew") or by skewing the distribution of one variable's
@@ -27,20 +27,18 @@ __all__ = ["contiguous_split", "dirichlet_split"]
 def contiguous_split(ds: DiscreteDataset, n_clients: int) -> list[DiscreteDataset]:
     """Split a dataset into contiguous row blocks, in original order.
 
-    Reproduces the reference implementation's client split
-    exactly: each client receives one contiguous block of rows, and the
-    original row order is preserved both within and across blocks, so
-    concatenating the clients' `values` in client order reproduces the
-    original dataset's rows exactly.
+    Each client receives one contiguous block, and row order is preserved
+    both within and across blocks, so concatenating the clients' `values` in
+    client order rebuilds the original dataset exactly.
 
-    The block boundaries are the reference implementation's: with ``bucketSize = n_rows / N``
-    computed in 32-bit float (as in the reference implementation source), client ``c`` gets
-    rows ``[ceil(c * bucketSize), ceil(c * bucketSize + bucketSize))``,
-    clamped to ``n_rows``. This differs from :func:`numpy.array_split`,
-    which front-loads the larger blocks: for ``n_rows=10, N=4`` the reference implementation gives
-    block sizes ``[3, 2, 3, 2]`` where ``array_split`` gives ``[3, 3, 2, 2]``.
-    Matching the reference implementation here is what makes a client-for-client comparison against
-    the reference implementation meaningful.
+    The boundaries deliberately match the original Java implementation rather
+    than :func:`numpy.array_split`: with ``bucketSize = n_rows / N`` computed
+    in 32-bit float, client ``c`` gets rows
+    ``[ceil(c * bucketSize), ceil(c * bucketSize + bucketSize))`` clamped to
+    ``n_rows``. The two differ in how they distribute the remainder. For
+    ``n_rows=10, N=4`` this gives block sizes ``[3, 2, 3, 2]`` where
+    ``array_split`` gives ``[3, 3, 2, 2]``, and matching it is what makes a
+    client-for-client comparison against published results meaningful.
 
     Parameters
     ----------
@@ -64,8 +62,7 @@ def contiguous_split(ds: DiscreteDataset, n_clients: int) -> list[DiscreteDatase
     if n_clients <= 0:
         raise ValueError(f"n_clients must be positive, got {n_clients}")
     n = ds.n_rows
-    # 32-bit float bucket size, matching the reference implementation's `(float) N` division
-    # exactly.
+    # 32-bit float bucket size, matching the Java `(float) N` division exactly.
     bucket = np.float32(n) / np.float32(n_clients)
     blocks: list[np.ndarray] = []
     for c in range(n_clients):

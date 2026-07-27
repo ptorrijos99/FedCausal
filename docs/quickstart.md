@@ -6,9 +6,7 @@
 pip install git+https://github.com/ptorrijos99/fedcausal
 ```
 
-Nothing else is required. The extras add the Flower transport (`[flower]`),
-numba acceleration for large graphs (`[accel]`), and causal-learn for the
-comparison benchmark (`[compare]`).
+Nothing else is required. The extras add the Flower transport (`[flower]`), numba acceleration for large graphs (`[accel]`), and causal-learn for the comparison benchmark (`[compare]`).
 
 ## Learn a structure from one table
 
@@ -24,10 +22,7 @@ print(cpdag.directed_edges())    # compelled: every DAG in the class agrees
 print(cpdag.undirected_edges())  # reversible: the data cannot tell them apart
 ```
 
-`fit` returns a CPDAG, not a DAG. That distinction matters: an undirected edge
-means the data is genuinely indifferent to the direction, not that the search
-gave up. Call `cpdag.to_dag()` when you need a concrete orientation, and treat
-the choice among reversible edges as arbitrary.
+`fit` returns a CPDAG, not a DAG. That distinction matters: an undirected edge means the data is genuinely indifferent to the direction, not that the search gave up. Call `cpdag.to_dag()` when you need a concrete orientation, and treat the choice among reversible edges as arbitrary.
 
 Nodes are integer indices. Their names live on the dataset:
 
@@ -60,9 +55,7 @@ print(shd(truth, learned), smhd(truth, learned))   # 3 2
 print(edge_scores(truth, learned).f1_skel)         # 0.875
 ```
 
-Prefer SMHD when comparing search results. It moralises both graphs first, so
-it does not punish an arbitrary orientation choice among reversible edges the
-way SHD does. [Benchmarks](benchmarks.md) says more about this.
+Prefer SMHD when comparing search results. It moralises both graphs first, so it does not punish an arbitrary orientation choice among reversible edges the way SHD does. [Benchmarks](benchmarks.md) says more about this.
 
 ## Run the federation in one process
 
@@ -76,9 +69,7 @@ for row in stats:
         print(f"round {row.iteration}: {row.edges} edges, SHD {row.shd}")
 ```
 
-The data is split into five contiguous blocks, each treated as one site's
-private holding. Nothing about the loop assumes the sites are in one process,
-which is what lets the same code run over Flower unchanged.
+The data is split into five contiguous blocks, each treated as one site's private holding. Nothing about the loop assumes the sites are in one process, which is what lets the same code run over Flower unchanged.
 
 ## Change how the sites combine their graphs
 
@@ -96,6 +87,4 @@ global_model, stats = run_fedges(
 
 ## Next
 
-Real data has quirks the synthetic examples do not:
-[Bring your own data](bring-your-own-data.md). Real federations run on more
-than one machine: [Flower deployment](flower-deployment.md).
+Real data has quirks the synthetic examples do not: [Bring your own data](bring-your-own-data.md). Real federations run on more than one machine: [Flower deployment](flower-deployment.md).

@@ -1,6 +1,6 @@
 """Structural distance and edge-recovery metrics for causal structure learning.
 
-The counting rules are pinned to the reference implementation, and are worth
+The counting rules are pinned to the original implementation, and are worth
 stating because several differ from what the names suggest.
 
 **SHD** (:func:`shd`) compares two DAGs' exact directed edge sets -- *not* their
@@ -19,7 +19,7 @@ across a Markov equivalence class, which SHD is not.
 **Skeleton SHD** (:func:`shd_skeleton`) counts undirected adjacency differences.
 
 **Precision, recall, F1** (:func:`edge_scores`) have no counterpart in the
-reference implementation, which never divides. For both the directed and the
+original implementation, which never divides. For both the directed and the
 skeleton group, all three are ``1.0`` when both edge sets are empty (a trivial
 exact match on "no edges"), ``0.0`` when exactly one side is empty, and the
 standard formulas otherwise.
@@ -116,7 +116,7 @@ def shd(g1: DAG, g2: DAG) -> int:
     Counts, per unordered node pair, 0 if the two DAGs agree (same directed
     edge, or neither adjacent), 1 if the pair is an edge in exactly one
     graph, and 1 (not 2) if both graphs have an edge between the pair but in
-    opposite directions. See the module docstring for the reference implementation derivation.
+    opposite directions. See the module docstring for the derivation.
 
     Parameters
     ----------

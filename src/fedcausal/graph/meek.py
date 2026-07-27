@@ -5,17 +5,17 @@ This module implements Chris Meek's (1995) complete orientation rule set
 that keep it Markov-equivalence preserving, plus :func:`dag_to_cpdag`, which
 builds the completed PDAG (pattern) of a DAG.
 
-The rule implementations are ported for fidelity from the reference implementation's
+The rule implementations follow Tetrad's
 ``edu.cmu.tetrad.search.utils.MeekRules`` (see
-``tools/java-golden/reference-src/MeekRules.java``). The the reference implementation
+``tools/java-golden/reference-src/MeekRules.java``). The Java implementation
 ``meekPreventCycles``
 flag defaults to ``false`` in that version, so :func:`apply_meek_rules` performs
 plain orientation without the arbitrary-collider cycle-prevention branch, and
-without the reference implementation's ``revertToUnshieldedColliders`` pre-step (the compelled edges
+without Tetrad's ``revertToUnshieldedColliders`` pre-step (the compelled edges
 we
 orient beforehand in :func:`dag_to_cpdag` must be preserved).
 
-Note on R4: in the reference implementation, rule R4 fires only when background knowledge is present
+Note on R4: in Tetrad, rule R4 fires only when background knowledge is present
 (``useRule4 = !knowledge.isEmpty()``). ``fedcausal`` has no background-knowledge
 mechanism yet, but R4 is ported and kept active here for fidelity; it is a sound
 orientation rule, so enabling it never introduces an incorrect orientation.
@@ -38,10 +38,10 @@ def _common_adjacents(pdag: PDAG, x: int, y: int) -> set[int]:
 
 
 def _direct(pdag: PDAG, a: int, c: int) -> bool:
-    """Orient the undirected edge `a - c` as `a -> c` (the reference implementation ``direct``).
+    """Orient the undirected edge `a - c` as `a -> c`.
 
     Returns ``True`` iff `a - c` was undirected and has now been oriented.
-    Mirrors the reference implementation's ``direct`` with ``meekPreventCycles == false`` and no
+    Mirrors Tetrad's ``direct`` with ``meekPreventCycles == false`` and no
     background knowledge (arrowheads always allowed).
     """
     if not pdag.has_undirected(a, c):
@@ -51,11 +51,7 @@ def _direct(pdag: PDAG, a: int, c: int) -> bool:
 
 
 def _meek_r1(pdag: PDAG, b: int, c: int) -> bool:
-    """Meek R1: if `a -> b`, `b - c`, and `a` not adjacent to `c`, then `b -> c`.
-
-    Ported from the reference implementation ``MeekRules.meekR1`` (``b - c`` is the undirected edge
-    being processed; `a` ranges over the parents of `b`).
-    """
+    """Meek R1: if `a -> b`, `b - c`, and `a` not adjacent to `c`, then `b -> c`."""
     for a in sorted(pdag.parents(b)):
         if a in pdag.adjacent(c):
             continue
@@ -71,7 +67,7 @@ def _r2_helper(pdag: PDAG, a: int, c: int) -> bool:
 def _meek_r2(pdag: PDAG, a: int, c: int) -> bool:
     """Meek R2: if `a -> b -> c` and `a - c`, then `a -> c`.
 
-    Ported from the reference implementation ``MeekRules.meekR2``. Both chain directions through a
+    Both chain directions through a
     common adjacent `b` are checked, so this may orient `a - c` either way.
     """
     oriented = False
@@ -95,11 +91,7 @@ def _r3_helper(pdag: PDAG, a: int, d: int, b: int, c: int) -> bool:
 
 
 def _meek_r3(pdag: PDAG, d: int, a: int) -> bool:
-    """Meek R3: if `d - a`, `d - b`, `d - c`, `b -> a`, `c -> a`, `b` not adj `c`, then `d -> a`.
-
-    Ported from the reference implementation ``MeekRules.meekR3`` (over the common adjacents of `a`
-    and `d`, taking non-adjacent pairs `b`, `c`).
-    """
+    """Meek R3: if `d - a`, `d - b`, `d - c`, `b -> a`, `c -> a`, `b` not adj `c`, then `d -> a`."""
     common = sorted(_common_adjacents(pdag, a, d))
     if len(common) < 2:
         return False
@@ -114,13 +106,13 @@ def _meek_r3(pdag: PDAG, d: int, a: int) -> bool:
 
 
 def _meek_r4(pdag: PDAG, a: int, b: int) -> bool:
-    """Meek R4 (ported verbatim from the reference implementation ``MeekRules.meekR4``).
+    """Meek R4: orient `a -> b` when a directed chain forces it.
 
     Given the undirected edge `a - b`, for each parent `c` of `b` and each
     common adjacent `d` of `a` and `c` (``d != b``) with `d` not adjacent to
     `b`, `d -> c` directed, and `a - d` *not* directed, orient `a -> b`.
 
-    In the reference implementation this rule is gated behind ``useRule4 = !knowledge.isEmpty()``
+    In Tetrad this rule is gated behind ``useRule4 = !knowledge.isEmpty()``
     and
     thus never fires without background knowledge; ``fedcausal`` keeps it active
     for fidelity. R4 is sound, so enabling it cannot mis-orient an edge.
@@ -147,7 +139,7 @@ def apply_meek_rules(pdag: PDAG) -> None:
     """Close `pdag` under Meek's rules R1-R4 in place, to a fixpoint.
 
     Iterates over the undirected edges in sorted order, applying rules R1-R4
-    (each in both endpoint orderings, matching the reference implementation's ``orientImplied``
+    (each in both endpoint orderings, matching Tetrad's ``orientImplied``
     loop),
     and repeats until a full pass orients nothing. Scans are deterministic:
     undirected edges, parent sets, and common-adjacent sets are all traversed in
@@ -161,7 +153,6 @@ def apply_meek_rules(pdag: PDAG) -> None:
 
     Notes
     -----
-    Ported from the reference implementation ``MeekRules.orientImplied`` with
     ``meekPreventCycles == false`` and ``revertToUnshieldedColliders`` disabled
     (callers such as :func:`dag_to_cpdag` orient v-structures beforehand and
     those must be preserved). See the module docstring on R4.
@@ -205,9 +196,9 @@ def dag_to_cpdag(dag: DAG) -> PDAG:
 
     Notes
     -----
-    This mirrors the reference implementation's pattern-from-DAG construction; Task 8 golden tests
+    This mirrors Tetrad's pattern-from-DAG construction; Task 8 golden tests
     pin
-    it against the real the reference implementation output.
+    it against the Java output.
     """
     from fedcausal.graph.pdag import PDAG
 

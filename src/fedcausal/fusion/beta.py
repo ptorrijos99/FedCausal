@@ -8,7 +8,7 @@ bubbling nodes into ``alpha`` order by adjacent swaps, reversing each crossed
 arc and moralizing so that no conditional independence of ``G`` is lost.
 
 Determinism: the sink chosen at each peeling step is the lowest-index ready
-sink, replacing the reference implementation's unordered ``HashSet.iterator().next()``. Documented
+sink, where the original picked an arbitrary element of an unordered set. Documented
 as
 a deliberate substitution; where it can change the intermediate ``beta`` the
 final union (:func:`~fedcausal.fusion.consensus.consensus_union`) is the
@@ -67,7 +67,7 @@ def beta_to_alpha(dag: DAG, order: Sequence[int]) -> DAG:
                 nodej = beta[i]
                 if rank[nodej] > rank[sink]:
                     break
-                if sink in dag.parents(nodej):  # original G, per the reference implementation
+                if sink in dag.parents(nodej):  # the original G, deliberately
                     break
                 if i == len(beta) - 1:
                     break

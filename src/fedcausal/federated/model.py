@@ -1,11 +1,9 @@
 """The unit exchanged in the federated loop: a DAG plus its cached score.
 
-Mirrors the reference implementation's ``bayesfl.model.BN``: two models are equal iff they have the
-same node count and the same set of *directed* edges (``BN.equals``), and the
-hash is taken over that edge set (``BN.hashCode``). The score is metadata only
-and never participates in equality -- exactly as in the reference implementation, where ``BN.score``
-is
-a lazily filled cache.
+Two models are equal iff they have the same node count and the same set of
+directed edges, and the hash is taken over that edge set. The score is metadata
+only and never participates in equality, so a model compares the same however
+it was scored.
 """
 
 from __future__ import annotations

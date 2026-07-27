@@ -1,6 +1,6 @@
 """In-process (single-process) federated structure-learning engine.
 
-A faithful, cleaned-up port of the reference implementation's simulated ``Client``/``Server`` loop:
+Clients learn locally and a coordinator fuses their structures:
 clients learn locally with GES, the server fuses their DAGs with a structural
 :class:`~fedcausal.fusion.FusionOperator`, and convergence criteria stop the
 rounds. See :func:`run_fedges` for the one-call entry point.

@@ -7,7 +7,7 @@ r"""Greedy Equivalence Search: the forward and backward phases, and the ``GES`` 
   Delete.
 
 Both are full scans: they re-score every candidate pair on every step. They are
-the reference implementation, exact by construction. :class:`GES` defaults to
+the reference, exact by construction. :class:`GES` defaults to
 the incremental engine in :mod:`fedcausal.search.incremental`, which is verified
 byte-identical against these and much faster as graphs grow; pass
 ``incremental=False`` to search with these instead.
@@ -219,7 +219,7 @@ class GES:
         Abandon a candidate pair unless it already passes validity and scores
         positively at ``T = {}``. Defaults to `False`: unlike the cap, this
         does cost the optimum, and it is not reliably faster. Provided for
-        compatibility with the reference implementation, not as a recommended
+        compatibility with the original Java implementation, not as a recommended
         setting; see ``docs/algorithms.md``.
     incremental : bool, optional
         **Defaults to `True`.** Use the incremental engine, which re-scores
