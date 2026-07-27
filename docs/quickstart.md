@@ -55,7 +55,7 @@ print(shd(truth, learned), smhd(truth, learned))   # 3 2
 print(edge_scores(truth, learned).f1_skel)         # 0.875
 ```
 
-Prefer SMHD when comparing search results. It moralises both graphs first, so it does not punish an arbitrary orientation choice among reversible edges the way SHD does. [Benchmarks](benchmarks.md) says more about this.
+Prefer SMHD when comparing search results. It moralises both graphs first, so it does not punish an arbitrary orientation choice among reversible edges the way SHD does. [Validation](validation.md) explains why.
 
 ## Run the federation in one process
 
@@ -74,7 +74,7 @@ The data is split into five contiguous blocks, each treated as one site's privat
 ## Change how the sites combine their graphs
 
 ```python
-from fedcausal.fusion import Consensus, MaxParents
+from fedcausal.fusion import MaxParents
 
 global_model, stats = run_fedges(
     data,

@@ -20,8 +20,8 @@ GES(score, h_pool="nayx", max_t_size=2, empty_t_gate=False, incremental=True)
 |---|---|---|---|
 | `max_t_size` | `2` | Caps the size of the neighbour subset the forward phase considers per candidate edge. | You need the optimality guarantee. `None` is Chickering-exact and up to 20x slower on wide-neighbourhood networks. |
 | `incremental` | `True` | Re-scores only the candidate pairs whose neighbourhood changed after each step, instead of everything. | Never, normally. `False` gives the exact-by-construction full scan if you suspect a bug. |
-| `h_pool` | `"nayx"` | Which neighbour set the backward phase draws deletion subsets from. `"nayx"` is Chickering Definition 13. | Reproducing FedGES results exactly. See [compatibility](#compatibility-options). |
-| `empty_t_gate` | `False` | Skips a candidate edge entirely unless it already scores positively with an empty neighbour subset. | Reproducing FedGES results exactly. It costs you the optimum. |
+| `h_pool` | `"nayx"` | Which neighbour set the backward phase draws deletion subsets from. `"nayx"` is Chickering Definition 13. | Matching the original Java implementation bit for bit. See [compatibility](#compatibility-options). |
+| `empty_t_gate` | `False` | Skips a candidate edge entirely unless it already scores positively with an empty neighbour subset. | Matching the original Java implementation. It costs you the optimum. |
 
 **On `max_t_size`.** The cap is the default because on all nine networks measured it produced byte-identical BDeu, edges, SHD, and SMHD to the exhaustive scan, while cutting `hailfinder` from 40.2 s to 1.86 s. In theory any finite cap forfeits Chickering's optimality guarantee, so state which you used in published results.
 
