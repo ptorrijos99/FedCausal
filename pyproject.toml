@@ -28,7 +28,14 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Typing :: Typed",
 ]
-dependencies = ["numpy>=1.24", "scipy>=1.10", "pandas>=2.0"]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "pandas>=2.0",
+  # Pure-Python, dependency-free shim: supplies `typing.Self` on Python 3.10,
+  # where it isn't in the stdlib yet.
+  "typing_extensions>=4.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/ptorrijos99/fedcausal"

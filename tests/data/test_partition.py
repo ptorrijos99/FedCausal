@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fedcausal.data import DiscreteDataset
+from fedcausal.data import ContinuousDataset, DiscreteDataset
 from fedcausal.data.partition import contiguous_split, dirichlet_split
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -199,3 +199,25 @@ def test_dirichlet_split_rejects_out_of_range_by() -> None:
     ds = _synthetic_dataset(n_rows=100)
     with pytest.raises(ValueError):
         dirichlet_split(ds, 3, alpha=1.0, seed=0, by=5)
+
+
+# --------------------------------------------------------------------------
+# ContinuousDataset support
+# --------------------------------------------------------------------------
+
+
+def test_contiguous_split_accepts_continuous():
+    ds = ContinuousDataset.from_arrays(np.arange(30, dtype=float).reshape(10, 3), ["a", "b", "c"])
+    parts = contiguous_split(ds, 3)
+    assert len(parts) == 3
+    assert all(isinstance(p, ContinuousDataset) for p in parts)
+    assert sum(p.n_rows for p in parts) == 10
+    assert all(p.names == ds.names for p in parts)
+
+
+def test_dirichlet_split_accepts_continuous():
+    ds = ContinuousDataset.from_arrays(np.arange(60, dtype=float).reshape(20, 3), ["a", "b", "c"])
+    parts = dirichlet_split(ds, 4, alpha=1.0, seed=0)
+    assert len(parts) == 4
+    assert all(isinstance(p, ContinuousDataset) for p in parts)
+    assert sum(p.n_rows for p in parts) == 20
