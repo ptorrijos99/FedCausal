@@ -20,12 +20,12 @@ GES(score, h_pool="nayx", max_t_size=2, empty_t_gate=False, incremental=True)
 
 | Option | Default | What it does | Change it when |
 |---|---|---|---|
-| `max_t_size` | `2` | Caps the size of the neighbour subset the forward phase considers per candidate edge. | You need the optimality guarantee. `None` is Chickering-exact and roughly 9x slower on `hailfinder`, for an identical result. |
+| `max_t_size` | `2` | Caps the size of the neighbour subset the forward phase considers per candidate edge. | You need the theoretical guarantee. `None` is Chickering-exact and roughly 9x slower on `hailfinder`, for an identical result there and on every other network compared. |
 | `incremental` | `True` | Re-scores only the candidate pairs whose neighbourhood changed after each step, instead of everything. | Never, normally. `False` gives the exact-by-construction full scan if you suspect a bug. |
 | `h_pool` | `"nayx"` | Which neighbour set the backward phase draws deletion subsets from. `"nayx"` is Chickering Definition 13. | Matching the original Java implementation bit for bit. See [compatibility](#compatibility-options). |
 | `empty_t_gate` | `False` | Skips a candidate edge entirely unless it already scores positively with an empty neighbour subset. | Matching the original Java implementation. It costs you the optimum. |
 
-**On `max_t_size`.** The cap is the default because it has produced byte-identical BDeu, edges, SHD, and SMHD to the exhaustive scan everywhere the comparison has been run, which is networks up to 223 variables, while cutting `hailfinder` from 4.8 s to 0.53 s. It has *not* been checked on `link` or `munin`, and any finite cap forfeits Chickering's optimality guarantee in theory, so state which you used in published results. See [Benchmarks](benchmarks.md).
+**On `max_t_size`.** The cap is the default because it has produced byte-identical BDeu, edges, SHD, and SMHD to the exhaustive scan on every network it has been compared on, from `asia` at 8 variables to `link` at 724, while cutting `hailfinder` from 4.8 s to 0.53 s. On `link`, `max_t_size` of 2, 4, and `None` all return the same graph. Any finite cap forfeits Chickering's optimality guarantee in theory, so state which you used in published results.
 
 **On `incremental`.** Verified byte-identical to the full scan on every benchmark network, and worth 2.3x at 37 variables rising to 8.9x at 223. Score deltas are local to the two endpoints, so invalidating pairs around changed nodes keeps every cached delta correct. Operator *validity* is not fully local, which is why this is checked empirically by a differential test rather than proved.
 

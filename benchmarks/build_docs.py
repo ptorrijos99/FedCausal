@@ -193,7 +193,7 @@ def main() -> None:
 
     text = f"""# Benchmarks
 
-Measured on one machine, single-threaded, with the default settings. Treat them as orders of magnitude.
+Measured on one machine, single-threaded, with the default settings. Structures are exact; timings are not, so read them as orders of magnitude and see the note at the end.
 
 ## How fast, and how large
 
@@ -244,6 +244,16 @@ Both defaults produce scores identical to the exhaustive, non-incremental search
 
 {numba_text}
 
+## Structure quality on the largest networks
+
+The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.
+
+On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,714, so the result is 55,000 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
+
+`max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
+
+Two levers help if you work at this scale. A complexity penalty helps most: `structure_prior=1.0` cuts `link` to 855 edges and roughly halves the structural error. Warm-starting from any reasonable prior structure helps too, which is also what the federated loop does for its clients after the first round.
+
 ## Regenerating this page
 
 The tables above are generated, not written:
@@ -271,7 +281,7 @@ python benchmarks/report_fedges.py
 
 ## A note on timing
 
-Wall-clock on a machine with a sync client running varied by 40% between invocations of the same job, which is enough to swamp most differences worth measuring. The numbers here were taken with it off, and the ratios come from back-to-back runs in one process. If you re-run these, do it outside a synced folder.
+Treat the absolute seconds loosely. Repeating the whole ladder on the same machine, with the same code and identical resulting structures, moved individual timings by up to a factor of two, and a sync client running in the background made it worse still. What survives that noise is the ratios, which are taken back to back in one process, and the orders of magnitude. If you re-run these, do it outside a synced folder and compare within a run rather than across runs.
 """
     OUT.write_text(text, encoding="utf-8")
     print("written", OUT, f"({len(text.splitlines())} lines)")
