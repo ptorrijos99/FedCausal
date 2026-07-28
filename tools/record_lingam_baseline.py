@@ -13,6 +13,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -39,6 +40,17 @@ def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> tuple[np.ndarray
 def split(x: np.ndarray, n_clients: int) -> list[np.ndarray]:
     """Contiguous horizontal split, matching the experiments' partitioning."""
     return [part for part in np.array_split(x, n_clients, axis=0)]
+
+
+def digest16(x: np.ndarray) -> str:
+    """Return a 16-hex-char SHA-256 digest of the generated matrix.
+
+    Lets a later regeneration of the same synthetic data (e.g. by a test that
+    reimplements ``make_lingam_data``) prove it produced byte-identical data
+    before comparing solver outputs, instead of silently desyncing the RNG
+    call sequence and failing in a way that looks like a solver bug.
+    """
+    return hashlib.sha256(np.ascontiguousarray(x, dtype=np.float64).tobytes()).hexdigest()[:16]
 
 
 CASES = [
@@ -70,6 +82,7 @@ def main() -> None:
     records = []
     for case in CASES:
         x, _ = make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
+        x_sha16 = digest16(x)
         clients = split(x, case["n_clients"])
         raw = [compute_local_raw_stats(part, order=4) for part in clients]
         stats = aggregate_and_compute_cumulants(raw)
@@ -87,6 +100,7 @@ def main() -> None:
                     "method": method,
                     "causal_order": [int(v) for v in causal_order],
                     "B": np.asarray(b_est, dtype=float).tolist(),
+                    "x_sha16": x_sha16,
                 }
             )
 
