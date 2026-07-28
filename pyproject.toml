@@ -42,8 +42,10 @@ dev = [
   "pytest>=8",
   "pytest-cov",
   "hypothesis>=6",
-  "ruff>=0.5",
-  "mypy>=1.10",
+  # Pinned: the formatter's output changes between minor releases, so an
+  # unpinned range turns a ruff upgrade into a red build nobody asked for.
+  "ruff>=0.16,<0.17",
+  "mypy>=1.10,<3",
   "pandas-stubs>=2.0",
   "pre-commit",
 ]
@@ -93,6 +95,12 @@ ignore_missing_imports = true
 # installed. Its app decorators are untyped, which under `strict` would make
 # every handler they wrap untyped too.
 module = ["flwr.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# numba is the optional `accel` extra, and the lint job deliberately installs
+# neither it nor flwr, so type checking must not depend on either being there.
+module = ["numba.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

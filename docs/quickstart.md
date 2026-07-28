@@ -18,7 +18,7 @@ from fedcausal.search import GES
 data = DiscreteDataset.from_csv("survey.csv")
 cpdag = GES(BDeuScore(data)).fit(data)
 
-print(cpdag.directed_edges())    # compelled: every DAG in the class agrees
+print(cpdag.directed_edges())  # compelled: every DAG in the class agrees
 print(cpdag.undirected_edges())  # reversible: the data cannot tell them apart
 ```
 
@@ -51,8 +51,8 @@ truth = DAG.from_edges(
 )
 
 learned = cpdag.to_dag()
-print(shd(truth, learned), smhd(truth, learned))   # 3 2
-print(edge_scores(truth, learned).f1_skel)         # 0.875
+print(shd(truth, learned), smhd(truth, learned))  # 3 2
+print(edge_scores(truth, learned).f1_skel)  # 0.875
 ```
 
 Prefer SMHD when comparing search results. It moralises both graphs first, so it does not punish an arbitrary orientation choice among reversible edges the way SHD does. [Validation](validation.md) explains why.
@@ -80,8 +80,8 @@ global_model, stats = run_fedges(
     data,
     n_clients=5,
     n_iterations=20,
-    server_fusion=MaxParents(3),   # cap the consensus structure's density
-    refinement="GES",              # re-search the differences after fusing
+    server_fusion=MaxParents(3),  # cap the consensus structure's density
+    refinement="GES",  # re-search the differences after fusing
 )
 ```
 

@@ -47,8 +47,8 @@ from fedcausal.scores import BDeuScore
 from fedcausal.search import GES
 
 data = DiscreteDataset.from_csv("data.csv")
-cpdag = GES(BDeuScore(data)).fit(data)   # a PDAG: the learned CPDAG
-dag = cpdag.to_dag()                     # any member of the equivalence class
+cpdag = GES(BDeuScore(data)).fit(data)  # a PDAG: the learned CPDAG
+dag = cpdag.to_dag()  # any member of the equivalence class
 ```
 
 `fes_only` and `bes_only` run the individual phases. See [docs/algorithms.md](docs/algorithms.md) for what the knobs do and which ones cost you the optimality guarantee.
@@ -58,7 +58,7 @@ dag = cpdag.to_dag()                     # any member of the equivalence class
 ```python
 from fedcausal.fusion import consensus_union, MaxParents
 
-fused = consensus_union(client_dags)      # the full consensus union
+fused = consensus_union(client_dags)  # the full consensus union
 sparse = MaxParents(3).fuse(client_dags)  # a budgeted variant
 ```
 

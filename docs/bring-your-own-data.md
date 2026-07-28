@@ -7,7 +7,7 @@ fedcausal works on fully observed categorical data. No continuous variables, no 
 ```python
 from fedcausal.data import DiscreteDataset
 
-data = DiscreteDataset.from_csv("cohort.csv")     # .csv.gz works too
+data = DiscreteDataset.from_csv("cohort.csv")  # .csv.gz works too
 ```
 
 The file needs a header row of variable names, then comma-separated category labels. Every value is read as a string, so `0` and `1` become the labels `"0"` and `"1"` rather than numbers. That is deliberate: a column coded `1, 2, 3` is a set of three categories, not a quantity, and silently treating it as one would change the score.
@@ -53,7 +53,7 @@ The consequence is that level indices need not match another tool's. Anything co
 ```python
 from fedcausal.data import contiguous_split, dirichlet_split
 
-parts = contiguous_split(data, 5)                    # five contiguous blocks
+parts = contiguous_split(data, 5)  # five contiguous blocks
 parts = dirichlet_split(data, 5, alpha=0.5, seed=0)  # unequal, non-IID sites
 ```
 
