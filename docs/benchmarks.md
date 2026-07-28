@@ -9,23 +9,23 @@ Measured on one machine, single-threaded, with the default settings. Structures 
 | Network | Variables | Seconds | Edges found | SHD | SMHD |
 |---|---:|---:|---:|---:|---:|
 | cancer | 5 | < 0.01 | 3 | 1 | 2 |
-| asia | 8 | < 0.01 | 8 | 3 | 2 |
-| child | 20 | 0.06 | 25 | 2 | 0 |
-| insurance | 27 | 0.13 | 45 | 16 | 18 |
-| water | 32 | 0.14 | 35 | 55 | 81 |
-| mildew | 35 | 0.22 | 33 | 22 | 40 |
-| alarm | 37 | 0.22 | 47 | 10 | 11 |
-| hailfinder | 56 | 0.78 | 66 | 62 | 73 |
-| hepar2 | 70 | 0.85 | 85 | 64 | 66 |
-| win95pts | 76 | 1.42 | 150 | 71 | 106 |
-| pathfinder | 109 | 3.07 | 194 | 233 | 288 |
-| andes | 223 | 8.45 | 366 | 101 | 178 |
-| diabetes | 413 | 60.9 | 613 | 332 | 239 |
-| pigs | 441 | 32.6 | 592 | 0 | 0 |
-| link | 724 | 301 | 1770 | 1591 | 3098 |
-| munin | 1041 | 919 | 1432 | 1591 | 2402 |
+| asia | 8 | < 0.01 | 7 | 2 | 1 |
+| child | 20 | 0.05 | 25 | 2 | 0 |
+| insurance | 27 | 0.12 | 44 | 17 | 19 |
+| water | 32 | 0.11 | 29 | 49 | 91 |
+| mildew | 35 | 0.21 | 33 | 22 | 40 |
+| alarm | 37 | 0.20 | 46 | 10 | 10 |
+| hailfinder | 56 | 0.58 | 59 | 58 | 72 |
+| hepar2 | 70 | 0.69 | 69 | 66 | 75 |
+| win95pts | 76 | 1.03 | 108 | 39 | 53 |
+| pathfinder | 109 | 1.94 | 147 | 196 | 235 |
+| andes | 223 | 6.26 | 285 | 59 | 146 |
+| diabetes | 413 | 57.9 | 583 | 309 | 251 |
+| pigs | 441 | 38.1 | 592 | 0 | 0 |
+| link | 724 | 140 | 855 | 679 | 987 |
+| munin | 1041 | 842 | 977 | 1230 | 1582 |
 
-Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 33 s against 61 s.
+Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 38 s against 58 s.
 
 ## Against causal-learn
 
@@ -35,20 +35,20 @@ The same data through both, same machine.
 |---|---:|---:|---:|---:|
 | cancer | 5 | < 0.01 | 0.06 |  |
 | asia | 8 | < 0.01 | 0.20 |  |
-| child | 20 | 0.06 | 7.45 | 132x |
-| insurance | 27 | 0.13 | 31.8 | 241x |
-| water | 32 | 0.14 | 18.1 | 133x |
-| mildew | 35 | 0.22 | 209 | 950x |
-| alarm | 37 | 0.22 | 52.9 | 243x |
-| hailfinder | 56 | 0.78 | 1459 | 1858x |
-| hepar2 | 70 | 0.85 | 53.2 | 63x |
-| win95pts | 76 | 1.42 | 97.5 | 68x |
-| pathfinder | 109 | 3.07 | 552 | 180x |
-| andes | 223 | 8.45 | > 30 min |  |
-| diabetes | 413 | 60.9 | > 30 min |  |
-| pigs | 441 | 32.6 | > 30 min |  |
-| link | 724 | 301 | not run |  |
-| munin | 1041 | 919 | not run |  |
+| child | 20 | 0.05 | 7.45 | 139x |
+| insurance | 27 | 0.12 | 31.8 | 255x |
+| water | 32 | 0.11 | 18.1 | 159x |
+| mildew | 35 | 0.21 | 209 | 1002x |
+| alarm | 37 | 0.20 | 52.9 | 258x |
+| hailfinder | 56 | 0.58 | 1459 | 2508x |
+| hepar2 | 70 | 0.69 | 53.2 | 78x |
+| win95pts | 76 | 1.03 | 97.5 | 94x |
+| pathfinder | 109 | 1.94 | 552 | 284x |
+| andes | 223 | 6.26 | > 30 min |  |
+| diabetes | 413 | 57.9 | > 30 min |  |
+| pigs | 441 | 38.1 | > 30 min |  |
+| link | 724 | 140 | not run |  |
+| munin | 1041 | 842 | not run |  |
 
 ## What federating costs you
 
