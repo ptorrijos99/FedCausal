@@ -81,7 +81,8 @@ class GESLearner:
     Parameters
     ----------
     sample_prior, structure_prior : float, optional
-        BDeu priors.
+        BDeu priors. Pass ``structure_prior=0.0`` to reproduce published
+        FedGES numbers exactly; see :class:`~fedcausal.scores.BDeuScore`.
     refinement : {"None", "FES", "BES", "GES"}, optional
         Post-fusion refinement stage. Default ``"None"``.
     max_t_size : int or None, optional
@@ -100,7 +101,7 @@ class GESLearner:
     def __init__(
         self,
         sample_prior: float = 1.0,
-        structure_prior: float = 0.0,
+        structure_prior: float = 1.0,
         refinement: Refinement = "None",
         max_t_size: int | None = 2,
         empty_t_gate: bool = False,

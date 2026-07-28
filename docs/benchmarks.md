@@ -10,22 +10,22 @@ Measured on one machine, single-threaded, with the default settings. Structures 
 |---|---:|---:|---:|---:|---:|
 | cancer | 5 | < 0.01 | 3 | 1 | 2 |
 | asia | 8 | < 0.01 | 8 | 3 | 2 |
-| child | 20 | 0.05 | 25 | 2 | 0 |
-| insurance | 27 | 0.12 | 45 | 16 | 18 |
-| water | 32 | 0.13 | 35 | 55 | 81 |
-| mildew | 35 | 0.20 | 33 | 22 | 40 |
-| alarm | 37 | 0.21 | 47 | 10 | 11 |
-| hailfinder | 56 | 0.69 | 66 | 62 | 73 |
-| hepar2 | 70 | 0.76 | 85 | 64 | 66 |
-| win95pts | 76 | 1.30 | 150 | 71 | 106 |
-| pathfinder | 109 | 2.74 | 194 | 233 | 288 |
-| andes | 223 | 7.75 | 366 | 101 | 178 |
-| diabetes | 413 | 55.9 | 613 | 332 | 239 |
-| pigs | 441 | 29.1 | 592 | 0 | 0 |
-| link | 724 | 186 | 1770 | 1591 | 3098 |
+| child | 20 | 0.06 | 25 | 2 | 0 |
+| insurance | 27 | 0.13 | 45 | 16 | 18 |
+| water | 32 | 0.14 | 35 | 55 | 81 |
+| mildew | 35 | 0.22 | 33 | 22 | 40 |
+| alarm | 37 | 0.22 | 47 | 10 | 11 |
+| hailfinder | 56 | 0.78 | 66 | 62 | 73 |
+| hepar2 | 70 | 0.85 | 85 | 64 | 66 |
+| win95pts | 76 | 1.42 | 150 | 71 | 106 |
+| pathfinder | 109 | 3.07 | 194 | 233 | 288 |
+| andes | 223 | 8.45 | 366 | 101 | 178 |
+| diabetes | 413 | 60.9 | 613 | 332 | 239 |
+| pigs | 441 | 32.6 | 592 | 0 | 0 |
+| link | 724 | 301 | 1770 | 1591 | 3098 |
 | munin | 1041 | 919 | 1432 | 1591 | 2402 |
 
-Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 29 s against 56 s.
+Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 33 s against 61 s.
 
 ## Against causal-learn
 
@@ -35,19 +35,19 @@ The same data through both, same machine.
 |---|---:|---:|---:|---:|
 | cancer | 5 | < 0.01 | 0.06 |  |
 | asia | 8 | < 0.01 | 0.20 |  |
-| child | 20 | 0.05 | 7.45 | 141x |
-| insurance | 27 | 0.12 | 31.8 | 255x |
-| water | 32 | 0.13 | 18.1 | 140x |
-| mildew | 35 | 0.20 | 209 | 1022x |
-| alarm | 37 | 0.21 | 52.9 | 258x |
-| hailfinder | 56 | 0.69 | 1459 | 2126x |
-| hepar2 | 70 | 0.76 | 53.2 | 70x |
-| win95pts | 76 | 1.30 | 97.5 | 75x |
-| pathfinder | 109 | 2.74 | 552 | 201x |
-| andes | 223 | 7.75 | > 30 min |  |
-| diabetes | 413 | 55.9 | > 30 min |  |
-| pigs | 441 | 29.1 | > 30 min |  |
-| link | 724 | 186 | not run |  |
+| child | 20 | 0.06 | 7.45 | 132x |
+| insurance | 27 | 0.13 | 31.8 | 241x |
+| water | 32 | 0.14 | 18.1 | 133x |
+| mildew | 35 | 0.22 | 209 | 950x |
+| alarm | 37 | 0.22 | 52.9 | 243x |
+| hailfinder | 56 | 0.78 | 1459 | 1858x |
+| hepar2 | 70 | 0.85 | 53.2 | 63x |
+| win95pts | 76 | 1.42 | 97.5 | 68x |
+| pathfinder | 109 | 3.07 | 552 | 180x |
+| andes | 223 | 8.45 | > 30 min |  |
+| diabetes | 413 | 60.9 | > 30 min |  |
+| pigs | 441 | 32.6 | > 30 min |  |
+| link | 724 | 301 | not run |  |
 | munin | 1041 | 919 | not run |  |
 
 ## What federating costs you
@@ -88,6 +88,18 @@ That is 9x for an identical result on this network. The cap forfeits the optimal
 Both defaults return scores identical to the slower setting everywhere the two have been compared. For `max_t_size` that runs up to `link` at 724 variables, where 2, 4 and `None` all give the same graph. For `incremental` it runs up to `andes` at 223, since a full scan above that is expensive. Neither has been compared on `munin`. The one option known to cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
 
 The `accel` extra JITs the semi-directed path check, the dominant cost on large graphs. Measured back to back on `link` (724 variables) it is 1.67x end to end, for a bit-identical result. Below a variable-count threshold the pure-Python walk wins and is used instead, so on small networks the extra changes nothing.
+
+## Cross-checked against the original implementation
+
+The reference tests pin the search against the original Java implementation on networks up to 37 variables. `link`, at 724, has now been run through both on the same data:
+
+| | Edges | SHD | SMHD | BDeu |
+|---|---:|---:|---:|---:|
+| true structure | 1125 | 0 | 0 | -1,059,715 |
+| BayesFL (Java) | 1779 | 1597 | 3153 | -1,114,310 |
+| fedcausal | 1770 | 1591 | 3098 | -1,114,303 |
+
+The two scores differ by 7 in 1.1 million, and the skeletons share 1666 edges. Both were scored without a structure prior, which is what the Java implementation effectively uses. fedcausal took 186 s against 2900 s.
 
 ## Structure quality on the largest networks
 

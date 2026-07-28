@@ -54,22 +54,29 @@ def test_tolerance_scales_with_the_scores() -> None:
     assert _denoise(1e-9, 1.0, 1.0) == 1e-9
 
 
-def test_a_constant_variable_earns_no_insert() -> None:
-    """A variable with one level carries no information, so no edge to it can pay."""
+@pytest.mark.parametrize("structure_prior", [0.0, 1.0])
+def test_a_constant_variable_earns_no_insert(structure_prior: float) -> None:
+    """A variable with one level carries no information, so no edge to it can pay.
+
+    Without a structure prior the delta is exactly zero, which is what the
+    relative tolerance exists to keep it at. With one it is negative, since the
+    extra parent is penalised and buys nothing. Neither is an improvement.
+    """
     data = _dataset()
-    score = BDeuScore(data)
+    score = BDeuScore(data, structure_prior=structure_prior)
     pdag = PDAG(data.n_vars)
     constant = 3
 
     for other in range(3):
         empty: frozenset[int] = frozenset()
-        assert insert_eval(score, pdag, other, constant, empty, na_yx(pdag, other, constant)) == 0.0
-        assert insert_eval(score, pdag, constant, other, empty, na_yx(pdag, constant, other)) == 0.0
+        assert insert_eval(score, pdag, other, constant, empty, na_yx(pdag, other, constant)) <= 0.0
+        assert insert_eval(score, pdag, constant, other, empty, na_yx(pdag, constant, other)) <= 0.0
 
 
-def test_the_search_leaves_a_constant_isolated() -> None:
+@pytest.mark.parametrize("structure_prior", [0.0, 1.0])
+def test_the_search_leaves_a_constant_isolated(structure_prior: float) -> None:
     data = _dataset()
-    learned = GES(BDeuScore(data)).fit(data).to_dag()
+    learned = GES(BDeuScore(data, structure_prior=structure_prior)).fit(data).to_dag()
 
     constant = 3
     assert not [(u, v) for u, v in learned.edges() if constant in (u, v)]

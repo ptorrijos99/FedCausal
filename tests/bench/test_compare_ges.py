@@ -83,7 +83,16 @@ def test_fedcausal_runner_reproduces_reference() -> None:
     xbif = NETWORKS / "asia.xbif"
 
     proc = subprocess.run(
-        [sys.executable, str(BENCH / "runners" / "run_fedcausal.py"), str(csv), str(xbif), "asia"],
+        [
+            sys.executable,
+            str(BENCH / "runners" / "run_fedcausal.py"),
+            str(csv),
+            str(xbif),
+            "asia",
+            # The reference was produced without a structure prior; the library
+            # default has one, so ask for the configuration being reproduced.
+            "--structure-prior=0.0",
+        ],
         capture_output=True,
         text=True,
         check=True,

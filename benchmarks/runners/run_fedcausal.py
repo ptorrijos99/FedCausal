@@ -7,7 +7,7 @@ BayesFL's incomplete BES; the two are compared in ``bench_ges.py``, not here.)
 
 Usage::
 
-    python benchmarks/runners/run_fedcausal.py <csv> <xbif> <net>
+    python benchmarks/runners/run_fedcausal.py <csv> <xbif> <net> [--structure-prior=X]
 """
 
 from __future__ import annotations
@@ -27,10 +27,16 @@ from fedcausal.search import GES  # noqa: E402
 
 def main(argv: list[str]) -> int:
     """Run GES once on the given CSV and emit the benchmark record."""
+    # A trailing --structure-prior overrides the library default, which the
+    # pipeline test uses to reproduce a reference produced without one.
+    prior: float | None = None
+    if len(argv) > 4 and argv[4].startswith("--structure-prior="):
+        prior = float(argv[4].split("=", 1)[1])
+        argv = argv[:4]
     csv, _xbif, net = parse_args(argv, "run_fedcausal.py")
 
     ds = DiscreteDataset.from_csv(csv)
-    score = BDeuScore(ds)
+    score = BDeuScore(ds) if prior is None else BDeuScore(ds, structure_prior=prior)
 
     start = time.perf_counter()
     cpdag = GES(score, h_pool="nayx").fit(ds)

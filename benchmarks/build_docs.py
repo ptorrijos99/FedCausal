@@ -261,6 +261,18 @@ Both defaults return scores identical to the slower setting everywhere the two h
 
 {numba_text}
 
+## Cross-checked against the original implementation
+
+The reference tests pin the search against the original Java implementation on networks up to 37 variables. `link`, at 724, has now been run through both on the same data:
+
+| | Edges | SHD | SMHD | BDeu |
+|---|---:|---:|---:|---:|
+| true structure | 1125 | 0 | 0 | -1,059,715 |
+| BayesFL (Java) | 1779 | 1597 | 3153 | -1,114,310 |
+| fedcausal | 1770 | 1591 | 3098 | -1,114,303 |
+
+The two scores differ by 7 in 1.1 million, and the skeletons share 1666 edges. Both were scored without a structure prior, which is what the Java implementation effectively uses. fedcausal took 186 s against 2900 s.
+
 ## Structure quality on the largest networks
 
 The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.

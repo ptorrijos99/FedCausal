@@ -34,23 +34,27 @@ NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
 # `max_shd_vs_true_cpdag` measures "how different do the two chosen DAGs
 # happen to look", not purely "how wrong is the learned skeleton/orientation".
 FAST_NETS = {
-    "asia": (5000, 2, 5),  # observed: smhd=1, shd=4
-    "cancer": (5000, 1, 1),  # observed: smhd=0, shd=0
-    "child": (5000, 1, 1),  # observed: smhd=0, shd=0
+    "asia": (5000, 2, 5),  # observed: smhd=1, shd=2
+    "cancer": (5000, 2, 2),  # observed: smhd=2, shd=1
+    "child": (5000, 1, 1),  # observed: smhd=0, shd=2
 }
 SLOW_NETS = {
     "alarm": (5000, 14, 12),  # observed: smhd=13, shd=11
     "insurance": (5000, 24, 24),  # observed: smhd=23, shd=23
 }
 
-# Nets where GES.fit recovers the true CPDAG *exactly* (observed shd=0,
-# smhd=0 above). For these, PDAG.__eq__ gives a strictly stronger, noise-free
-# assertion than max_shd_vs_true_cpdag: comparing the two CPDAGs directly
-# rather than two independently-chosen consistent DAG extensions of them
-# (see the module-level comment on max_shd_vs_true_cpdag's extension-choice
-# noise). asia/alarm/insurance keep only the tolerant SHD/SMHD checks since
-# exact recovery does not hold for them.
-EXACT_RECOVERY_NETS = frozenset({"cancer", "child"})
+# Nets where GES.fit recovers the true CPDAG *exactly*. For these, PDAG.__eq__
+# is a stronger, noise-free assertion than max_shd_vs_true_cpdag, which compares
+# two independently chosen DAG extensions (see the module comment on its
+# extension-choice noise).
+#
+# `cancer` used to be here and no longer is. The default structure prior costs
+# exact recovery on it: five nodes and four edges do not carry enough evidence
+# to outweigh a per-parent penalty, so it now recovers SMHD 2 rather than 0.
+# That is the deliberate trade for large-network quality -- the same default
+# takes win95pts from 125 to 55 and link from 3098 to 987 -- and passing
+# `structure_prior=0.0` restores exact recovery here. See docs/benchmarks.md.
+EXACT_RECOVERY_NETS = frozenset({"child"})
 
 
 def _run_recovery(net: str, n_rows: int, max_smhd: int, max_shd: int) -> None:
