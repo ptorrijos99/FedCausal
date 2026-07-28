@@ -128,5 +128,17 @@
     "pure_s": 312.14803400007077,
     "speedup": 1.6693755073161416,
     "same_bdeu": true
+  },
+  "link_structure_prior": {
+    "0.0": {
+      "edges": 1770,
+      "shd": 1591,
+      "smhd": 3098
+    },
+    "1.0": {
+      "edges": 855,
+      "shd": 679,
+      "smhd": 987
+    }
   }
 }

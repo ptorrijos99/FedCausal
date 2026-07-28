@@ -1,6 +1,6 @@
 # Benchmarks
 
-Measured on one machine, single-threaded, with the default settings. Treat them as orders of magnitude.
+Measured on one machine, single-threaded, with the default settings. Structures are exact; timings are not, so read them as orders of magnitude and see the note at the end.
 
 ## How fast, and how large
 
@@ -13,19 +13,19 @@ Measured on one machine, single-threaded, with the default settings. Treat them 
 | child | 20 | 0.05 | 25 | 2 | 0 |
 | insurance | 27 | 0.12 | 45 | 16 | 18 |
 | water | 32 | 0.13 | 35 | 55 | 81 |
-| mildew | 35 | 0.21 | 33 | 22 | 40 |
+| mildew | 35 | 0.20 | 33 | 22 | 40 |
 | alarm | 37 | 0.21 | 47 | 10 | 11 |
-| hailfinder | 56 | 0.75 | 66 | 62 | 73 |
-| hepar2 | 70 | 0.74 | 85 | 64 | 66 |
-| win95pts | 76 | 1.41 | 153 | 74 | 117 |
-| pathfinder | 109 | 3.56 | 198 | 237 | 303 |
-| andes | 223 | 14.2 | 366 | 101 | 178 |
-| diabetes | 413 | 86.6 | 613 | 332 | 239 |
-| pigs | 441 | 51.1 | 592 | 0 | 0 |
-| link | 724 | 436 | 1807 | 1628 | 3243 |
-| munin | 1041 | 1073 | 1446 | 1603 | 2453 |
+| hailfinder | 56 | 0.69 | 66 | 62 | 73 |
+| hepar2 | 70 | 0.76 | 85 | 64 | 66 |
+| win95pts | 76 | 1.30 | 150 | 71 | 106 |
+| pathfinder | 109 | 2.74 | 194 | 233 | 288 |
+| andes | 223 | 7.75 | 366 | 101 | 178 |
+| diabetes | 413 | 55.9 | 613 | 332 | 239 |
+| pigs | 441 | 29.1 | 592 | 0 | 0 |
+| link | 724 | 186 | 1770 | 1591 | 3098 |
+| munin | 1041 | 919 | 1432 | 1591 | 2402 |
 
-Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 51 s against 87 s.
+Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 29 s against 56 s.
 
 ## Against causal-learn
 
@@ -36,19 +36,19 @@ The same data through both, same machine.
 | cancer | 5 | < 0.01 | 0.06 |  |
 | asia | 8 | < 0.01 | 0.20 |  |
 | child | 20 | 0.05 | 7.45 | 141x |
-| insurance | 27 | 0.12 | 31.8 | 257x |
+| insurance | 27 | 0.12 | 31.8 | 255x |
 | water | 32 | 0.13 | 18.1 | 140x |
-| mildew | 35 | 0.21 | 209 | 985x |
-| alarm | 37 | 0.21 | 52.9 | 251x |
-| hailfinder | 56 | 0.75 | 1459 | 1941x |
-| hepar2 | 70 | 0.74 | 53.2 | 72x |
-| win95pts | 76 | 1.41 | 97.5 | 69x |
-| pathfinder | 109 | 3.56 | 552 | 155x |
-| andes | 223 | 14.2 | > 30 min |  |
-| diabetes | 413 | 86.6 | > 30 min |  |
-| pigs | 441 | 51.1 | > 30 min |  |
-| link | 724 | 436 | not run |  |
-| munin | 1041 | 1073 | not run |  |
+| mildew | 35 | 0.20 | 209 | 1022x |
+| alarm | 37 | 0.21 | 52.9 | 258x |
+| hailfinder | 56 | 0.69 | 1459 | 2126x |
+| hepar2 | 70 | 0.76 | 53.2 | 70x |
+| win95pts | 76 | 1.30 | 97.5 | 75x |
+| pathfinder | 109 | 2.74 | 552 | 201x |
+| andes | 223 | 7.75 | > 30 min |  |
+| diabetes | 413 | 55.9 | > 30 min |  |
+| pigs | 441 | 29.1 | > 30 min |  |
+| link | 724 | 186 | not run |  |
+| munin | 1041 | 919 | not run |  |
 
 ## What federating costs you
 
@@ -74,7 +74,7 @@ Splitting the same data across more sites costs accuracy, because each site sees
 | `max_t_size=2` (default) | 0.53 | |
 | `max_t_size=None` | 4.8 | yes |
 
-That is 9x for an identical result on this network. The cap is not free in theory, since it forfeits the optimality guarantee, but it has not changed a recovered structure on anything measured.
+That is 9x for an identical result on this network. The cap forfeits the optimality guarantee in theory; in practice it has not changed a recovered structure on any network the two have been compared on.
 
 `incremental=True`, the default, against the full scan:
 
@@ -85,9 +85,19 @@ That is 9x for an identical result on this network. The cap is not free in theor
 | win95pts | 76 | 1.09 | 4.0 | 3.6x |
 | andes | 223 | 7.98 | 71.1 | 8.9x |
 
-Both defaults produce scores identical to the exhaustive, non-incremental search everywhere the comparison has been run, which is networks up to 223 variables. Neither has been checked against the exhaustive scan on `link` or `munin`, where a full scan is expensive. The one option known to cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
+Both defaults return scores identical to the slower setting everywhere the two have been compared. For `max_t_size` that runs up to `link` at 724 variables, where 2, 4 and `None` all give the same graph. For `incremental` it runs up to `andes` at 223, since a full scan above that is expensive. Neither has been compared on `munin`. The one option known to cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
 
 The `accel` extra JITs the semi-directed path check, the dominant cost on large graphs. Measured back to back on `link` (724 variables) it is 1.67x end to end, for a bit-identical result. Below a variable-count threshold the pure-Python walk wins and is used instead, so on small networks the extra changes nothing.
+
+## Structure quality on the largest networks
+
+The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.
+
+On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,714, so the result is 55,000 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
+
+`max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
+
+Two levers help if you work at this scale. A complexity penalty helps most: `structure_prior=1.0` takes `link` from 1770 edges to 855, and SMHD from 3098 to 987. Warm-starting from any reasonable prior structure helps too, which is also what the federated loop gives its clients after the first round.
 
 ## Regenerating this page
 
@@ -116,4 +126,4 @@ python benchmarks/report_fedges.py
 
 ## A note on timing
 
-Wall-clock on a machine with a sync client running varied by 40% between invocations of the same job, which is enough to swamp most differences worth measuring. The numbers here were taken with it off, and the ratios come from back-to-back runs in one process. If you re-run these, do it outside a synced folder.
+Treat the absolute seconds loosely. Repeating the whole ladder on the same machine, with the same code and identical resulting structures, moved individual timings by up to a factor of two, and a sync client running in the background made it worse still. What survives that noise is the ratios, which are taken back to back in one process, and the orders of magnitude. If you re-run these, do it outside a synced folder and compare within a run rather than across runs.
