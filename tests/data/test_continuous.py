@@ -24,10 +24,17 @@ def test_rejects_name_count_mismatch():
         ContinuousDataset.from_arrays(np.zeros((4, 3)), ["a", "b"])
 
 
-def test_rejects_non_finite():
-    values = np.array([[1.0, 2.0], [np.nan, 4.0]])
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+def test_rejects_non_finite(bad):
+    values = np.array([[1.0, 2.0], [bad, 4.0]])
     with pytest.raises(ValueError, match="non-finite"):
         ContinuousDataset.from_arrays(values, ["a", "b"])
+
+
+def test_from_pandas_rejects_a_non_numeric_column():
+    df = pd.DataFrame({"x": [1.0, 2.0], "label": ["a", "b"]})
+    with pytest.raises(ValueError, match="'label' is not numeric"):
+        ContinuousDataset.from_pandas(df)
 
 
 def test_subset_shares_names_and_selects_rows():

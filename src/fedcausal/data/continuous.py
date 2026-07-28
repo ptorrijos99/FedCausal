@@ -26,7 +26,7 @@ class ContinuousDataset:
 
     Parameters
     ----------
-    values : numpy.ndarray
+    values : np.ndarray
         Real-valued data, shape ``(n_rows, n_vars)``. Cast to ``float64``.
     names : Sequence[str]
         Variable names, length ``n_vars``. Coerced to an immutable
@@ -34,7 +34,7 @@ class ContinuousDataset:
 
     Attributes
     ----------
-    values : numpy.ndarray
+    values : np.ndarray
         See Parameters.
     names : tuple[str, ...]
         See Parameters.
