@@ -175,6 +175,23 @@ def main() -> None:
             f"finishes in {b['seconds_search']:.0f} s against {a['seconds_search']:.0f} s."
         )
 
+    sp = final.get("link_structure_prior") or {}
+    if sp.get("0.0") and sp.get("1.0"):
+        base, penalised = sp["0.0"], sp["1.0"]
+        prior_note = (
+            f"Two levers help if you work at this scale. A complexity penalty helps most: "
+            f"`structure_prior=1.0` takes `link` from {base['edges']} edges to "
+            f"{penalised['edges']}, and SMHD from {base['smhd']} to {penalised['smhd']}. "
+            f"Warm-starting from any reasonable prior structure helps too, which is also what "
+            f"the federated loop gives its clients after the first round."
+        )
+    else:
+        prior_note = (
+            "Two levers help if you work at this scale: a complexity penalty through "
+            "`structure_prior`, and warm-starting from a prior structure, which is also what "
+            "the federated loop gives its clients after the first round."
+        )
+
     nb = final.get("numba_link") or {}
     if nb.get("speedup"):
         numba_text = (
@@ -252,7 +269,7 @@ On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring
 
 `max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
 
-Two levers help if you work at this scale. A complexity penalty helps most: `structure_prior=1.0` cuts `link` to 855 edges and roughly halves the structural error. Warm-starting from any reasonable prior structure helps too, which is also what the federated loop does for its clients after the first round.
+{prior_note}
 
 ## Regenerating this page
 

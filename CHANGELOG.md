@@ -8,9 +8,10 @@ First public release.
 
 ### Structure learning
 
-- `GES`, greedy equivalence search over CPDAGs, with an incremental engine that re-scores only the candidate pairs whose neighbourhood changed. Verified byte-identical to the full scan on every benchmark network, and 8.9x faster on `andes` at 223 variables.
+- `GES`, greedy equivalence search over CPDAGs, with an incremental engine that re-scores only the candidate pairs whose neighbourhood changed. Byte-identical to the full scan everywhere the two have been compared, and several times faster; see [Benchmarks](docs/benchmarks.md).
 - `BDeuScore` with a vectorised counting kernel and a memoised local-score cache.
-- Completes `munin` (1041 variables, 5000 rows) in about 18 minutes, single-threaded and in pure Python. The optional `accel` extra adds numba, worth 1.67x end to end on `link` at 724 variables.
+- Runs the whole benchmark ladder up to `munin` (1041 variables, 5000 rows), single-threaded and in pure Python. The optional `accel` extra adds numba for the dominant path check on large graphs.
+- Operator score deltas are compared against a tolerance that scales with the scores, so accumulated `lgamma` rounding cannot be mistaken for an improvement. Without it, the search inserted edges that existed only in the rounding on the largest networks, and a platform whose `lgamma` rounded differently would have produced a different graph.
 
 ### Federation
 
