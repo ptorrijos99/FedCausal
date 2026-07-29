@@ -9,6 +9,20 @@ the paper's results. **Do not regenerate it from ported code** — that would ma
 the test compare the port against itself. Regenerate only with
 `tools/record_lingam_baseline.py` pointed at the original repository.
 
+Each case carries eight method records: the four FedRCD-family solvers
+(`fedrcd`, `fedrcd_noniterative`, `ishc` — beta/OLS-deflation ISHC,
+`fedrcd_exact`) and the four comparison baselines (`fedishc` — the published
+alpha-ratio-deflation ISHC, `fedhc`, `hc_lingam`, `hc`). `fedishc` and `fedhc`
+are recorded from `src.fedishc.core.ishc` and `src.fedishc.core.hc`
+(aggregated-stats input, like the FedRCD family); `hc_lingam` and `hc` are
+recorded from `src.hclingam.HCLiNGAM(method='hc-lingam' | 'hc').fit(x)`
+against the **pooled** data matrix directly, since those two are centralised
+and never see a federated aggregation step. `fedhc`'s original — `hc()` with
+its default `iterative=False` — returns `None` for B (the no-deflation
+ablation leaves B estimation to the caller), so that one method's `B` field
+is recorded as `null` and only its `causal_order` is checked against the
+port.
+
 Each record also carries `x_sha16`, a 16-hex-char SHA-256 digest of the full
 generated data matrix (before the client split). A consumer that reimplements
 `make_lingam_data` — for example a test that regenerates these same synthetic

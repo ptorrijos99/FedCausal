@@ -72,12 +72,19 @@ def main() -> None:
         aggregate_and_compute_cumulants,
         compute_local_raw_stats,
     )
+    from src.fedishc.core import hc as fedhc_orig  # noqa: PLC0415
+    from src.fedishc.core import ishc as fedishc_orig  # noqa: PLC0415
     from src.fedrcd.core import (  # noqa: PLC0415
         fedrcd,
         fedrcd_exact,
         fedrcd_noniterative,
-        ishc,
     )
+    from src.fedrcd.core import ishc as ishc_beta_orig  # noqa: PLC0415
+    from src.hclingam.hclingam import HCLiNGAM  # noqa: PLC0415
+
+    # `src.fedrcd.core.ishc` (beta/OLS deflation) and `src.fedishc.core.ishc`
+    # (alpha-ratio deflation) are two different functions that happen to
+    # share a name across modules -- aliased above to keep them apart.
 
     records = []
     for case in CASES:
@@ -97,11 +104,18 @@ def main() -> None:
             for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22")
         }
 
+        # Federated baselines: consume aggregated stats, never raw data.
         for method, order_and_b in [
             ("fedrcd", fedrcd(stats)),
             ("fedrcd_noniterative", fedrcd_noniterative(stats)),
-            ("ishc", ishc(stats)),
+            ("ishc", ishc_beta_orig(stats)),
             ("fedrcd_exact", fedrcd_exact(clients)),
+            ("fedishc", fedishc_orig(stats)),
+            # `fedhc_orig` is `hc()` from fedishc/core.py, called with its
+            # default `iterative=False`. It deliberately returns `None` for
+            # B -- the no-deflation ablation leaves B estimation to the
+            # caller -- so `b_est` is `None` for this one record only.
+            ("fedhc", fedhc_orig(stats)),
         ]:
             causal_order, b_est = order_and_b
             records.append(
@@ -109,7 +123,22 @@ def main() -> None:
                     **case,
                     "method": method,
                     "causal_order": [int(v) for v in causal_order],
-                    "B": np.asarray(b_est, dtype=float).tolist(),
+                    "B": None if b_est is None else np.asarray(b_est, dtype=float).tolist(),
+                    "x_sha16": x_sha16,
+                    "cumulants": cumulants,
+                }
+            )
+
+        # Centralised baselines: consume the pooled data matrix directly,
+        # not the per-client stats -- there is no federated aggregation step.
+        for method, hclingam_method in [("hc_lingam", "hc-lingam"), ("hc", "hc")]:
+            model = HCLiNGAM(method=hclingam_method).fit(x)
+            records.append(
+                {
+                    **case,
+                    "method": method,
+                    "causal_order": [int(v) for v in model.causal_order_],
+                    "B": np.asarray(model.adjacency_matrix_, dtype=float).tolist(),
                     "x_sha16": x_sha16,
                     "cumulants": cumulants,
                 }

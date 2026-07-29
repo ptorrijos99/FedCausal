@@ -12,16 +12,34 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fedcausal.lingam import fedrcd, fedrcd_exact, fedrcd_noniterative, ishc_beta
+from fedcausal.lingam import (
+    fedhc,
+    fedishc,
+    fedrcd,
+    fedrcd_exact,
+    fedrcd_noniterative,
+    hc,
+    hc_lingam,
+    ishc_beta,
+)
 from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "lingam" / "rcd_baseline.json"
 CASES = json.loads(FIXTURE.read_text(encoding="utf-8"))["cases"]
 
+# Federated solvers: consume aggregated cumulant stats.
 SOLVERS = {
     "fedrcd": fedrcd,
     "fedrcd_noniterative": fedrcd_noniterative,
     "ishc": ishc_beta,
+    "fedishc": fedishc,
+    "fedhc": fedhc,
+}
+
+# Centralised solvers: consume the pooled data matrix directly, not stats.
+CENTRALISED_SOLVERS = {
+    "hc_lingam": hc_lingam,
+    "hc": hc,
 }
 
 
@@ -70,16 +88,28 @@ def test_regenerated_data_matches_the_recording(case):
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
 def test_port_reproduces_the_original(case):
-    clients = _clients(case)
-    if case["method"] == "fedrcd_exact":
-        result = fedrcd_exact(clients)
+    method = case["method"]
+    if method == "fedrcd_exact":
+        result = fedrcd_exact(_clients(case))
+    elif method in CENTRALISED_SOLVERS:
+        # hc_lingam/hc work on the pooled data matrix, not aggregated stats.
+        result = CENTRALISED_SOLVERS[method](_data(case))
     else:
         stats = aggregate_and_compute_cumulants(
-            [compute_local_raw_stats(c, order=4) for c in clients]
+            [compute_local_raw_stats(c, order=4) for c in _clients(case)]
         )
-        result = SOLVERS[case["method"]](stats)
+        result = SOLVERS[method](stats)
 
     assert list(result.causal_order) == case["causal_order"]
+
+    if case["B"] is None:
+        # fedhc's original (`hc()` in fedishc/core.py, iterative=False)
+        # returns None for B: the no-deflation ablation deliberately leaves B
+        # estimation to the caller, so there is nothing recorded from the
+        # original to bit-check the port's B against. Only the causal order
+        # is pinned for this method.
+        return
+
     np.testing.assert_allclose(result.b, np.array(case["B"]), rtol=1e-9, atol=1e-9)
 
 
