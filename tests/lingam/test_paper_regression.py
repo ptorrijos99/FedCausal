@@ -81,3 +81,24 @@ def test_port_reproduces_the_original(case):
 
     assert list(result.causal_order) == case["causal_order"]
     np.testing.assert_allclose(result.b, np.array(case["B"]), rtol=1e-9, atol=1e-9)
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
+def test_cumulants_match_the_recording(case):
+    """Pin the aggregated cumulants themselves, not just the order they induce.
+
+    Once the causal order is fixed, ``B`` is re-estimated from ``cov`` alone
+    -- no solver ever reads ``c3``/``c4``/etc. again. So a subtle bias-
+    correction bug in ``cumulants.py`` only shows up in
+    ``test_port_reproduces_the_original`` if it happens to be large enough to
+    flip the tau ranking; a smaller error would pass that gate silently. This
+    test checks the eight aggregated arrays directly, with no regression step
+    in between to absorb a discrepancy.
+    """
+    stats = aggregate_and_compute_cumulants(
+        [compute_local_raw_stats(c, order=4) for c in _clients(case)]
+    )
+    for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22"):
+        np.testing.assert_allclose(
+            stats[key], np.array(case["cumulants"][key]), rtol=1e-12, atol=1e-12
+        )

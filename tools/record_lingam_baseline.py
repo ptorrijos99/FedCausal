@@ -87,6 +87,16 @@ def main() -> None:
         raw = [compute_local_raw_stats(part, order=4) for part in clients]
         stats = aggregate_and_compute_cumulants(raw)
 
+        # Per-case aggregated cumulants, shared by every method record of this
+        # case (same as x_sha16 already is). These pin the values that a
+        # bias-correction bug in cumulants.py could quietly perturb without
+        # ever flipping a causal order -- see
+        # tests/lingam/test_paper_regression.py::test_cumulants_match_the_recording.
+        cumulants = {
+            key: np.asarray(stats[key], dtype=float).tolist()
+            for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22")
+        }
+
         for method, order_and_b in [
             ("fedrcd", fedrcd(stats)),
             ("fedrcd_noniterative", fedrcd_noniterative(stats)),
@@ -101,6 +111,7 @@ def main() -> None:
                     "causal_order": [int(v) for v in causal_order],
                     "B": np.asarray(b_est, dtype=float).tolist(),
                     "x_sha16": x_sha16,
+                    "cumulants": cumulants,
                 }
             )
 
