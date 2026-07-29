@@ -23,8 +23,20 @@ from fedcausal.lingam.cumulants import (
     aggregate_and_compute_cumulants,
     compute_local_raw_stats,
 )
+from fedcausal.lingam.rcd import (
+    RCDResult,
+    fedrcd,
+    fedrcd_exact,
+    fedrcd_noniterative,
+    ishc_beta,
+)
 
 __all__ = [
+    "RCDResult",
     "aggregate_and_compute_cumulants",
     "compute_local_raw_stats",
+    "fedrcd",
+    "fedrcd_exact",
+    "fedrcd_noniterative",
+    "ishc_beta",
 ]
