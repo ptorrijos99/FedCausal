@@ -78,3 +78,11 @@ def test_third_order_only_stats_still_work():
     clients = _skewed_chain_clients(5)
     stats = aggregate_and_compute_cumulants([compute_local_raw_stats(c, order=3) for c in clients])
     assert fedrcd(stats).causal_order == (0, 1, 2, 3)
+
+
+def test_missing_n_raises_key_error_in_the_lasso_path():
+    """A silent 1000-sample default would quietly mis-scale the Lasso penalty."""
+    stats = dict(_stats(_chain_clients(6)))
+    del stats["n"]
+    with pytest.raises(KeyError, match="stats is missing 'n'"):
+        fedrcd(stats, use_lasso=True)

@@ -156,6 +156,15 @@ def fedrcd(
     c12 = np.array(stats["c12"], dtype=float).copy()
     c21 = np.array(stats["c21"], dtype=float).copy()
 
+    # Bound unconditionally so they are never possibly-undefined below, even
+    # though they are only ever read when `has_4th` (equivalently `use_4th`,
+    # which mirrors it) is True. The `if has_4th:` block overwrites these with
+    # the real values; the shape here is irrelevant since it is never read.
+    c4 = np.zeros(0, dtype=np.float64)
+    c13 = np.zeros((0, 0), dtype=np.float64)
+    c31 = np.zeros((0, 0), dtype=np.float64)
+    c22 = np.zeros((0, 0), dtype=np.float64)
+
     has_4th = "c4" in stats
     if has_4th:
         c4 = np.array(stats["c4"], dtype=float).copy()
