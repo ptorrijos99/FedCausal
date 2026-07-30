@@ -170,6 +170,31 @@ def test_disagreeing_schemas_are_rejected() -> None:
         run_rcd_server_loop(grid, n_clients=2)  # type: ignore[arg-type]
 
 
+def test_same_names_different_order_is_rejected() -> None:
+    """The case `_check_schemas` exists for -- and the one the other test above misses.
+
+    A count mismatch (3 vs 4 variables, see `test_disagreeing_schemas_are_rejected`) is
+    caught incidentally by numpy's broadcasting rules inside
+    `aggregate_and_compute_cumulants` even with no schema check at all: the moment-sum
+    arrays have mismatched shapes and something raises regardless.
+
+    Same names, same count, different order is different: every array has an identical
+    shape on both clients, so nothing raises on its own. Without `_check_schemas`, the
+    server would silently aggregate cumulants across columns that mean different things
+    on different clients, and hand back a confident, meaningless causal order. This is
+    the only scenario where removing the check would corrupt the result instead of
+    raising -- so it is the one that actually needs a test.
+    """
+    rng = np.random.default_rng(0)
+    values = rng.normal(size=(500, 3))
+    forward = ContinuousDataset.from_arrays(values, ["a", "b", "c"])
+    swapped = ContinuousDataset.from_arrays(values[:, [1, 0, 2]], ["b", "a", "c"])
+    grid = _StubGrid([lambda _ctx: forward, lambda _ctx: swapped])  # type: ignore[list-item]
+
+    with pytest.raises(SchemaMismatchError, match="disagree on their variables"):
+        run_rcd_server_loop(grid, n_clients=2)  # type: ignore[arg-type]
+
+
 def test_a_failed_client_stops_the_run() -> None:
     """A dropout must not quietly shrink the ensemble the solver sees."""
     data = _chain_dataset(0)
