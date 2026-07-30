@@ -141,18 +141,18 @@ If you use fedcausal, cite the FedGES paper:
 
 If you use FedRCD specifically, also cite the PGM paper it comes from:
 
-> Torrijos, P., et al. Federated Causal Discovery via Regression-Directed Cumulants. Probabilistic Graphical Models (PGM), 2026.
+> Torrijos, P., Stella, F., Gámez, J.A. & Puerta, J.M. Federated Causal Discovery via Regression-Directed Cumulants. Probabilistic Graphical Models (PGM), 2026.
 
 ```bibtex
 @inproceedings{torrijos2026fedrcd,
   title     = {Federated Causal Discovery via Regression-Directed Cumulants},
-  author    = {Torrijos, Pablo and others},
+  author    = {Torrijos, Pablo and Stella, Fabio and G{\'a}mez, Jos{\'e} A. and Puerta, Jos{\'e} M.},
   booktitle = {Probabilistic Graphical Models (PGM)},
   year      = {2026},
 }
 ```
 
-The full author list, page numbers, and DOI are not yet final at the time of writing; `author = {Torrijos, Pablo and others}` and the missing BibTeX fields will be filled in once the camera-ready is out.
+The proceedings are not out yet, so pages, volume and DOI are still missing from this entry.
 
 ## Credits
 

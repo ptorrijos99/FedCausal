@@ -56,6 +56,12 @@ references:
     authors:
       - family-names: "Torrijos"
         given-names: "Pablo"
+      - family-names: "Stella"
+        given-names: "Fabio"
+      - family-names: "Gámez"
+        given-names: "José A."
+      - family-names: "Puerta"
+        given-names: "José M."
     conference:
       name: "Probabilistic Graphical Models (PGM)"
     year: 2026
