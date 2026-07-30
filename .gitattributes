@@ -1,0 +1,12 @@
+# LF in the repository and in every working tree, whatever the platform. The
+# history was a mix of both before this file existed, which turned an edit made
+# on Windows into a whole-file diff.
+* text=auto eol=lf
+
+# Not text, whatever the content sniffer decides.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.gz binary
+*.zip binary
+*.bundle binary
