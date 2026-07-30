@@ -20,6 +20,10 @@ without it; those two rows are silently skipped if the package is not importable
 of the original experiment suite (real-graph structures, plotting) that this port does
 not include -- see "What this port leaves out" below.
 
+## Reproduction: client splits are not bit-identical to the paper's
+
+`data.py` splits each generated dataset across clients with `fedcausal.data.contiguous_split` (deterministic, order-preserving blocks), whereas the original experiment code shuffled the rows with `rng.permutation` before splitting them into contiguous chunks. For freshly generated i.i.d. rows the two are statistically equivalent -- which client gets which row does not change the joint distribution any client's cumulant estimator sees -- but it does mean that a run of this port with the same seed as a run of the original will not produce the same per-client statistics, and therefore not bit-identical results. Aggregate results (the numbers `main` and `stratification` report, averaged over seeds) should match; individual seed-level rows will not.
+
 ## Modes
 
 **`main`** -- the paper's Table 1. A grid of `p in {10, 20, 30, 50}` variables x

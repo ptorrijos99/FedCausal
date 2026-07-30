@@ -70,6 +70,8 @@ jobs:
       - run: pip install -e .
       - run: python examples/01_learn_structure.py
       - run: python examples/02_fedges_inprocess.py
+      - run: python examples/03_fedrcd.py
+      - run: python benchmarks/pgm26/benchmark.py --mode main --quick --out /tmp/pgm26.jsonl
 
   build:
     runs-on: ubuntu-latest
