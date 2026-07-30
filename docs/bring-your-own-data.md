@@ -59,7 +59,7 @@ parts = dirichlet_split(data, 5, alpha=0.5, seed=0)  # unequal, non-IID sites
 
 `contiguous_split` keeps rows in their original order and slices them into blocks, which is the honest default when rows are already unordered. `dirichlet_split` draws site sizes from a Dirichlet distribution, so a low `alpha` gives you a few large sites and several small ones. Use that when you want to know how the method behaves under imbalance.
 
-Both are for experiments. In a real deployment each site already has its own data and you never split anything; see [Flower deployment](flower-deployment.md).
+Both are for experiments. In a real deployment each site already has its own data and you never split anything; see [Deployment](deployment.md).
 
 ## What every site must agree on
 

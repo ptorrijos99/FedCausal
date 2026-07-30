@@ -125,21 +125,6 @@ markers = [
   "bigdata: needs large networks not shipped with the package; set FEDCAUSAL_NETWORKS",
 ]
 
-# --- Flower app config (`flwr run .`; needs the `flower-simulation` extra) ---
-# Keep `num-clients` and `options.num-supernodes` below in step.
-[tool.flwr.app]
-publisher = "pablotorrijos"
-
-[tool.flwr.app.components]
-serverapp = "fedcausal.flower.example:server_app"
-clientapp = "fedcausal.flower.example:client_app"
-
-[tool.flwr.app.config]
-num-server-rounds = 5
-num-clients = 5
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 5
+# The Flower app lives in examples/flower_app/, with its own pyproject: `flwr
+# run examples/flower_app`. A library has no business shipping a `[tool.flwr]`
+# block of its own.

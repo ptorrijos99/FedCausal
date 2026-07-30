@@ -60,7 +60,7 @@ Prefer SMHD when comparing search results. It moralises both graphs first, so it
 ## Run the federation in one process
 
 ```python
-from fedcausal.federated import run_fedges
+from fedcausal.fedges import run_fedges
 
 global_model, stats = run_fedges(data, n_clients=5, n_iterations=20, truth=truth)
 
@@ -87,4 +87,4 @@ global_model, stats = run_fedges(
 
 ## Next
 
-Real data has quirks the synthetic examples do not: [Bring your own data](bring-your-own-data.md). Real federations run on more than one machine: [Flower deployment](flower-deployment.md).
+Real data has quirks the synthetic examples do not: [Bring your own data](bring-your-own-data.md). Real federations run on more than one machine: [Deployment](deployment.md).

@@ -13,20 +13,20 @@ First public release.
 - Runs the whole benchmark ladder up to `munin` (1041 variables, 5000 rows), single-threaded and in pure Python. The optional `accel` extra adds numba for the dominant path check on large graphs.
 - Operator score deltas are compared against a tolerance that scales with the scores, so accumulated `lgamma` rounding cannot be mistaken for an improvement. Without it, the search inserted edges that existed only in the rounding on the largest networks, and a platform whose `lgamma` rounded differently would have produced a different graph.
 
-### Federation
+### `fedcausal.fedges`
 
-- `run_fedges` runs the whole loop on one dataset. `Client`, `Server`, and `GESLearner` are available for finer control.
+- `run_fedges` runs the whole FedGES loop on one dataset. `Client`, `Server`, and `GESLearner` are available for finer control.
 - Five convergence criteria, composable through `MultipleConvergence`.
 - Structural fusion following Puerta et al. (2021): the consensus union plus the budgeted variants `MaxEdges`, `MaxFrequency`, `Consensus`, `MaxParents`, and `Intersection`.
 - The loop is transport-agnostic. The server holds no client data, scores are reported by the site that computed them, and evaluation happens outside the loop through an observer.
 
-### Flower
+### `fedcausal.flower`
 
-- `ClientApp` and `ServerApp` on the Message API, supporting both simulation and deployment against a real SuperLink.
-- Where a client's data comes from is a seam: `NodeConfigLoader` reads one shard from the supernode's own config, `InMemoryPartitions` indexes a list for simulation, and anything matching `PartitionLoader` works in their place.
+- `ClientApp` and `ServerApp` on the Message API for both method families, in simulation and deployed against a real SuperLink. One module per family over shared plumbing, so a third one is a module rather than a second transport.
+- Where a client's data comes from is a seam: `NodeConfigLoader` reads one shard from the supernode's own config, `InMemoryPartitions` indexes a list for simulation, and anything matching `PartitionLoader` works in their place. All of them are generic over the dataset type.
 - Clients report a schema fingerprint and the server refuses a federation whose members disagree on their variables.
 - A failed client aborts the round rather than silently shrinking the ensemble; `min_clients` opts into tolerating dropouts.
-- Both transports are asserted to produce identical global models round by round.
+- Both transports are asserted to produce identical results to the in-process ones, round by round.
 
 ### Graphs, data, and metrics
 
@@ -42,5 +42,5 @@ First public release.
 - The FedRCD family, for continuous data under a linear non-Gaussian (LiNGAM) model: `fedrcd`, `fedrcd_noniterative`, and `fedrcd_exact` recover a causal order and coefficient matrix from cumulant statistics rather than raw rows. `fedrcd` and `fedrcd_noniterative` need one communication round; `fedrcd_exact` runs `p - 1` rounds of exact deflation to avoid the algebraic error the one-shot solvers can accumulate under finite samples. `ishc_beta` is a related third-order-only variant.
 - `compute_local_raw_stats` and `aggregate_and_compute_cumulants`: the client-side and server-side halves of the statistics exchange. Nine additive moment-sum arrays per client cross the network, never a row of data.
 - `fedishc`, `fedhc` (Chen et al.'s FedISHC baselines) and `hc_lingam`, `hc` (Chen et al.'s centralised HC-LiNGAM baselines), ported for comparison in the PGM 2026 benchmark.
-- A Flower transport in `fedcausal.lingam.flower`, requiring the `flower` extra but not otherwise imported by the subpackage, so `fedcausal.lingam` itself needs only numpy and scipy.
+- Every solver is a pure function of the aggregated statistics, so `fedcausal.lingam` itself needs only numpy and scipy. Its Flower transport is `fedcausal.flower.lingam`, under the `flower` extra.
 - See [FedRCD](docs/fedrcd.md) and [`benchmarks/pgm26/`](benchmarks/pgm26/README.md).

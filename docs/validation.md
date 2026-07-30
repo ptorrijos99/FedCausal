@@ -21,10 +21,11 @@ No downloads, no environment variables, no JVM. Everything the tests need ships 
 | Graph operations | SHD, SMHD, moralisation, treewidth, CPDAG conversion all pinned |
 | Structure recovery | Learn from data sampled out of a known network, compare to it |
 | Against causal-learn | Same data through both, results compared |
-| Flower transport | Identical models to the in-process engine, round by round |
+| FedRCD solvers | Pinned against the original FedLiNGAM implementation's recorded output |
+| Flower transports | Identical results to the in-process code, round by round, for both families |
 | Incremental engine | Byte-identical to the full scan on every benchmark network |
 
-The transport check is the one worth knowing about. It asserts `BNModel` equality per round rather than only at the end, and it runs on every platform rather than only where Flower's Ray-based simulation installs, because the loop is driven over a stub grid that routes messages to the real client handler in-process. Nothing is faked but the wire.
+The transport check is the one worth knowing about. For FedGES it asserts `BNModel` equality per round rather than only at the end; for the FedRCD family it asserts the same causal order and coefficient matrix to 1e-12. Both run on every platform rather than only where Flower's Ray-based simulation installs, because the loops are driven over a stub grid that routes messages to the real client handlers in-process. Nothing is faked but the wire.
 
 ## Why search runs are compared on score, not on edges
 

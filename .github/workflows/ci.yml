@@ -67,11 +67,15 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: pip install -e .
+      - run: pip install -e ".[flower]"
       - run: python examples/01_learn_structure.py
       - run: python examples/02_fedges_inprocess.py
       - run: python examples/03_fedrcd.py
       - run: python benchmarks/pgm26/benchmark.py --mode main --quick --out /tmp/pgm26.jsonl
+      # The README points people at this app, so a wiring mistake in it should
+      # be a red build rather than something they discover.
+      - run: python -c "import fedcausal_site.app"
+        working-directory: examples/flower_app
 
   build:
     runs-on: ubuntu-latest

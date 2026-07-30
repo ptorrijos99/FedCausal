@@ -6,14 +6,11 @@ that keep it Markov-equivalence preserving, plus :func:`dag_to_cpdag`, which
 builds the completed PDAG (pattern) of a DAG.
 
 The rule implementations follow Tetrad's
-``edu.cmu.tetrad.search.utils.MeekRules`` (see
-``tools/java-golden/reference-src/MeekRules.java``). The Java implementation
-``meekPreventCycles``
-flag defaults to ``false`` in that version, so :func:`apply_meek_rules` performs
-plain orientation without the arbitrary-collider cycle-prevention branch, and
-without Tetrad's ``revertToUnshieldedColliders`` pre-step (the compelled edges
-we
-orient beforehand in :func:`dag_to_cpdag` must be preserved).
+``edu.cmu.tetrad.search.utils.MeekRules``. Its ``meekPreventCycles`` flag
+defaults to ``false`` there, so :func:`apply_meek_rules` performs plain
+orientation without the arbitrary-collider cycle-prevention branch, and without
+Tetrad's ``revertToUnshieldedColliders`` pre-step, since the compelled edges
+:func:`dag_to_cpdag` orients beforehand must be preserved.
 
 Note on R4: in Tetrad, rule R4 fires only when background knowledge is present
 (``useRule4 = !knowledge.isEmpty()``). ``fedcausal`` has no background-knowledge

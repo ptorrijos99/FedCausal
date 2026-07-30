@@ -1,8 +1,7 @@
 """BDeu (Bayesian Dirichlet equivalent uniform) score with a counting cache.
 
-This module ports Tetrad's ``BdeuScore.localScore`` (tetrad-lib 7.6.5, see
-``tools/java-golden/reference-src/BdeuScore.java``) to a vectorized NumPy
-kernel, wrapped in :class:`BDeuScore`. It is the numerically critical inner
+This module ports Tetrad's ``BdeuScore.localScore`` (tetrad-lib 7.6.5) to a
+vectorized NumPy kernel, wrapped in :class:`BDeuScore`. It is the critical inner
 loop of GES-style search: at ~1000 variables the local score is evaluated
 millions of times, so a fast counting kernel and a memoizing cache matter.
 

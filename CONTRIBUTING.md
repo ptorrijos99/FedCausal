@@ -41,6 +41,10 @@ If you do report timings, take them within one process, back to back, minimum of
 
 Any change to the search must keep the incremental engine byte-identical to the full scan. `tests/search/test_incremental.py` checks that; do not weaken it.
 
+## Adding a method
+
+`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`; `tests/flower/test_lingam_oneshot.py` has the check that keeps it that way.
+
 ## Style
 
 Ruff handles formatting and import order, so do not argue with it.

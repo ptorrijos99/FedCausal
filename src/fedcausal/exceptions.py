@@ -35,7 +35,7 @@ class ConvergedBeforeFusionError(FedCausalError):
     Raised when the convergence criterion fires on the first round, or when the
     iteration budget is exhausted without a fusion, leaving no global model to
     return. The built-in criteria never converge on a first sighting, so this
-    normally points at a custom :class:`~fedcausal.federated.Convergence`.
+    normally points at a custom :class:`~fedcausal.fedges.Convergence`.
     """
 
 

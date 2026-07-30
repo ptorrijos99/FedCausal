@@ -46,7 +46,7 @@ CENTRALISED_SOLVERS = {
 def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> np.ndarray:
     """Regenerate a recorded problem.
 
-    This must reproduce ``tools/record_lingam_baseline.py``'s generator exactly.
+    This must reproduce ``tests/fixtures/lingam/record_baseline.py``'s generator exactly.
     The RNG is stateful, so the *sequence* of draws is what matters: one
     ``rng.random()`` per (child, parent) pair, followed by ``rng.uniform`` then
     ``rng.choice`` only when that draw is below 0.5, and a single ``rng.laplace``

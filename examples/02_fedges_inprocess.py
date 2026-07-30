@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fedcausal.data import DiscreteDataset
-from fedcausal.federated import run_fedges
+from fedcausal.fedges import run_fedges
 from fedcausal.graph import DAG
 from fedcausal.io import load_xbif
 from fedcausal.metrics import shd, smhd

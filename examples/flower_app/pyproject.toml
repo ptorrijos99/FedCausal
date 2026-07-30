@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fedcausal-site"
+version = "0.1.0"
+description = "A fedcausal federation, in simulation or across real machines"
+requires-python = ">=3.10"
+dependencies = ["fedcausal[flower]>=0.1.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["fedcausal_site"]
+
+[tool.flwr.app]
+publisher = "example"
+
+[tool.flwr.app.components]
+serverapp = "fedcausal_site.app:app_server"
+clientapp = "fedcausal_site.app:app_client"
+
+[tool.flwr.app.config]
+# "fedges" learns a Bayesian network structure from discrete data; "fedrcd"
+# recovers a causal order and coefficient matrix from continuous data.
+algorithm = "fedges"
+num-clients = 3
+# FedGES only. How many build/fuse rounds, and how many variables the sites
+# hold -- the server needs the count to rebuild the graphs it is sent.
+num-server-rounds = 5
+num-variables = 4
+# FedRCD only. "fedrcd" is the default one-shot solver; "fedrcd_noniterative",
+# "ishc_beta", "fedishc" and "fedhc" are its one-shot siblings, and
+# "fedrcd_exact" runs p - 1 communication rounds instead of one.
+solver = "fedrcd"
+result-path = "rcd_result.json"
+# Leave unset to require every site each round. Set it to tolerate dropouts.
+# min-clients = 2
+
+[tool.flwr.federations]
+default = "local-simulation"
+
+# Every site in one process, on synthetic data. Needs Flower's Ray-based
+# engine: pip install "fedcausal[flower-simulation]"
+[tool.flwr.federations.local-simulation]
+options.num-supernodes = 3
+
+# Real supernodes, each reading its own CSV. Point the address at your
+# SuperLink; each site supplies its own data-path at startup. See README.md.
+[tool.flwr.federations.remote]
+address = "127.0.0.1:9093"
+insecure = true

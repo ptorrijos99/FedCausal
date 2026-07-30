@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 # Reuse the loader from the GES comparator so both reports read one CSV set.
 from compare_ges import load_net, networks_dir  # noqa: E402
 
-from fedcausal.federated import run_fedges
+from fedcausal.fedges import run_fedges
 from fedcausal.metrics import shd, smhd
 from fedcausal.scores import BDeuScore
 

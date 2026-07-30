@@ -2,13 +2,13 @@
 
 Learn causal structure across several sites without moving any data between them.
 
-fedcausal covers two data regimes, each with its own algorithm family. For discrete data, it implements [FedGES](https://doi.org/10.1007/s10994-025-06939-2) (Torrijos, Gámez & Puerta, *Machine Learning* 115, 2026): each site runs greedy equivalence search on the data it holds, a coordinator combines the resulting graphs into one consensus structure and sends it back, and the sites refine against it. Only graphs and scores cross the network. For continuous data under a linear non-Gaussian model, it implements the FedRCD family (Torrijos et al., PGM 2026): each site reduces its rows to a handful of cumulant statistics, and a causal order and coefficient matrix fall out of a tau discriminator applied to the aggregated statistics. Only those statistics cross the network -- see [FedRCD](docs/fedrcd.md).
+Two data regimes, an algorithm family each. For discrete data, fedcausal implements [FedGES](https://doi.org/10.1007/s10994-025-06939-2) (Torrijos, Gámez & Puerta, *Machine Learning* 115, 2026): each site runs greedy equivalence search on the data it holds, a coordinator combines the resulting graphs into one consensus structure and sends it back, and the sites refine against it. Only graphs and scores cross the network. For continuous data under a linear non-Gaussian model it implements the FedRCD family (Torrijos et al., PGM 2026): each site reduces its rows to a handful of cumulant statistics, and a causal order and coefficient matrix fall out of a tau discriminator applied to the aggregate. Only those statistics cross the network. See [FedRCD](docs/fedrcd.md).
 
-The FedGES loop runs in a single process for experiments, and over [Flower](https://flower.ai) for a real deployment. Both use the same code, and a test asserts they produce identical models round by round.
+Either family runs in a single process for experiments, or over [Flower](https://flower.ai) for a real deployment. Both paths use the same code, and a test asserts they produce identical models round by round.
 
 ```python
 from fedcausal.data import DiscreteDataset
-from fedcausal.federated import run_fedges
+from fedcausal.fedges import run_fedges
 
 data = DiscreteDataset.from_csv("data.csv")
 global_model, stats = run_fedges(data, n_clients=5, n_iterations=20)
@@ -33,11 +33,9 @@ Ray has no wheel for every Python version and platform, which is why simulation 
 
 ## Why this exists
 
-Two reasons, and scale is the first one.
+Scale, first of all. Score-based structure learning over discrete data gets expensive fast. causal-learn, the closest Python comparison, does not finish `andes` at 223 variables inside half an hour. fedcausal gets through the whole size ladder up to `munin` at 1041 variables, single-threaded and in pure Python, with numbers in [Benchmarks](docs/benchmarks.md). The optional numba extra speeds up the dominant path check, but nothing needs compiling for the base install to work.
 
-Score-based structure learning over discrete data gets expensive fast. causal-learn, the closest Python comparison, does not finish `andes` at 223 variables inside half an hour. fedcausal gets through the whole size ladder up to `munin` at 1041 variables, single-threaded and in pure Python, with numbers in [Benchmarks](docs/benchmarks.md). The optional numba extra speeds up the dominant path check, but nothing needs compiling for the base install to work.
-
-The second is federation. Plenty of data cannot leave the institution that holds it, while a graph usually can. fedcausal is built for that case, which is why the server never touches client data at any point: each site scores its own model and reports one number, and anything that needs a ground-truth network to evaluate against happens outside the loop, through an observer.
+Then federation. Plenty of data cannot leave the institution that holds it, while a graph usually can. fedcausal is built for that case, which is why the server never touches client data at any point: each site scores its own model and reports one number, and anything that needs a ground-truth network to evaluate against happens outside the loop, through an observer.
 
 ## Learning one structure
 
@@ -78,10 +76,10 @@ Over Flower, with each site loading its own data:
 
 ```bash
 pip install "fedcausal[flower-simulation]"
-flwr run .                       # the bundled example, on synthetic data
+flwr run examples/flower_app        # three sites in one process, on synthetic data
 ```
 
-For a federation across real machines, see [docs/flower-deployment.md](docs/flower-deployment.md) and the runnable app in [`examples/flower_deployment/`](examples/flower_deployment/). The short version: each SuperNode is started with a path to its own CSV and reads nothing else, and the server checks on the first round that every site agrees on the variables before it trusts any edge.
+For a federation across real machines, see [docs/deployment.md](docs/deployment.md) and the runnable app in [`examples/flower_app/`](examples/flower_app/), which serves both method families. The short version: each SuperNode is started with a path to its own CSV and reads nothing else, and the server checks on the first round that every site agrees on the variables before it trusts any edge.
 
 ## FedRCD: continuous data, linear non-Gaussian models
 
@@ -103,11 +101,22 @@ print(result.to_dag().edges())
 
 `fedrcd` and its one-shot siblings (`fedrcd_noniterative`, `ishc_beta`) need exactly one round of communication. `fedrcd_exact` trades `p - 1` rounds for exact deflation instead of an algebraic approximation, which matters when finite-sample noise would otherwise let error accumulate across deflation steps. See [FedRCD](docs/fedrcd.md) for the full family, what crosses the network, and the baselines it is compared against, and [`benchmarks/pgm26/`](benchmarks/pgm26/README.md) to reproduce the PGM 2026 results.
 
-For a federation across real machines, see the deployment section of [docs/fedrcd.md](docs/fedrcd.md#deployment) and the runnable app in [`examples/fedrcd_deployment/`](examples/fedrcd_deployment/): each SuperNode reads a path to its own CSV of numeric columns and nothing else, the same way the FedGES deployment above does for discrete data.
-
 ## Documentation
 
-[Quickstart](docs/quickstart.md) is the place to start. After that: [Bring your own data](docs/bring-your-own-data.md) covers what the loader expects and what it refuses; [Flower deployment](docs/flower-deployment.md) walks through a federation over real machines; [Algorithms](docs/algorithms.md) explains the search, the fusion operators, and the compatibility options; [FedRCD](docs/fedrcd.md) covers the continuous-data family. For evidence, see [Validation](docs/validation.md) and [Benchmarks](docs/benchmarks.md).
+[Quickstart](docs/quickstart.md) is the place to start. After that: [Bring your own data](docs/bring-your-own-data.md) covers what the loader expects and what it refuses; [Deployment](docs/deployment.md) walks through a federation over real machines; [Algorithms](docs/algorithms.md) explains the search, the fusion operators, and the compatibility options; [FedRCD](docs/fedrcd.md) covers the continuous-data family. For evidence, see [Validation](docs/validation.md) and [Benchmarks](docs/benchmarks.md).
+
+## Layout
+
+```
+fedcausal/
+  data  graph  io  metrics     datasets, graph types, XMLBIF, SHD/SMHD
+  scores  search  fusion       BDeu, GES, the structural fusion operators
+  fedges                       the FedGES round loop, in one process
+  lingam                       the FedRCD family and its baselines
+  flower                       both families over Flower, plus the shared plumbing
+```
+
+The algorithm packages never import `flwr`. Adding a method means a package beside `fedges` and `lingam`, and one module in `flower` if it federates.
 
 ## Development
 
@@ -154,7 +163,7 @@ If you use FedRCD specifically, also cite the PGM paper it comes from:
 }
 ```
 
-The proceedings are not out yet, so pages, volume and DOI are still missing from this entry.
+The proceedings are not out yet, so pages, volume and DOI are still missing from that entry.
 
 ## Credits
 

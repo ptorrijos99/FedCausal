@@ -7,7 +7,7 @@ code the PGM 2026 paper links to, on three fixed synthetic problems.
 It exists so the port into `fedcausal.lingam` can be shown not to have changed
 the paper's results. **Do not regenerate it from ported code** — that would make
 the test compare the port against itself. Regenerate only with
-`tools/record_lingam_baseline.py` pointed at the original repository.
+`record_baseline.py`, in this directory, pointed at the original repository.
 
 Each case carries eight method records: the four FedRCD-family solvers
 (`fedrcd`, `fedrcd_noniterative`, `ishc` — beta/OLS-deflation ISHC,
