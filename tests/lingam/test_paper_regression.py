@@ -43,17 +43,20 @@ CENTRALISED_SOLVERS = {
 }
 
 
-def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> np.ndarray:
-    """Regenerate a recorded problem.
+def make_lingam_data(
+    seed: int, n_samples: int, n_vars: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Regenerate a recorded problem, returning ``(x, b_true, noise)``.
 
     This must reproduce ``tests/fixtures/lingam/record_baseline.py``'s generator exactly.
     The RNG is stateful, so the *sequence* of draws is what matters: one
     ``rng.random()`` per (child, parent) pair, followed by ``rng.uniform`` then
     ``rng.choice`` only when that draw is below 0.5, and a single ``rng.laplace``
     call after the loop finishes. Batching or reordering any of those silently
-    produces different data. ``test_regenerated_data_matches_the_recording``
+    produces different data. ``test_regenerated_draws_match_the_recording``
     below is what makes such a desync say so, instead of surfacing as a
-    mysterious solver mismatch.
+    mysterious solver mismatch, so ``b_true`` and ``noise`` are returned
+    alongside the ``x`` built from them.
     """
     rng = np.random.default_rng(seed)
     b_true = np.zeros((n_vars, n_vars))
@@ -65,11 +68,11 @@ def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> np.ndarray:
     x = np.zeros((n_samples, n_vars))
     for j in range(n_vars):
         x[:, j] = x @ b_true[j] + noise[:, j]
-    return x
+    return x, b_true, noise
 
 
 def _data(case: dict) -> np.ndarray:
-    return make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
+    return make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])[0]
 
 
 def _digest(x: np.ndarray) -> str:
@@ -81,9 +84,21 @@ def _clients(case: dict) -> list[np.ndarray]:
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
-def test_regenerated_data_matches_the_recording(case):
-    """Fail here, and the generator drifted -- not the solvers."""
-    assert _digest(_data(case)) == case["x_sha16"]
+def test_regenerated_draws_match_the_recording(case):
+    """Fail here, and the generator drifted, not the solvers.
+
+    The digests cover the RNG's output (``b_true``, ``noise``), never the data
+    matrix ``x`` built from it. ``x`` comes out of ``x @ b_true[j]``, whose
+    summation order and FMA use depend on the BLAS kernel the host CPU
+    dispatches to, so its bytes move by ~1e-15 between machines while every
+    draw behind them stays identical. ``b_true`` and ``noise`` come straight
+    out of the ``Generator``, so they catch a desync without pinning the CPU.
+    The values in ``x`` are pinned to 1e-12 by
+    ``test_cumulants_match_the_recording``.
+    """
+    _, b_true, noise = make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
+    assert _digest(b_true) == case["b_sha16"]
+    assert _digest(noise) == case["noise_sha16"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
