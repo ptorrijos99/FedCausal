@@ -24,6 +24,14 @@ Every one of these is additive across disjoint row subsets, which is the only pr
 
 Over Flower (`fedcausal.lingam.flower`, requires the `flower` extra), this is one round-trip for every solver except `fedrcd_exact`: the server broadcasts a `train` message, each supernode computes its nine arrays and replies with them, its row count, and a fingerprint of its variable names, and the server aggregates, checks the fingerprints agree, and runs the selected solver.
 
+## Deployment
+
+Simulation and deployment are different things. Simulation runs every site inside one process -- `run_flower_rcd` / `run_flower_rcd_exact`, or `flwr run .` against the repository's bundled FedGES example, get you there, and both need Flower's Ray-based simulation engine (`fedcausal[flower-simulation]`). Deployment runs each site as its own process, usually on its own machine, and needs only `fedcausal[flower]` -- no Ray.
+
+A complete, runnable app for the FedRCD family is in [`examples/fedrcd_deployment/`](../examples/fedrcd_deployment/); see its README for the exact SuperLink/SuperNode commands. The client side loads its data through `NodeConfigContinuousLoader`, the continuous-data counterpart of `fedcausal.flower.data.NodeConfigLoader`: it reads a CSV path out of the supernode's own `node_config` (the `--node-config "data-path='...'"` flag each site passes at startup) and reads that file and nothing else. `InMemoryContinuousPartitions` is the simulation-only counterpart, indexing a list of in-memory datasets by `partition-id`; `run_flower_rcd` and `run_flower_rcd_exact` use it internally, and it is exported for anyone building their own simulation client app.
+
+What crosses the network is exactly what the section above describes: the nine moment-sum arrays, a row count, and a variable-name fingerprint, once per round. What stays local is every row of raw data, on every site, for the whole run -- the server never reconstructs, and cannot reconstruct, an individual observation from the aggregated statistics it receives.
+
 ## One-shot versus multi-round
 
 | Function | Rounds | What it does |

@@ -40,10 +40,20 @@ The server logic for both protocols is split in two layers, mirroring
   through Flower's Ray-based simulation engine
   (:mod:`fedcausal.flower.simulation` uses the same engine for FedGES), and
   hand back the final :class:`~fedcausal.lingam.rcd.RCDResult`.
+
+Client apps load their :class:`~fedcausal.data.ContinuousDataset` through a
+:class:`ContinuousLoader`, exactly as :mod:`fedcausal.flower.app` loads a
+:class:`~fedcausal.data.DiscreteDataset` through a
+:class:`~fedcausal.flower.data.PartitionLoader`. Two implementations ship:
+:class:`InMemoryContinuousPartitions` for simulation, and
+:class:`NodeConfigContinuousLoader` for a real deployment, where each
+supernode reads a CSV named by its own ``node_config`` and nothing else; see
+``docs/fedrcd.md`` and ``examples/fedrcd_deployment/``.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import numpy as np
@@ -60,6 +70,7 @@ from flwr.client import ClientApp
 from flwr.common import ArrayRecord, Context, Message, MessageType, RecordDict
 from flwr.server import Grid, ServerApp
 
+from fedcausal.data import ContinuousDataset
 from fedcausal.exceptions import ClientFailureError, ConfigurationError, SchemaMismatchError
 from fedcausal.flower.serde import (
     control_config,
@@ -76,11 +87,12 @@ from fedcausal.lingam.tau import tau_matrix_4th
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from fedcausal.data import ContinuousDataset
     from fedcausal.lingam.cumulants import Cumulants
 
 __all__ = [
     "ContinuousLoader",
+    "InMemoryContinuousPartitions",
+    "NodeConfigContinuousLoader",
     "build_exact_client_app",
     "build_exact_server_app",
     "build_rcd_client_app",
@@ -119,6 +131,44 @@ class ContinuousLoader(Protocol):
     def __call__(self, context: Context) -> ContinuousDataset:
         """Return the dataset this supernode should compute statistics from."""
         ...
+
+
+class NodeConfigContinuousLoader:
+    """Load a supernode's own CSV, named by a key in its ``node_config``.
+
+    The continuous counterpart of :class:`fedcausal.flower.data.NodeConfigLoader`:
+    the deployment path for the FedRCD family. Start each supernode with
+    ``--node-config "data-path='/path/to/my/shard.csv'"`` and it reads that file
+    and nothing else.
+
+    Parameters
+    ----------
+    key : str, optional
+        Which ``node_config`` key holds the path (default ``"data-path"``).
+    """
+
+    def __init__(self, key: str = "data-path") -> None:
+        self.key = key
+
+    def __call__(self, context: Context) -> ContinuousDataset:
+        """Load and return this supernode's dataset.
+
+        Raises
+        ------
+        ConfigurationError
+            If the key is missing from ``node_config`` or names a path that
+            does not exist.
+        """
+        raw = context.node_config.get(self.key)
+        if raw is None:
+            raise ConfigurationError(
+                f"node_config has no {self.key!r}; start the supernode with "
+                f"--node-config \"{self.key}='/path/to/shard.csv'\""
+            )
+        path = Path(str(raw))
+        if not path.exists():
+            raise ConfigurationError(f"{self.key}={path} does not exist on this supernode")
+        return ContinuousDataset.from_csv(path)
 
 
 def handle_stats_message(msg: Message, context: Context, loader: ContinuousLoader) -> Message:
@@ -344,7 +394,7 @@ def run_flower_rcd(
 
     parts = contiguous_split(data, n_clients)
     results: list[RCDResult] = []
-    client_app = build_rcd_client_app(_InMemoryContinuousPartitions(parts))
+    client_app = build_rcd_client_app(InMemoryContinuousPartitions(parts))
     server_app = build_rcd_server_app(n_clients, solver, results=results, **solver_kwargs)
     run_simulation(server_app=server_app, client_app=client_app, num_supernodes=n_clients)
 
@@ -644,7 +694,7 @@ def run_flower_rcd_exact(
 
     parts = contiguous_split(data, n_clients)
     results: list[RCDResult] = []
-    client_app = build_exact_client_app(_InMemoryContinuousPartitions(parts))
+    client_app = build_exact_client_app(InMemoryContinuousPartitions(parts))
     server_app = build_exact_server_app(n_clients, results=results, **solver_kwargs)
     run_simulation(server_app=server_app, client_app=client_app, num_supernodes=n_clients)
 
@@ -653,12 +703,13 @@ def run_flower_rcd_exact(
     return results[0]
 
 
-class _InMemoryContinuousPartitions:
+class InMemoryContinuousPartitions:
     """Serve one of several in-memory `ContinuousDataset`s, indexed by ``partition-id``.
 
     Simulation-only continuous analogue of
-    :class:`fedcausal.flower.data.InMemoryPartitions`; kept private since only
-    :func:`run_flower_rcd` and :func:`run_flower_rcd_exact` need it.
+    :class:`fedcausal.flower.data.InMemoryPartitions`. Used by
+    :func:`run_flower_rcd` and :func:`run_flower_rcd_exact`, and public so a
+    caller building its own simulation ``ClientApp`` can use it directly.
 
     Parameters
     ----------
@@ -680,8 +731,8 @@ class _InMemoryContinuousPartitions:
         """
         if "partition-id" not in context.node_config:
             raise ConfigurationError(
-                "node_config has no 'partition-id'; _InMemoryContinuousPartitions only "
-                "works in simulation"
+                "node_config has no 'partition-id'; InMemoryContinuousPartitions only "
+                "works in simulation. Use NodeConfigContinuousLoader for a real deployment."
             )
         pid = int(context.node_config["partition-id"])
         if not 0 <= pid < len(self._partitions):

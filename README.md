@@ -103,6 +103,8 @@ print(result.to_dag().edges())
 
 `fedrcd` and its one-shot siblings (`fedrcd_noniterative`, `ishc_beta`) need exactly one round of communication. `fedrcd_exact` trades `p - 1` rounds for exact deflation instead of an algebraic approximation, which matters when finite-sample noise would otherwise let error accumulate across deflation steps. See [FedRCD](docs/fedrcd.md) for the full family, what crosses the network, and the baselines it is compared against, and [`benchmarks/pgm26/`](benchmarks/pgm26/README.md) to reproduce the PGM 2026 results.
 
+For a federation across real machines, see the deployment section of [docs/fedrcd.md](docs/fedrcd.md#deployment) and the runnable app in [`examples/fedrcd_deployment/`](examples/fedrcd_deployment/): each SuperNode reads a path to its own CSV of numeric columns and nothing else, the same way the FedGES deployment above does for discrete data.
+
 ## Documentation
 
 [Quickstart](docs/quickstart.md) is the place to start. After that: [Bring your own data](docs/bring-your-own-data.md) covers what the loader expects and what it refuses; [Flower deployment](docs/flower-deployment.md) walks through a federation over real machines; [Algorithms](docs/algorithms.md) explains the search, the fusion operators, and the compatibility options; [FedRCD](docs/fedrcd.md) covers the continuous-data family. For evidence, see [Validation](docs/validation.md) and [Benchmarks](docs/benchmarks.md).
