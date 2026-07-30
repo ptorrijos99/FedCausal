@@ -10,17 +10,22 @@ repository-code: "https://github.com/ptorrijos99/fedcausal"
 license: MIT
 version: 0.1.0
 abstract: >-
-  A Python implementation of FedGES, a federated approach to Bayesian network
-  structure learning. Each site runs greedy equivalence search on the data it
-  holds, a coordinator combines the resulting graphs by structural consensus
-  fusion, and only graphs and scores cross the network. Runs in-process for
-  experiments and over Flower for deployment.
+  A Python implementation of federated causal discovery over two data regimes.
+  FedGES learns Bayesian network structure from discrete data: each site runs
+  greedy equivalence search on the data it holds, a coordinator combines the
+  resulting graphs by structural consensus fusion, and only graphs and scores
+  cross the network. FedRCD learns a causal order and linear coefficients from
+  continuous data under a linear non-Gaussian model: each site reduces its
+  rows to cumulant statistics, and only those statistics cross the network.
+  Runs in-process for experiments and over Flower for deployment.
 keywords:
   - causal discovery
   - structure learning
   - Bayesian networks
   - federated learning
   - greedy equivalence search
+  - LiNGAM
+  - cumulants
 
 preferred-citation:
   type: article
@@ -42,6 +47,24 @@ preferred-citation:
   url: "https://doi.org/10.1007/s10994-025-06939-2"
 
 references:
+  # The FedRCD paper. Author list beyond Torrijos, page numbers, volume, DOI,
+  # and URL are not yet known -- see the field-by-field note in the task-14
+  # report -- and are left out rather than guessed. Fill in once the PGM 2026
+  # camera-ready is out.
+  - type: conference-paper
+    title: "Federated Causal Discovery via Regression-Directed Cumulants"
+    authors:
+      - family-names: "Torrijos"
+        given-names: "Pablo"
+      - family-names: "Stella"
+        given-names: "Fabio"
+      - family-names: "Gámez"
+        given-names: "José A."
+      - family-names: "Puerta"
+        given-names: "José M."
+    conference:
+      name: "Probabilistic Graphical Models (PGM)"
+    year: 2026
   - type: article
     title: "Optimal structure identification with greedy search"
     authors:

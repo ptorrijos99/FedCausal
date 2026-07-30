@@ -28,7 +28,14 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Typing :: Typed",
 ]
-dependencies = ["numpy>=1.24", "scipy>=1.10", "pandas>=2.0"]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "pandas>=2.0",
+  # Pure-Python, dependency-free shim: supplies `typing.Self` on Python 3.10,
+  # where it isn't in the stdlib yet.
+  "typing_extensions>=4.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/ptorrijos99/fedcausal"
@@ -56,6 +63,9 @@ flower = ["flwr>=1.23"]
 # version and platform, so it is a separate extra rather than a hard cost of
 # using the transport.
 flower-simulation = ["flwr[simulation]>=1.23"]
+# Experiment-only. The fedcausal.lingam algorithms need none of these; the
+# published comparisons do.
+lingam-experiments = ["lingam>=1.8", "bnlearn>=0.7", "matplotlib>=3.7", "seaborn>=0.13", "tqdm>=4.62"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fedcausal"]

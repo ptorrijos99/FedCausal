@@ -1,7 +1,6 @@
-"""Client partitioning strategies for federated discrete datasets.
+"""Client partitioning strategies for federated datasets.
 
-This module splits a :class:`~fedcausal.data.dataset.DiscreteDataset` into
-per-client datasets under two regimes:
+This module splits a dataset into per-client datasets under two regimes:
 
 - :func:`contiguous_split` — contiguous row blocks in original order, with
   the block boundaries the original Java implementation uses.
@@ -9,22 +8,60 @@ per-client datasets under two regimes:
   simulating non-IID federated clients, either by overall row-count skew
   ("quantity skew") or by skewing the distribution of one variable's
   levels across clients ("value skew").
+
+Both functions are generic over :class:`Partitionable`, the minimal
+protocol they need from a dataset, so they work on either
+:class:`~fedcausal.data.dataset.DiscreteDataset` or
+:class:`~fedcausal.data.continuous.ContinuousDataset` without a cast: the
+type checker infers ``list[DiscreteDataset]`` or ``list[ContinuousDataset]``
+from the argument passed in.
 """
 
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 
+from fedcausal.data.dataset import DiscreteDataset
+
 if TYPE_CHECKING:
-    from fedcausal.data.dataset import DiscreteDataset
+    from typing_extensions import Self
 
-__all__ = ["contiguous_split", "dirichlet_split"]
+__all__ = ["Partitionable", "contiguous_split", "dirichlet_split"]
 
 
-def contiguous_split(ds: DiscreteDataset, n_clients: int) -> list[DiscreteDataset]:
+@runtime_checkable
+class Partitionable(Protocol):
+    """A dataset that can be split by rows across federated clients.
+
+    Both :class:`~fedcausal.data.DiscreteDataset` and
+    :class:`~fedcausal.data.ContinuousDataset` satisfy this. The partitioners
+    need nothing else from a dataset but `n_rows`, `n_vars`, and `subset`, so
+    typing them against this protocol is what lets one implementation serve
+    both method families.
+    """
+
+    @property
+    def n_rows(self) -> int:
+        """int: Number of rows (observations)."""
+        ...
+
+    @property
+    def n_vars(self) -> int:
+        """int: Number of variables (columns)."""
+        ...
+
+    def subset(self, rows: np.ndarray) -> Self:
+        """Return a new dataset holding only `rows`."""
+        ...
+
+
+DatasetT = TypeVar("DatasetT", bound=Partitionable)
+
+
+def contiguous_split(ds: DatasetT, n_clients: int) -> list[DatasetT]:
     """Split a dataset into contiguous row blocks, in original order.
 
     Each client receives one contiguous block, and row order is preserved
@@ -42,14 +79,14 @@ def contiguous_split(ds: DiscreteDataset, n_clients: int) -> list[DiscreteDatase
 
     Parameters
     ----------
-    ds : DiscreteDataset
+    ds : DiscreteDataset or ContinuousDataset
         The dataset to split.
     n_clients : int
         Number of clients (blocks) to produce. Must be positive.
 
     Returns
     -------
-    list[DiscreteDataset]
+    list[DiscreteDataset] or list[ContinuousDataset]
         `n_clients` datasets, in client order, each sharing `ds`'s full
         variable domains (see `DiscreteDataset.subset`). If `n_clients`
         exceeds `ds.n_rows`, the trailing clients receive empty blocks.
@@ -73,12 +110,12 @@ def contiguous_split(ds: DiscreteDataset, n_clients: int) -> list[DiscreteDatase
 
 
 def dirichlet_split(
-    ds: DiscreteDataset,
+    ds: DatasetT,
     n_clients: int,
     alpha: float,
     seed: int,
     by: int | None = None,
-) -> list[DiscreteDataset]:
+) -> list[DatasetT]:
     """Split a dataset across clients via Dirichlet-distribution draws.
 
     Two regimes are supported:
@@ -103,7 +140,7 @@ def dirichlet_split(
 
     Parameters
     ----------
-    ds : DiscreteDataset
+    ds : DiscreteDataset or ContinuousDataset
         The dataset to split.
     n_clients : int
         Number of clients. Must satisfy ``1 <= n_clients <= ds.n_rows``.
@@ -117,12 +154,14 @@ def dirichlet_split(
         reproducible given the same `ds`, `n_clients`, `alpha`, `seed`,
         and `by`.
     by : int, optional
-        Column index of the variable to use for value skew. If
-        ``None`` (default), quantity skew is used instead.
+        Column index of the variable to use for value skew. Only
+        supported for a `DiscreteDataset`, since it skews the split by a
+        variable's discrete levels. If ``None`` (default), quantity skew
+        is used instead, which works for either dataset type.
 
     Returns
     -------
-    list[DiscreteDataset]
+    list[DiscreteDataset] or list[ContinuousDataset]
         `n_clients` datasets forming an exact partition of `ds`'s rows:
         every row is assigned to exactly one client, and every client is
         non-empty. Each shares `ds`'s full variable domains (see
@@ -134,6 +173,8 @@ def dirichlet_split(
         If `n_clients` is not positive, if `alpha` is not positive, if
         `n_clients > ds.n_rows` (so the every-client-non-empty guarantee
         is unsatisfiable), or if `by` is out of range.
+    TypeError
+        If `by` is given but `ds` is not a `DiscreteDataset`.
     """
     if n_clients <= 0:
         raise ValueError(f"n_clients must be positive, got {n_clients}")
@@ -151,6 +192,8 @@ def dirichlet_split(
     if by is None:
         client_rows = _quantity_skew_rows(ds.n_rows, n_clients, alpha, rng)
     else:
+        if not isinstance(ds, DiscreteDataset):
+            raise TypeError(f"by is only supported for a DiscreteDataset, got {type(ds).__name__}")
         client_rows = _value_skew_rows(ds, n_clients, alpha, by, rng)
     _ensure_all_nonempty(client_rows)
     return [ds.subset(np.array(sorted(rows), dtype=np.int64)) for rows in client_rows]
