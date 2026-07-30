@@ -26,7 +26,7 @@ from flwr.common import Context, Error, Message, RecordDict
 from fedcausal.data import ContinuousDataset
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 
 def _chain_dataset(seed: int, n: int = 6000, n_vars: int = 4) -> ContinuousDataset:
@@ -37,6 +37,35 @@ def _chain_dataset(seed: int, n: int = 6000, n_vars: int = 4) -> ContinuousDatas
     for j in range(1, n_vars):
         x[:, j] = 0.8 * x[:, j - 1] + e[:, j]
     return ContinuousDataset.from_arrays(x, [f"x{j}" for j in range(n_vars)])
+
+
+def _permuted_chain_dataset(seed: int, perm: Sequence[int], n: int = 6000) -> ContinuousDataset:
+    """The same linear non-Gaussian chain as `_chain_dataset`, with columns permuted.
+
+    `_chain_dataset` numbers its variables in causal order (``x0 -> x1 -> x2 -> x3``).
+    For FedRCD-Exact that is a dangerous coincidence: `remaining_local` and
+    `active_global` both preserve ascending order on every column drop, so on that
+    fixture the identified source (`src_local`) is *always* 0, at every round. A
+    client bug that drops a hard-coded column instead of the one the server actually
+    named is then indistinguishable from correct behaviour -- the test cannot see
+    it. Permuting the columns breaks the coincidence: the causal order is no longer
+    the identity, `src_local` genuinely varies round to round, and a wrong-column
+    bug changes the answer.
+
+    Parameters
+    ----------
+    seed : int
+        Forwarded to `_chain_dataset`.
+    perm : Sequence[int]
+        A permutation of ``range(len(perm))``. New column ``j`` holds original
+        (causal-order) column ``perm[j]``.
+    n : int, optional
+        Row count, forwarded to `_chain_dataset`.
+    """
+    n_vars = len(perm)
+    base = _chain_dataset(seed, n=n, n_vars=n_vars)
+    permuted = base.values[:, list(perm)]
+    return ContinuousDataset.from_arrays(permuted, [f"x{j}" for j in range(n_vars)])
 
 
 class _ContinuousInMemoryPartitions:
@@ -71,6 +100,16 @@ class _StubGrid:
         One partition loader per supernode.
     fail_nodes : set[int], optional
         Node indices whose replies should come back carrying an error.
+
+    Attributes
+    ----------
+    call_count : int
+        Number of `send_and_receive` calls so far -- the number of message
+        round-trips the protocol under test actually performed. A round loop
+        that runs one round too many or too few changes this even when it
+        happens not to change the final output (e.g. an off-by-one in a
+        broadcast guard that only wastes a round), so tests can assert on it
+        directly instead of only on the answer.
     """
 
     def __init__(
@@ -92,11 +131,13 @@ class _StubGrid:
             )
             for i in range(len(loaders))
         ]
+        self.call_count = 0
 
     def get_node_ids(self) -> list[int]:
         return list(range(len(self._loaders)))
 
     def send_and_receive(self, messages: list[Message]) -> list[Message]:
+        self.call_count += 1
         replies = []
         for node_id, msg in enumerate(messages):
             if node_id in self._fail:

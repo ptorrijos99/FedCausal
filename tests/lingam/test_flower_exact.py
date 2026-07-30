@@ -30,7 +30,12 @@ from fedcausal.lingam.flower import (  # noqa: E402
     run_exact_server_loop,
 )
 
-from ._flower_stub import _chain_dataset, _ContinuousInMemoryPartitions, _StubGrid  # noqa: E402
+from ._flower_stub import (  # noqa: E402
+    _chain_dataset,
+    _ContinuousInMemoryPartitions,
+    _permuted_chain_dataset,
+    _StubGrid,
+)
 
 
 def test_run_exact_server_loop_recovers_the_chain() -> None:
@@ -45,7 +50,15 @@ def test_run_exact_server_loop_recovers_the_chain() -> None:
     assert result.causal_order == (0, 1, 2, 3)
 
 
-def test_exact_transport_matches_the_in_process_solver() -> None:
+@pytest.mark.parametrize(
+    "make_dataset",
+    [
+        lambda: _chain_dataset(1),
+        lambda: _permuted_chain_dataset(1, perm=[3, 2, 1, 0]),
+    ],
+    ids=["identity-order", "permuted-order"],
+)
+def test_exact_transport_matches_the_in_process_solver(make_dataset) -> None:
     """The transport must not change the answer. This is the equivalence claim.
 
     Drives `run_exact_server_loop` over the in-process `_StubGrid`, so this
@@ -53,10 +66,18 @@ def test_exact_transport_matches_the_in_process_solver() -> None:
     `handle_deflate_message` handler -- including its `context.state`
     persistence across rounds -- and the real `stats_to_record` /
     `record_to_stats` serialisation, and depends on nothing but `flwr` itself.
+
+    Parametrised over two fixtures deliberately. `_chain_dataset` numbers its
+    variables in causal order, so `src_local` is 0 at every single round on it
+    -- a client that dropped a hard-coded column instead of the server-named
+    `src_local` would still pass against it. `_permuted_chain_dataset` breaks
+    that coincidence and is the case that actually exercises `src_local`
+    varying round to round; the identity case is kept too since it still
+    covers the simple path.
     """
     from fedcausal.lingam import fedrcd_exact
 
-    data = _chain_dataset(1)
+    data = make_dataset()
     expected = fedrcd_exact(list(np.array_split(data.values, 3, axis=0)))
 
     parts = contiguous_split(data, 3)
@@ -67,10 +88,21 @@ def test_exact_transport_matches_the_in_process_solver() -> None:
 
     assert actual.causal_order == expected.causal_order
     np.testing.assert_allclose(actual.b, expected.b, rtol=1e-10, atol=1e-10)
+    # p - 1 rounds of communication -- a round loop that runs one round too many
+    # or too few (e.g. an off-by-one in a broadcast guard) may not change the
+    # output at all, so this is the only thing that can catch it.
+    assert grid.call_count == data.n_vars - 1
 
 
 def test_client_state_shrinks_by_one_column_per_round():
-    """Each round drops the identified source, so the working matrix narrows."""
+    """Each round drops the identified source and deflates the survivors by it.
+
+    Checks the actual residual values, not just the shrunk width: `src_local`
+    is deliberately not 0 and `betas` is deliberately non-zero, so a client
+    that dropped the wrong column, or dropped the right column but skipped the
+    `x_j -= beta_j * x_s` deflation, would produce a matrix of the right shape
+    but the wrong contents -- which a shape-only assertion cannot see.
+    """
     from flwr.common import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 
     from fedcausal.lingam.flower import _WORKING_STATE_KEY
@@ -87,12 +119,15 @@ def test_client_state_shrinks_by_one_column_per_round():
     handle_deflate_message(msg, context, loader)
     first = context.state[_WORKING_STATE_KEY].to_numpy_ndarrays()[0]
     assert first.shape[1] == 4
+    np.testing.assert_allclose(first, data.values)
 
+    src_local = 1
+    betas = np.array([0.3, -0.5, 0.2, 0.1])
     follow_up = Message(
         RecordDict(
             {
-                "control": ConfigRecord({"round": 1, "src_local": 0}),
-                "betas": ArrayRecord([np.zeros(4)]),
+                "control": ConfigRecord({"round": 1, "src_local": src_local}),
+                "betas": ArrayRecord([betas]),
             }
         ),
         dst_node_id=0,
@@ -100,7 +135,13 @@ def test_client_state_shrinks_by_one_column_per_round():
     )
     handle_deflate_message(follow_up, context, loader)
     second = context.state[_WORKING_STATE_KEY].to_numpy_ndarrays()[0]
+
+    remaining = [j for j in range(4) if j != src_local]
+    x_s = data.values[:, src_local]
+    expected = np.column_stack([data.values[:, j] - betas[j] * x_s for j in remaining])
+
     assert second.shape[1] == 3
+    np.testing.assert_allclose(second, expected)
 
 
 def test_disagreeing_schemas_are_rejected_at_round_zero() -> None:
