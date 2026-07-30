@@ -44,6 +44,12 @@ def test_lasso_shrinks_towards_zero_but_keeps_the_true_edges():
     estimate on the same covariance is. Comparing against `b_true` instead
     would pass even when Lasso's L1 norm is *larger* than OLS's, which is the
     opposite of shrinkage.
+
+    The comparison must be strict: on this fixture (seed 2), OLS's L1 norm is
+    ~1.4044 and Lasso's is ~1.3762, a ~2% margin that is comfortable, not
+    floating-point noise. A `<=` here would still pass for a "Lasso" that
+    performs no shrinkage at all and just returns the OLS estimate -- `<`
+    is the only version of this assertion a no-op implementation can fail.
     """
     x, _ = _sem(2)
     cov = np.cov(x, rowvar=False)
@@ -51,7 +57,7 @@ def test_lasso_shrinks_towards_zero_but_keeps_the_true_edges():
     b_lasso = estimate_b_lasso_from_cov([0, 1, 2], cov, n_samples=x.shape[0])
     assert b_lasso[1, 0] != 0.0
     assert b_lasso[2, 1] != 0.0
-    assert np.abs(b_lasso).sum() <= np.abs(b_ols).sum()
+    assert np.abs(b_lasso).sum() < np.abs(b_ols).sum()
 
 
 def test_lasso_rejects_an_unknown_lambda_type():
