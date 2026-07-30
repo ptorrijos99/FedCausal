@@ -715,9 +715,16 @@ class InMemoryContinuousPartitions:
     ----------
     partitions : Sequence[ContinuousDataset]
         One dataset per partition id.
+
+    Raises
+    ------
+    ConfigurationError
+        If `partitions` is empty.
     """
 
     def __init__(self, partitions: Sequence[ContinuousDataset]) -> None:
+        if not partitions:
+            raise ConfigurationError("InMemoryContinuousPartitions needs at least one partition")
         self._partitions = list(partitions)
 
     def __call__(self, context: Context) -> ContinuousDataset:

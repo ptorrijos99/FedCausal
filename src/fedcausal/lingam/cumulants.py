@@ -67,6 +67,35 @@ _MIN_SAMPLES_3RD: int = 3
 _MIN_SAMPLES_4TH: int = 4
 
 
+def _n_samples(stats: Cumulants) -> int:
+    """Look up the total sample count, raising if the aggregator omitted it.
+
+    Shared by every solver in :mod:`fedcausal.lingam` that needs the sample
+    count to scale its Lasso penalty (:mod:`fedcausal.lingam.rcd` and
+    :mod:`fedcausal.lingam.ishc`); byte-identical between the two before being
+    hoisted here.
+
+    Parameters
+    ----------
+    stats : Cumulants
+        Aggregated statistics from :func:`aggregate_and_compute_cumulants`.
+
+    Returns
+    -------
+    int
+        The ``"n"`` entry.
+
+    Raises
+    ------
+    KeyError
+        If ``"n"`` is missing. A silent default would quietly mis-scale the
+        Lasso penalty.
+    """
+    if "n" not in stats:
+        raise KeyError("stats is missing 'n'; the aggregator always sets it")
+    return int(stats["n"])
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # §1  Raw Moment Computation (client-side, privacy-safe)
 # ═══════════════════════════════════════════════════════════════════════════

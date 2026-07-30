@@ -80,8 +80,9 @@ def tau_matrix_4th(
     -----
     The fourth-order discriminator is the stronger of the two and is the default
     everywhere in this subpackage. The third-order one matters when the data has
-    skew but little excess kurtosis, which is what the solvers' ``adaptive``
-    option detects.
+    skew but little excess kurtosis: it is the only one of the two that gets a
+    signal from skew, while the fourth-order one is driven entirely by excess
+    kurtosis and stays near zero on data that lacks it.
     """
     tau = np.abs(c4[:, np.newaxis] * c13 - c22 * c31)
     np.fill_diagonal(tau, 0.0)

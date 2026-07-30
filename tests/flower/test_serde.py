@@ -101,3 +101,31 @@ def test_stats_round_trip_rejects_third_order_only():
 def test_names_fingerprint_agrees_on_equal_names_and_differs_on_order():
     assert names_fingerprint(["a", "b"]) == names_fingerprint(["a", "b"])
     assert names_fingerprint(["a", "b"]) != names_fingerprint(["b", "a"])
+
+
+def test_stats_to_record_packs_arrays_in_the_fixed_wire_order():
+    """Pin the wire order positionally and literally.
+
+    `stats_to_record` and `record_to_stats` both derive from `_STATS_KEYS`, so
+    a round-trip test alone cannot catch a reorder of that tuple -- packing
+    and unpacking would still agree with each other, just not with a client
+    or server built against a different version. This test does not read
+    `_STATS_KEYS` at all: it names each of the nine keys literally and checks
+    the packed record's arrays against the stats dict fetched by that literal
+    name, so a reorder of the source tuple makes this test fail.
+    """
+    x = np.random.default_rng(2).laplace(0.0, 1.0, size=(200, 3))
+    stats = compute_local_raw_stats(x, order=4)
+    rec = stats_to_record(stats)
+    arrays = rec.to_numpy_ndarrays()
+
+    assert len(arrays) == 9
+    np.testing.assert_array_equal(arrays[0], stats["sum_x"])
+    np.testing.assert_array_equal(arrays[1], stats["sum_xx"])
+    np.testing.assert_array_equal(arrays[2], stats["sum_x3"])
+    np.testing.assert_array_equal(arrays[3], stats["sum_x1y2"])
+    np.testing.assert_array_equal(arrays[4], stats["sum_x2y1"])
+    np.testing.assert_array_equal(arrays[5], stats["sum_x4"])
+    np.testing.assert_array_equal(arrays[6], stats["sum_x1y3"])
+    np.testing.assert_array_equal(arrays[7], stats["sum_x3y1"])
+    np.testing.assert_array_equal(arrays[8], stats["sum_x2y2"])

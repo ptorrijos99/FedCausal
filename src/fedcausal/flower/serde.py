@@ -45,6 +45,12 @@ __all__ = [
     "record_to_stats",
 ]
 
+# This tuple IS the wire format: append-only, never reorder. `stats_to_record`
+# and `record_to_stats` agree on which array is which purely by position, so
+# reordering these names would silently swap the meaning of every field
+# between a client and server built against mismatched versions -- and
+# nothing would catch it, since both functions derive from the same tuple and
+# a round-trip test is structurally blind to a reorder.
 _STATS_KEYS = (
     "sum_x",
     "sum_xx",
@@ -59,11 +65,19 @@ _STATS_KEYS = (
 
 
 def names_fingerprint(names: Sequence[str]) -> str:
-    """Return a short stable digest of a variable-name sequence.
+    r"""Return a short stable digest of a variable-name sequence.
 
     Two clients produce the same fingerprint exactly when they agree on the
     variables they are learning over, in the same order -- the condition under
     which exchanging column indices between them is meaningful.
+
+    Notes
+    -----
+    Names are joined with ``\x1f`` and not otherwise escaped, so a name that
+    itself contains ``\x1e`` or ``\x1f`` can collide with a different split of
+    the same characters across adjacent names (e.g. ``["A\x1e2\x1f2"]`` and
+    ``["A\x1e2", "2"]``). Vanishingly unlikely for CSV-derived variable names,
+    but variable names must not contain those two characters.
     """
     return hashlib.sha256("\x1f".join(names).encode("utf-8")).hexdigest()[:16]
 

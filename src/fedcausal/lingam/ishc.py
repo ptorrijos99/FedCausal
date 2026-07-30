@@ -30,7 +30,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from fedcausal.lingam.cumulants import Cumulants
+from fedcausal.lingam.cumulants import Cumulants, _n_samples
 from fedcausal.lingam.rcd import RCDResult
 from fedcausal.lingam.solvers import estimate_b_from_cov, estimate_b_lasso_from_cov
 from fedcausal.lingam.tau import tau_matrix_3rd
@@ -42,31 +42,6 @@ __all__ = ["fedhc", "fedishc"]
 # function's Notes section for why these must not be adjusted.
 _EPS = 1e-6
 _ALPHA_CLIP = 10.0
-
-
-def _n_samples(stats: Cumulants) -> int:
-    """Look up the total sample count, raising if the aggregator omitted it.
-
-    Parameters
-    ----------
-    stats : Cumulants
-        Aggregated statistics from
-        :func:`fedcausal.lingam.cumulants.aggregate_and_compute_cumulants`.
-
-    Returns
-    -------
-    int
-        The ``"n"`` entry.
-
-    Raises
-    ------
-    KeyError
-        If ``"n"`` is missing. A silent default would quietly mis-scale the
-        Lasso penalty.
-    """
-    if "n" not in stats:
-        raise KeyError("stats is missing 'n'; the aggregator always sets it")
-    return int(stats["n"])
 
 
 def fedishc(

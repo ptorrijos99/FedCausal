@@ -29,6 +29,7 @@ from fedcausal.exceptions import (  # noqa: E402
 )
 from fedcausal.flower.serde import names_fingerprint  # noqa: E402
 from fedcausal.lingam.flower import (  # noqa: E402
+    InMemoryContinuousPartitions,
     build_rcd_client_app,
     handle_stats_message,
     run_rcd_server_loop,
@@ -214,6 +215,16 @@ def test_run_flower_rcd_matches_the_in_process_solver_via_simulation() -> None:
 
     assert actual.causal_order == expected.causal_order
     np.testing.assert_allclose(actual.b, expected.b, rtol=1e-12, atol=1e-12)
+
+
+def test_in_memory_continuous_partitions_rejects_an_empty_sequence() -> None:
+    """Mirrors `fedcausal.flower.data.InMemoryPartitions`'s guard on the discrete side.
+
+    An empty list previously fell through to `__call__` and failed later with a
+    less specific out-of-range error; this checks it fails immediately instead.
+    """
+    with pytest.raises(ConfigurationError, match="needs at least one partition"):
+        InMemoryContinuousPartitions([])
 
 
 def test_lingam_package_imports_without_flwr(monkeypatch: pytest.MonkeyPatch) -> None:

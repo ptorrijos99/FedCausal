@@ -75,3 +75,13 @@ flwr run . remote --run-config "num-clients=5 solver='fedrcd_exact'"
 By default a round needs every site, and the run stops with a `ClientFailureError` naming the ones that failed. That is deliberate: a run that quietly learns from two sites when you configured three gives you a number you cannot interpret.
 
 Set `min-clients` to accept fewer.
+
+## Known frictions
+
+Standing up a real 3-site federation on Windows surfaced three environment issues, all Flower-version or Windows-console problems rather than anything wrong with this example:
+
+- `flower-supernode`'s default `--isolation subprocess` failed with a SuperExec `UNAUTHENTICATED` gRPC error against `flwr==1.32.1`. Passing `--isolation process` instead worked.
+- `flwr run` crashed with a `UnicodeEncodeError` on a Windows `cp1252` console, because Flower's own CLI banner contains an emoji that console cannot encode. Setting `PYTHONIOENCODING=utf-8` before running fixed it.
+- The SuperLink's auto-spawned `flower-superexec` failed with `unrecognized arguments: --allow-runtime-dependency-installation`, an internal mismatch within that `flwr` build between the SuperLink and the SuperExec it spawns.
+
+None of these are specific to FedRCD; expect to hit the same things running any Flower app on a similar setup.

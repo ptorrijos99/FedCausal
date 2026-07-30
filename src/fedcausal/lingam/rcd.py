@@ -43,6 +43,7 @@ import numpy.typing as npt
 from fedcausal.graph import DAG
 from fedcausal.lingam.cumulants import (
     Cumulants,
+    _n_samples,
     aggregate_and_compute_cumulants,
     compute_local_raw_stats,
 )
@@ -97,30 +98,6 @@ class RCDResult:
             if abs(float(self.b[child, parent])) > threshold
         ]
         return DAG.from_edges(n_vars, edges)
-
-
-def _n_samples(stats: Cumulants) -> int:
-    """Look up the total sample count, raising if the aggregator omitted it.
-
-    Parameters
-    ----------
-    stats : Cumulants
-        Aggregated statistics from :func:`aggregate_and_compute_cumulants`.
-
-    Returns
-    -------
-    int
-        The ``"n"`` entry.
-
-    Raises
-    ------
-    KeyError
-        If ``"n"`` is missing. A silent default would quietly mis-scale the
-        Lasso penalty.
-    """
-    if "n" not in stats:
-        raise KeyError("stats is missing 'n'; the aggregator always sets it")
-    return int(stats["n"])
 
 
 def fedrcd(
@@ -288,6 +265,12 @@ def ishc_beta(
 
     This is the improved variant that uses beta (OLS) for deflation instead
     of alpha (the cumulant ratio) that the original ISHC baseline uses.
+
+    Naming note: every other solver here that takes aggregated federated
+    statistics is `fed`-prefixed (`fedrcd`, `fedrcd_noniterative`, `fedishc`,
+    `fedhc`); `ishc_beta` takes the same kind of input but keeps the name of
+    the original single-machine implementation it was adapted from, for
+    traceability back to that source.
 
     Parameters
     ----------
