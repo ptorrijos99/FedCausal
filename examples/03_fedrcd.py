@@ -1,13 +1,20 @@
-"""Recover a causal order from continuous data split across sites, with FedRCD.
+"""
+Continuous data: FedRCD
+=======================
 
-Generates a small linear non-Gaussian SEM, splits it across simulated clients,
-and runs the one-shot and multi-round FedRCD solvers over the aggregated
-cumulant statistics -- never the raw rows:
+The other data regime. Where FedGES federates by exchanging *graphs*, the FedRCD
+family federates by exchanging *sufficient statistics*: each site reduces its
+rows to nine moment sums, and a causal order and coefficient matrix fall out of
+the aggregate.
 
-    python examples/03_fedrcd.py
+This needs a linear non-Gaussian model. Under Gaussian noise the causal order is
+not identifiable from the joint distribution at all, which is why the noise below
+is skewed.
 """
 
-from __future__ import annotations
+# %%
+# A chain ``x0 -> x1 -> ... -> x4`` with centred exponential noise, which has
+# skewness 2. That asymmetry is the signal the whole method runs on.
 
 import numpy as np
 
@@ -26,61 +33,61 @@ N_ROWS = 4000
 N_CLIENTS = 4
 NAMES = [f"x{i}" for i in range(N_VARS)]
 
+rng = np.random.default_rng(0)
 
-def _make_sem(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
-    """Build a chain SEM x0 -> x1 -> ... -> x{N_VARS-1} with skewed noise.
+b_true = np.zeros((N_VARS, N_VARS))
+for child in range(1, N_VARS):
+    b_true[child, child - 1] = rng.uniform(0.5, 1.5) * rng.choice([-1.0, 1.0])
 
-    Centred exponential noise is skewed (skewness 2), which is what the
-    non-Gaussianity of LiNGAM-family methods needs: under Gaussian noise the
-    causal order is not identifiable from the joint distribution at all.
-    """
-    b = np.zeros((N_VARS, N_VARS))
-    for child in range(1, N_VARS):
-        b[child, child - 1] = rng.uniform(0.5, 1.5) * rng.choice([-1.0, 1.0])
+e = rng.exponential(1.0, size=(N_ROWS, N_VARS)) - 1.0  # centred, skewed
+values = np.zeros((N_ROWS, N_VARS))
+for j in range(N_VARS):
+    values[:, j] = e[:, j] + values @ b_true[j]
 
-    e = rng.exponential(1.0, size=(N_ROWS, N_VARS)) - 1.0  # centred, skewed
-    x = np.zeros((N_ROWS, N_VARS))
-    for j in range(N_VARS):
-        x[:, j] = e[:, j] + x @ b[j]
-    return x, b
+data = ContinuousDataset.from_arrays(values, NAMES)
+truth = DAG.from_edges(
+    N_VARS,
+    [(p, c) for c in range(N_VARS) for p in range(N_VARS) if b_true[c, p] != 0.0],
+)
 
+print(f"{data.n_rows} rows, {data.n_vars} variables across {N_CLIENTS} sites")
+print(f"true causal order: {' -> '.join(NAMES)}")
 
-def main() -> None:
-    """Split a synthetic SEM across sites and recover its causal order."""
-    rng = np.random.default_rng(0)
-    values, b_true = _make_sem(rng)
-    data = ContinuousDataset.from_arrays(values, NAMES)
-    truth = DAG.from_edges(
-        N_VARS,
-        [(p, c) for c in range(N_VARS) for p in range(N_VARS) if b_true[c, p] != 0.0],
-    )
+# %%
+# What crosses the network. ``compute_local_raw_stats`` reduces a client's whole
+# matrix to nine additive moment-sum arrays plus a row count. Additivity is the
+# only property the server needs: it sums them and applies bias-corrected
+# k-statistic formulas to get unbiased cumulant estimates.
+#
+# A client's rows cannot be recovered from its nine arrays. They are aggregates
+# over its whole local sample, not a reversible encoding of it.
 
-    print(f"{data.n_rows} rows, {data.n_vars} variables across {N_CLIENTS} sites")
-    print(f"true causal order: {' -> '.join(NAMES)}\n")
+clients = contiguous_split(data, N_CLIENTS)
 
-    clients = contiguous_split(data, N_CLIENTS)
+raw_stats = [compute_local_raw_stats(c.values, order=4) for c in clients]
+stats = aggregate_and_compute_cumulants(raw_stats)
 
-    # Only nine moment-sum arrays per client cross the network here, never a
-    # row of `values`: compute_local_raw_stats is purely additive, so the
-    # server can sum what each client sends without seeing any sample.
-    raw_stats = [compute_local_raw_stats(c.values, order=4) for c in clients]
-    stats = aggregate_and_compute_cumulants(raw_stats)
+print(f"arrays sent per client: {len(raw_stats[0])}")
 
-    # One-shot: a single round of communication, deflating the aggregated
-    # cumulants algebraically on the server.
-    one_shot = fedrcd(stats)
-    order_names = " -> ".join(NAMES[i] for i in one_shot.causal_order)
-    print(f"fedrcd (one round):     {order_names}")
-    print(f"  SHD against truth:    {shd(truth, one_shot.to_dag(threshold=0.3))}")
+# %%
+# One shot. A single round of communication: the server deflates the aggregated
+# cumulants algebraically, identifying the most exogenous variable at each step.
 
-    # Multi-round: p - 1 rounds, each client re-deflating its own local data
-    # and sending fresh statistics, which avoids the algebraic error the
-    # one-shot deflation can accumulate under finite samples.
-    exact = fedrcd_exact([c.values for c in clients])
-    order_names = " -> ".join(NAMES[i] for i in exact.causal_order)
-    print(f"fedrcd_exact ({N_VARS - 1} rounds): {order_names}")
-    print(f"  SHD against truth:    {shd(truth, exact.to_dag(threshold=0.3))}")
+one_shot = fedrcd(stats)
 
+print(f"recovered order: {' -> '.join(NAMES[i] for i in one_shot.causal_order)}")
+print(f"SHD against truth: {shd(truth, one_shot.to_dag(threshold=0.3))}")
 
-if __name__ == "__main__":
-    main()
+# %%
+# Multi-round. ``fedrcd_exact`` spends ``p - 1`` rounds instead, each client
+# deflating its *own rows* and sending fresh statistics, so every round's
+# cumulants come from real data rather than from already-deflated estimates.
+#
+# It costs more traffic and earns it back when finite-sample noise would let the
+# one-shot deflation drift, which tends to mean small ``p`` or noise close to the
+# Gaussian boundary. On a clean chain like this one, both get it right.
+
+exact = fedrcd_exact([c.values for c in clients])
+
+print(f"recovered order: {' -> '.join(NAMES[i] for i in exact.causal_order)}")
+print(f"SHD against truth: {shd(truth, exact.to_dag(threshold=0.3))}")

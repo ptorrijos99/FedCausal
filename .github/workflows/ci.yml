@@ -68,14 +68,55 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -e ".[flower]"
+      # The gallery build runs these too, but as plain scripts they must
+      # also work for anyone who clones the repo and just runs one.
       - run: python examples/01_learn_structure.py
       - run: python examples/02_fedges_inprocess.py
       - run: python examples/03_fedrcd.py
+      - run: python examples/04_fusion_operators.py
+      - run: python examples/05_your_own_data.py
       - run: python benchmarks/pgm26/benchmark.py --mode main --quick --out /tmp/pgm26.jsonl
       # The README points people at this app, so a wiring mistake in it should
       # be a red build rather than something they discover.
       - run: python -c "import fedcausal_site.app"
-        working-directory: examples/flower_app
+        working-directory: flower_app
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -e ".[docs]"
+      # -W turns warnings into errors: a broken cross-reference or a docstring
+      # that does not parse should fail here rather than ship as a wrong page.
+      # The gallery executes every example, so this also runs them.
+      - run: sphinx-build -b html -W --keep-going docs docs/_build/html
+      # Belt and braces: the Actions-based Pages pipeline does not run Jekyll,
+      # but without this a switch to branch-based publishing would silently
+      # drop every `_static/` and `_modules/` path.
+      - run: touch docs/_build/html/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_build/html
+
+  # Publishing is its own job so that a pull request still builds the docs
+  # without being able to deploy them.
+  publish-docs:
+    needs: docs
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   build:
     runs-on: ubuntu-latest
