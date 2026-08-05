@@ -10,9 +10,9 @@ package does not ship, which is where the prior earns its keep::
 
     python benchmarks/sweep_bundled_prior.py --networks /path/to/BNs --out results.json
 
-Unlike ``sweep_structure_prior.py``, this needs no CSVs: it forward-samples from
-the network definition, so a run is fully determined by the ``.xbif`` and the
-seed. The paragraph in ``docs/algorithms.md`` is written from its output.
+It needs no CSVs: it forward-samples from the network definition, so a run is
+fully determined by the ``.xbif`` and the seed. The paragraph in
+``docs/algorithms.md`` is written from its output.
 """
 
 from __future__ import annotations
