@@ -1,21 +1,15 @@
 # Quickstart
 
-## Install
-
-```bash
-pip install git+https://github.com/ptorrijos99/fedcausal
-```
-
-Nothing else is required. The extras add the Flower transport (`[flower]`), Flower's simulation engine (`[flower-simulation]`), numba acceleration for large graphs (`[accel]`), and causal-learn for the comparison benchmark (`[compare]`).
-
 ## Learn a structure from one table
+
+The outputs shown below come from 5000 rows sampled from the `asia` network, which ships with the package. [`examples/01_learn_structure.py`](../examples/01_learn_structure.py) is this page as a runnable script, if you would rather check the numbers than take them on trust.
 
 ```python
 from fedcausal.data import DiscreteDataset
 from fedcausal.scores import BDeuScore
 from fedcausal.search import GES
 
-data = DiscreteDataset.from_csv("survey.csv")
+data = DiscreteDataset.from_csv("asia.csv")
 cpdag = GES(BDeuScore(data)).fit(data)
 
 print(cpdag.directed_edges())  # compelled: every DAG in the class agrees
@@ -51,8 +45,8 @@ truth = DAG.from_edges(
 )
 
 learned = cpdag.to_dag()
-print(shd(truth, learned), smhd(truth, learned))  # 3 2
-print(edge_scores(truth, learned).f1_skel)  # 0.875
+print(shd(truth, learned), smhd(truth, learned))  # 2 1
+print(edge_scores(truth, learned).f1_skel)  # 0.933
 ```
 
 Prefer SMHD when comparing search results. It moralises both graphs first, so it does not punish an arbitrary orientation choice among reversible edges the way SHD does. [Validation](validation.md) explains why.

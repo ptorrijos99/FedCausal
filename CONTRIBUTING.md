@@ -9,7 +9,7 @@ pip install -e ".[dev,flower]"
 pytest
 ```
 
-The suite is self-contained. No downloads, no environment variables, no JVM. Four xfails are expected and [Validation](docs/validation.md) explains why.
+The suite is self-contained: no downloads, no environment variables, no JVM. Some xfails are expected; [Validation](docs/validation.md) explains which and why.
 
 ## Before you open a pull request
 
@@ -19,7 +19,7 @@ mypy src
 pytest
 ```
 
-CI runs the same three on Linux and Windows, on Python 3.10 and 3.13.
+CI runs the tests on Linux and Windows, on Python 3.10 and 3.13. Ruff and mypy run once, on Linux and 3.13, since neither depends on the platform.
 
 ## What the tests are for
 
@@ -27,9 +27,9 @@ CI runs the same three on Linux and Windows, on Python 3.10 and 3.13.
 
 Markers:
 
-- `slow` for anything over a few seconds. CI runs these on one matrix entry.
+- `slow` for anything over a few seconds. CI runs these everywhere; only `bigdata` is deselected.
 - `regression` for the reference comparisons.
-- `bigdata` for tests needing networks too large to ship. They skip unless `FEDCAUSAL_NETWORKS` points at a directory holding them.
+- `bigdata` for tests needing networks too large to ship. They skip unless `FEDCAUSAL_NETWORKS` is set; see [Benchmarks](docs/benchmarks.md).
 
 ## Performance changes
 
@@ -43,7 +43,7 @@ Any change to the search must keep the incremental engine byte-identical to the 
 
 ## Adding a method
 
-`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`; `tests/flower/test_lingam_oneshot.py` has the check that keeps it that way.
+`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`; `tests/test_import.py` has the check that keeps it that way.
 
 ## Style
 

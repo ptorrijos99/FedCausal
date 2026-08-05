@@ -37,13 +37,9 @@ The same reasoning applies to metrics. SMHD moralises both graphs and is invaria
 
 ## The four expected xfails
 
-On `child` and `alarm`, fedcausal reaches a strictly *better* optimum than the original Java implementation. Both are marked `strict`, so the suite goes red if that ever stops being true. Each is counted twice because it is checked at two levels.
+On `child` and `alarm`, fedcausal reaches a strictly *better* optimum than the original Java implementation, so the pinned comparison fails in fedcausal's favour. Both are marked `strict`, so the suite goes red if that ever stops being true, and each is counted twice because it is checked at two levels.
 
-On `child` the cause is identified: the Java implementation skips a candidate edge unless it already scores positively with an empty neighbour subset, where fedcausal considers every subset. Turning that gate on reproduces the Java result bit for bit, which is what pins the diagnosis.
-
-On `alarm` the cause is not identified, and the tests say so rather than borrowing `child`'s explanation. What is verified is that the Java result is not a local optimum of its own operator: an admissible `Insert(VENTLUNG, INTUBATION, T={})` worth +749.05 remains available in it, which is exactly the score gap. Tie-break direction and single-orientation candidate sets have been ruled out.
-
-In both cases fedcausal scores higher, so neither is a defect here.
+On `child` the cause is the `empty_t_gate` quirk described in [Algorithms](algorithms.md): turning that gate on reproduces the Java result bit for bit. On `alarm` the cause is not identified, and the tests say so rather than borrowing `child`'s explanation; what is verified there is that the Java result is not a local optimum of its own operator.
 
 ## Limits
 

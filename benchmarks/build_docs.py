@@ -80,28 +80,24 @@ def main() -> None:
 
     nets = [n for n in ORDER if n in fc]
 
-    # --- scale ladder ---
+    # --- the ladder, with causal-learn alongside ---
+    # One table rather than two over the same sixteen networks: the comparison
+    # is the point, and splitting it made the reader cross-reference by eye.
     scale_rows = []
     for n in nets:
-        r = fc[n]
-        scale_rows.append(
-            f"| {n} | {r['n_vars']} | {secs(r)} | {r.get('n_edges', '-')} | "
-            f"{r.get('shd', '-')} | {r.get('smhd', '-')} |"
-        )
-
-    # --- vs causal-learn ---
-    cmp_rows = []
-    for n in nets:
-        f, c = fc[n], cl.get(n)
+        r, c = fc[n], cl.get(n)
         ratio = ""
         if (
             c is not None
             and c.get("status") == "ok"
-            and f.get("status") == "ok"
-            and f["seconds_search"] >= 0.01
+            and r.get("status") == "ok"
+            and r["seconds_search"] >= 0.01
         ):
-            ratio = f"{c['seconds_search'] / f['seconds_search']:.0f}x"
-        cmp_rows.append(f"| {n} | {f['n_vars']} | {secs(f)} | {secs(c)} | {ratio} |")
+            ratio = f"{c['seconds_search'] / r['seconds_search']:.0f}x"
+        scale_rows.append(
+            f"| {n} | {r['n_vars']} | {secs(r)} | {secs(c)} | {ratio} | "
+            f"{r.get('n_edges', '-')} | {r.get('smhd', '-')} |"
+        )
 
     # --- federated cost ---
     fed = [r for r in rows(FED) if r["impl"] == "fedcausal" and r.get("status") == "ok"]
@@ -214,21 +210,13 @@ Measured on one machine, single-threaded, with the default settings. Structures 
 
 ## How fast, and how large
 
-5000 rows per network. Times are search only.
+5000 rows per network, same data through both implementations on the same machine. Times are search only.
 
-| Network | Variables | Seconds | Edges found | SHD | SMHD |
-|---|---:|---:|---:|---:|---:|
+| Network | Variables | fedcausal | causal-learn | Ratio | Edges found | SMHD |
+|---|---:|---:|---:|---:|---:|---:|
 {chr(10).join(scale_rows)}
 
 {density_note}
-
-## Against causal-learn
-
-The same data through both, same machine.
-
-| Network | Variables | fedcausal | causal-learn | Ratio |
-|---|---:|---:|---:|---:|
-{chr(10).join(cmp_rows)}
 
 ## What federating costs you
 
@@ -277,7 +265,7 @@ The two scores differ by 7 in 1.1 million, and the skeletons share 1666 edges. B
 
 The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.
 
-On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,714, so the result is 55,000 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
+On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,715, so the result is 55,000 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
 
 `max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
 
@@ -304,7 +292,7 @@ python benchmarks/compare_fedges.py               # quality against site count
 python benchmarks/report_fedges.py
 ```
 
-`FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks come from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/); the five smallest ship with the package under `tests/fixtures/networks/`.
+`FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks come from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/); the five smallest ship inside the package, via `fedcausal.datasets`.
 
 `compare_ges.py` runs one subprocess per cell and appends results as they finish, so a hang costs one cell and the run resumes where it stopped.
 
@@ -312,7 +300,9 @@ python benchmarks/report_fedges.py
 
 Treat the absolute seconds loosely. Repeating the whole ladder on the same machine, with the same code and identical resulting structures, moved individual timings by up to a factor of two, and a sync client running in the background made it worse still. What survives that noise is the ratios, which are taken back to back in one process, and the orders of magnitude. If you re-run these, do it outside a synced folder and compare within a run rather than across runs.
 """
-    OUT.write_text(text, encoding="utf-8")
+    # newline="\n" so regenerating on Windows does not rewrite every line with
+    # CRLF and leave the whole page looking modified.
+    OUT.write_text(text, encoding="utf-8", newline="\n")
     print("written", OUT, f"({len(text.splitlines())} lines)")
 
 
