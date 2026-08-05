@@ -9,17 +9,14 @@ observed value is recorded in a comment next to each threshold).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
+from fedcausal.datasets import load_network
 from fedcausal.graph.meek import dag_to_cpdag
-from fedcausal.io import forward_sample, load_xbif
+from fedcausal.io import forward_sample
 from fedcausal.metrics import shd, smhd
 from fedcausal.scores import BDeuScore
 from fedcausal.search import GES
-
-NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
 
 # net -> (n_rows, max_smhd, max_shd_vs_true_cpdag)
 #
@@ -58,8 +55,7 @@ EXACT_RECOVERY_NETS = frozenset({"child"})
 
 
 def _run_recovery(net: str, n_rows: int, max_smhd: int, max_shd: int) -> None:
-    xbif = NETWORKS / f"{net}.xbif"
-    bn = load_xbif(str(xbif))
+    bn = load_network(net).network
     ds = forward_sample(bn, n_rows, seed=0)
     # forward_sample keeps bn.dag's node order (see its docstring's "same
     # node order" guarantee) -- verified once against asia.xbif's actual

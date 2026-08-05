@@ -18,6 +18,7 @@ REPO = Path(__file__).resolve().parent.parent
 SUBPACKAGES = [
     "fedcausal",
     "fedcausal.data",
+    "fedcausal.datasets",
     "fedcausal.exceptions",
     "fedcausal.fedges",
     "fedcausal.fusion",

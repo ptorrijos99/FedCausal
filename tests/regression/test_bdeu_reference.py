@@ -12,11 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from fedcausal.data import DiscreteDataset
+from fedcausal.datasets import load_network
 from fedcausal.scores import BDeuScore
 
 GOLDEN_DIR = Path(__file__).resolve().parent
-NETWORKS = GOLDEN_DIR.parent / "fixtures" / "networks"
 
 BDEU_GOLDENS = ["bdeu_scores_asia.json", "bdeu_scores_alarm.json", "bdeu_scores_asia_sp.json"]
 
@@ -26,7 +25,8 @@ BDEU_GOLDENS = ["bdeu_scores_asia.json", "bdeu_scores_alarm.json", "bdeu_scores_
 def test_bdeu_matches_reference(golden_name: str) -> None:
     golden = json.loads((GOLDEN_DIR / golden_name).read_text(encoding="ascii"))
 
-    ds = DiscreteDataset.from_csv(NETWORKS / f"{golden['dataset']}.gz")
+    # "asia.0.csv" names the sampled dataset bundled with the `asia` network.
+    ds = load_network(golden["dataset"].split(".")[0]).data
     score = BDeuScore(
         ds,
         sample_prior=golden["sample_prior"],

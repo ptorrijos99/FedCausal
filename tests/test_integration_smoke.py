@@ -1,18 +1,15 @@
 import math
-from pathlib import Path
 
+from fedcausal.datasets import load_asia
 from fedcausal.graph.meek import dag_to_cpdag
-from fedcausal.io import forward_sample, load_xbif
+from fedcausal.io import forward_sample
 from fedcausal.metrics import shd, smhd
 from fedcausal.scores import BDeuScore
 
-FIXTURES = Path(__file__).resolve().parent / "fixtures"
-ASIA_XBIF = FIXTURES / "networks" / "asia.xbif"
-
 
 def test_phase1_stack_end_to_end() -> None:
-    # load_xbif -> forward_sample -> BDeuScore -> score_dag
-    bn = load_xbif(ASIA_XBIF)
+    # load_asia -> forward_sample -> BDeuScore -> score_dag
+    bn = load_asia().network
     dataset = forward_sample(bn, 2000, seed=0)
     score = BDeuScore(dataset)
     total = score.score_dag(bn.dag)

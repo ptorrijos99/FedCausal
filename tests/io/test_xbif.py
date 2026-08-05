@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
+import atexit
+from contextlib import ExitStack
+from importlib.resources import as_file, files
 
 import numpy as np
 import pytest
 
 from fedcausal.io import DiscreteBN, forward_sample, load_xbif
 
-FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
-ASIA_XBIF = FIXTURES / "networks" / "asia.xbif"
+# These tests exercise `load_xbif` itself, so they need a real file rather than
+# the parsed network `fedcausal.datasets` hands back. `as_file` yields one from
+# the packaged data; the ExitStack keeps it alive for the module's lifetime.
+_resources = ExitStack()
+atexit.register(_resources.close)
+ASIA_XBIF = _resources.enter_context(as_file(files("fedcausal.datasets") / "data" / "asia.xbif"))
 
 
 def test_load_xbif_returns_discrete_bn() -> None:
@@ -155,7 +161,7 @@ def test_asia_either_is_deterministic_or() -> None:
 
 def test_load_xbif_missing_file_raises() -> None:
     with pytest.raises(FileNotFoundError):
-        load_xbif(FIXTURES / "does_not_exist.xbif")
+        load_xbif(ASIA_XBIF.parent / "does_not_exist.xbif")
 
 
 def test_forward_sample_returns_discrete_dataset() -> None:

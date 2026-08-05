@@ -6,15 +6,11 @@ independently of the committed reference runs, which pin one specific tie order.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import hypothesis.strategies as st
 from hypothesis import given, settings
 
 from fedcausal.fusion import consensus_union, max_frequency, max_parents
 from fedcausal.graph import DAG
-
-NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
 
 
 @st.composite
@@ -53,15 +49,14 @@ def test_fuses_real_ges_output_on_asia() -> None:
     Proves the fusion consumes real GES output. The SMHD bound is generous;
     the binding assertions are acyclicity and a non-degenerate result.
     """
-    xbif = NETWORKS / "asia.xbif"
-
     from fedcausal.data.partition import contiguous_split
-    from fedcausal.io import forward_sample, load_xbif
+    from fedcausal.datasets import load_asia
+    from fedcausal.io import forward_sample
     from fedcausal.metrics import smhd
     from fedcausal.scores import BDeuScore
     from fedcausal.search import GES
 
-    bn = load_xbif(str(xbif))
+    bn = load_asia().network
     ds = forward_sample(bn, 5000, seed=0)
     shards = contiguous_split(ds, 3)
     client_dags = [GES(BDeuScore(s)).fit(s).to_dag() for s in shards]

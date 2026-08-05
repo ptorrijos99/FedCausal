@@ -58,22 +58,21 @@ makes.
 from __future__ import annotations
 
 import time
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
 
+from fedcausal.datasets import load_network
 from fedcausal.graph import PDAG
 from fedcausal.graph.meek import dag_to_cpdag
-from fedcausal.io import forward_sample, load_xbif
+from fedcausal.io import forward_sample
 from fedcausal.metrics import shd, smhd
 from fedcausal.scores import BDeuScore
 from fedcausal.search import GES
 
 cl_ges = pytest.importorskip("causallearn.search.ScoreBased.GES")
 
-NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
 NETS = ["asia", "cancer", "child"]
 
 # One genuinely-strong, reliably-recoverable ground-truth edge per network, by
@@ -84,7 +83,7 @@ NETS = ["asia", "cancer", "child"]
 # would fail a direct adjacency assertion on a known-strong dependency.
 #
 # Each edge was chosen by inspecting the ground-truth network's own CPTs (see
-# `<net>.xbif` under `tests/fixtures/networks/`), picking the child variable
+# `<net>.xbif` under `src/fedcausal/datasets/data/`), picking the child variable
 # whose conditional probability swings most strongly with its parent, then
 # verified empirically (this exact seed/n_rows) that BOTH engines' result
 # CPDAGs keep the pair adjacent:
@@ -167,8 +166,7 @@ def _run_crosscheck(net: str, n_rows: int) -> None:
 
     See the module docstring for the one-sided assertion this makes and why.
     """
-    xbif = NETWORKS / f"{net}.xbif"
-    bn = load_xbif(str(xbif))
+    bn = load_network(net).network
     ds = forward_sample(bn, n_rows, seed=0)
     assert ds.names == tuple(bn.names)
 

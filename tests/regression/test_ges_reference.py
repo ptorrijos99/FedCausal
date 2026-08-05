@@ -20,16 +20,14 @@ from typing import Any
 
 import pytest
 
-from fedcausal.data import DiscreteDataset
+from fedcausal.datasets import load_network
 from fedcausal.graph import DAG
 from fedcausal.graph.meek import dag_to_cpdag
-from fedcausal.io import load_xbif
 from fedcausal.metrics import shd, smhd
 from fedcausal.scores import BDeuScore
 from fedcausal.search import GES
 
 GOLDEN_DIR = Path(__file__).resolve().parent
-NETWORKS = GOLDEN_DIR.parent / "fixtures" / "networks"
 
 GOLDEN = json.loads((GOLDEN_DIR / "ges_runs.json").read_text())
 
@@ -81,7 +79,8 @@ def _mapped_dag(n: int, name_to_idx: dict[str, int], named_edges: list[list[str]
 def test_ges_matches_reference(run: dict[str, Any]) -> None:
     """Pin fedcausal's GES (BDeu, CPDAG, SMHD) against a reference run."""
     net = run["net"]
-    ds = DiscreteDataset.from_csv(NETWORKS / f"{run['dataset']}.gz")
+    bundle = load_network(net)
+    ds = bundle.data
     # Every name->index remap below silently compares the wrong nodes if the
     # column order ever disagrees with the golden's own variable order.
     assert list(ds.names) == run["variables"], (
@@ -100,18 +99,15 @@ def test_ges_matches_reference(run: dict[str, Any]) -> None:
     golden_cpdag = dag_to_cpdag(_mapped_dag(ds.n_vars, name_to_idx, run["directed_edges"]))
     assert result == golden_cpdag, f"{net}: our CPDAG != golden's CPDAG"
 
-    # Load the .xbif ground truth rather than trusting the golden's committed
-    # truth_edges blindly: this is the only place load_xbif's ground-truth
-    # parsing is cross-validated against an independent source.
-    bn = load_xbif(NETWORKS / run["xbif"])
-    assert set(bn.names) == set(ds.names), (
-        f"{net}: xbif variables {sorted(bn.names)} != dataset variables {sorted(ds.names)}"
+    # Check the .xbif-derived ground truth rather than trusting the golden's
+    # committed truth_edges blindly: this is the only place load_xbif's
+    # ground-truth parsing, and the re-indexing `load_network` does on top of
+    # it, are cross-validated against an independent source.
+    assert set(bundle.network.names) == set(ds.names), (
+        f"{net}: xbif variables {sorted(bundle.network.names)} "
+        f"!= dataset variables {sorted(ds.names)}"
     )
-    bn_idx_to_ds_idx = {i: name_to_idx[name] for i, name in enumerate(bn.names)}
-    truth_dag = DAG.from_edges(
-        ds.n_vars,
-        [(bn_idx_to_ds_idx[u], bn_idx_to_ds_idx[v]) for u, v in bn.dag.edges()],
-    )
+    truth_dag = bundle.truth
     assert truth_dag == _mapped_dag(ds.n_vars, name_to_idx, run["truth_edges"]), (
         f"{net}: load_xbif ground truth != golden's committed truth_edges"
     )

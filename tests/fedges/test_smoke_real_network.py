@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
+from fedcausal.datasets import load_asia
 from fedcausal.fedges import run_fedges
-from fedcausal.io import forward_sample, load_xbif
+from fedcausal.io import forward_sample
 from fedcausal.metrics import shd
-
-ASIA_XBIF = Path(__file__).resolve().parent.parent / "fixtures" / "networks" / "asia.xbif"
 
 
 @pytest.mark.slow
 def test_fedges_on_sampled_asia_recovers_a_nontrivial_structure():
-    bn = load_xbif(ASIA_XBIF)
+    bn = load_asia().network
     ds = forward_sample(bn, 5000, seed=0)
     global_model, stats = run_fedges(ds, n_clients=5, n_iterations=20, truth=bn.dag)
 

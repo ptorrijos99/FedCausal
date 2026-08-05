@@ -1,13 +1,12 @@
 fedcausal is licensed under the MIT License (see LICENSE).
 
-Test data
----------
+Bundled networks
+----------------
 
-`tests/fixtures/networks/` contains sampled datasets and network definitions
-for five Bayesian networks from the public Bayesian Network Repository (asia,
-cancer, child, insurance, alarm). They are included so the test suite runs
-without external downloads, and are used for testing only -- no fedcausal code
-depends on them at run time, and they are excluded from the distributed package
-(the wheel packages only `src/fedcausal`).
+`src/fedcausal/datasets/data/` contains network definitions and sampled
+datasets for five Bayesian networks from the public Bayesian Network Repository
+(asia, cancer, child, insurance, alarm). They ship inside the package, are
+exposed through `fedcausal.datasets`, and are used by the examples, the
+documentation and the test suite so that all three run without downloads.
 
 Bayesian Network Repository: https://www.bnlearn.com/bnrepository/

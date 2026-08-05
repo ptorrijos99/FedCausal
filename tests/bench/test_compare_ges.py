@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from importlib.resources import as_file, files
 from pathlib import Path
 
 import pytest
@@ -30,7 +31,9 @@ sys.path.insert(0, str(BENCH))
 
 from compare_ges import rebuild_pdag  # noqa: E402
 
-NETWORKS = REPO_ROOT / "tests" / "fixtures" / "networks"
+# The runner is a subprocess taking file paths, so this needs the bundled data
+# as real files rather than through `fedcausal.datasets`.
+NETWORK_DATA = files("fedcausal.datasets") / "data"
 GOLDEN = json.loads((REPO_ROOT / "tests" / "regression" / "ges_runs.json").read_text())
 
 
@@ -79,24 +82,27 @@ def test_fedcausal_runner_reproduces_reference() -> None:
     target for the default ``h_pool="nayx"`` the runner uses.
     """
     run = next(r for r in GOLDEN["runs"] if r["net"] == "asia")
-    csv = NETWORKS / "asia.0.csv.gz"
-    xbif = NETWORKS / "asia.xbif"
 
-    proc = subprocess.run(
-        [
-            sys.executable,
-            str(BENCH / "runners" / "run_fedcausal.py"),
-            str(csv),
-            str(xbif),
-            "asia",
-            # The reference was produced without a structure prior; the library
-            # default has one, so ask for the configuration being reproduced.
-            "--structure-prior=0.0",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    with (
+        as_file(NETWORK_DATA / "asia.0.csv.gz") as csv,
+        as_file(NETWORK_DATA / "asia.xbif") as xbif,
+    ):
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(BENCH / "runners" / "run_fedcausal.py"),
+                str(csv),
+                str(xbif),
+                "asia",
+                # The reference was produced without a structure prior; the
+                # library default has one, so ask for the configuration being
+                # reproduced.
+                "--structure-prior=0.0",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
     payload = json.loads(proc.stdout.strip().splitlines()[-1])
 
     assert payload["impl"] == "fedcausal"
