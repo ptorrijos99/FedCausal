@@ -163,7 +163,7 @@ def max_frequency(dags: Sequence[DAG], limit: int) -> DAG:
 
 
 def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
-    """Union every edge appearing in at least `percent`% of inputs.
+    """Union every edge appearing in at least `percent` per cent of inputs.
 
     The threshold is ``lim = percent * len(dags) // 100`` (truncating, exactly
     as the original ``Consensus`` mode), then a frequency filter at ``lim``.

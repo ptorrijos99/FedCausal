@@ -234,7 +234,8 @@ def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulan
 
     Notes
     -----
-    Bias correction follows the k-statistic formulas [2]_:
+    Bias correction follows the k-statistic formulas of [2] in the module's
+    References:
 
     - 3rd order: k₃ = N / ((N-1)(N-2)) · M₃.
     - 4th order: k₄ = [N(N+1) M₄ - 3(N-1) M₂²] / [(N-1)(N-2)(N-3)].

@@ -35,8 +35,8 @@ def moralize(dag: DAG) -> np.ndarray:
 
     The moral graph consists of the DAG's skeleton (every directed edge
     becomes undirected) plus an edge between every pair of nodes that share
-    a common child (i.e. every pair of co-parents), mirroring Tetrad
-    reference's ``Utils.moralize``.
+    a common child (i.e. every pair of co-parents), mirroring Tetrad's
+    ``Utils.moralize``.
 
     Parameters
     ----------
@@ -196,11 +196,10 @@ def treewidth_java(dag: DAG) -> int:
 
     Moralizes `dag`, triangulates the moral graph (MCS ordering followed by
     fill-in), recomputes an MCS ordering on the triangulated graph, and
-    returns the size of its largest maximal clique. This mirrors Tetrad
-    reference's ``Utils.getTreeWidth`` **exactly**, including its
-    off-by-one convention: it returns the maximum clique **size**, not
-    ``size - 1``. Use :func:`treewidth` for the standard graph-theoretic
-    definition.
+    returns the size of its largest maximal clique. This mirrors Tetrad's
+    ``Utils.getTreeWidth`` **exactly**, including its off-by-one convention:
+    it returns the maximum clique **size**, not ``size - 1``. Use
+    :func:`treewidth` for the standard graph-theoretic definition.
 
     Parameters
     ----------

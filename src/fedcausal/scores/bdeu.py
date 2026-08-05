@@ -112,32 +112,29 @@ def _counts(
 class BDeuScore:
     """BDeu local score with a memoizing, thread-safe cache.
 
-    The score of
-    a family ``(node, parents)`` is the BDeu log marginal likelihood plus
-    Tetrad's structure-prior term (see the module docstring).
+    The score of a family ``(node, parents)`` is the BDeu log marginal
+    likelihood plus Tetrad's structure-prior term (see the module docstring).
 
     Parameters
     ----------
     dataset : DiscreteDataset
         The discrete data to score against.
     sample_prior : float, optional
-        The equivalent sample size (ESS). Default
-        ``1.0``.
+        The equivalent sample size (ESS). Default ``1.0``.
     structure_prior : float, optional
         Penalises parent count; ``0.0`` disables the structure-prior term.
-        Default ``0.001``.
+        Default ``1.0``. Watch the direction: a *larger* value is a *weaker*
+        penalty, since the per-parent cost is ``log(e / (n_rows - 1))``.
     cache : bool, optional
         If ``True`` (default), memoize local scores keyed by
         ``(node, sorted_parents)``.
 
     Notes
     -----
-    ``structure_prior`` defaults to ``0.001`` because it recovers better
-    structure as networks grow: over five sampled datasets each, it improves
-    SMHD on six of twelve benchmark networks and costs three, with the gains
-    concentrated where they matter (``win95pts`` 125 to 58, ``pathfinder`` 318
-    to 214, ``link`` 3098 to 980) and the losses small. See
-    ``docs/benchmarks.md``.
+    The structure prior is on by default because it recovers better structure
+    as networks grow, at the cost of a few small ones. The per-network figures
+    live in ``docs/algorithms.md`` rather than here, so that re-running the
+    benchmarks means correcting them in one place.
 
     The original Java implementation effectively scores with ``0.0``: it
     declares ``0.001`` but never propagates it onto the score object, so it
