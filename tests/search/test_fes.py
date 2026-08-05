@@ -17,13 +17,11 @@ def testsubsets_order_two_elements() -> None:
 
 
 def testsubsets_order_three_elements() -> None:
-    # Pins the full ascending-size-then-lexicographic contract: two elements
-    # alone can't distinguish "ascending size" from some other tie-break
-    # among same-size subsets, since there is only one subset of size 2 (the
-    # full set). Three elements have three distinct size-2 subsets, so this
-    # catches an implementation that orders sizes correctly but shuffles
-    # same-size subsets (e.g. by sorting subset contents instead of preserving
-    # itertools.combinations' source order).
+    # Three elements, not two: with two there is only one subset of size 2, so
+    # nothing distinguishes "ascending size" from any other tie-break among
+    # same-size subsets. Three gives three distinct size-2 subsets, which
+    # catches an implementation that sorts subset contents instead of
+    # preserving itertools.combinations' order.
     assert list(subsets([1, 2, 3])) == [
         frozenset(),
         frozenset({1}),
@@ -67,12 +65,9 @@ def test_fes_monotone_score_increase() -> None:
     cpdag, _ = run_fes(score, empty)
     s_empty = score.score_dag(DAG(4))
     s_final = score.score_dag(cpdag.to_dag())
-    # Strict `>`, not `>=`: `>=` would also pass for a no-op implementation
-    # that returns the empty graph unchanged. Strictness is safe here (not a
-    # risk of spurious failure on a legitimately flat score surface) because
-    # the sibling test `test_fes_recovers_ab_adjacency` already asserts
-    # `flag is True` on this exact fixture, so FES demonstrably inserted at
-    # least one edge here.
+    # Strict `>`, since `>=` would also pass for a no-op implementation that
+    # returns the empty graph. It cannot fail spuriously on a flat score
+    # surface: FES provably inserts an edge on this fixture.
     assert s_final > s_empty
 
 
@@ -88,21 +83,14 @@ def test_fes_does_not_mutate_input_pdag() -> None:
 
 
 def test_fes_is_deterministic_across_repeated_runs() -> None:
-    # Comparing two runs against *each other* in the same process does not
-    # actually pin scan/tie-break order on this fixture: both runs execute
-    # identical construction sequences over small ints, and hash(int) == int,
-    # so PYTHONHASHSEED perturbs nothing here. An implementation that
-    # iterates frozenset candidates directly (instead of via sorted(...))
-    # would still traverse them in the same order both runs, within and
-    # across processes, and would still pass a cpdag1 == cpdag2 check alone.
-    # The assertions below pin the *exact* expected CPDAG instead, so any
-    # change to candidate scan order, tie-breaking, or subset order changes
-    # the result and fails here -- this is a change-detector for those three
-    # things, not a real "is it deterministic" test. Expected value obtained
-    # by running the current implementation and eyeballed for plausibility:
-    # A and B are strongly dependent (see _dep_dataset), so FES connects them
-    # (undirected, since nothing forces an orientation); C and D are
-    # independent of everything, so no other edge appears.
+    # Comparing two runs against each other would pin nothing on this fixture:
+    # hash(int) == int, so PYTHONHASHSEED perturbs no iteration order and an
+    # implementation that walks frozensets directly would traverse them
+    # identically in both runs. The exact CPDAG is pinned instead, which makes
+    # this a change-detector for candidate scan order, tie-breaking and subset
+    # order. A and B are strongly dependent so FES connects them, undirected
+    # since nothing forces an orientation; C and D are independent of
+    # everything, so no other edge appears.
     ds = _dep_dataset()
     score = BDeuScore(ds)
     cpdag1, flag1 = run_fes(score, PDAG(4))
@@ -183,12 +171,10 @@ def test_best_insert_keeps_first_seen_candidate_on_exact_tie() -> None:
 
 
 def test_run_fes_restricted_candidate_edges_omits_edge_unrestricted_would_add() -> None:
-    # A and B are strongly dependent (see _dep_dataset), so unrestricted FES
-    # connects them (test_fes_recovers_ab_adjacency / the determinism test
-    # above both pin the resulting undirected (0, 1) edge). Restricting
-    # candidate_edges to every ordered pair *except* (0, 1) and (1, 0) must
-    # therefore prevent that edge from ever being scanned, leaving the graph
-    # empty even though the data would otherwise justify the edge.
+    # A and B are strongly dependent, so unrestricted FES connects them.
+    # Restricting candidate_edges to every ordered pair except (0, 1) and
+    # (1, 0) keeps that edge from ever being scanned, leaving the graph empty
+    # even though the data would justify it.
     ds = _dep_dataset()
     score = BDeuScore(ds)
     n = 4
@@ -212,15 +198,12 @@ class _DirectedInsertScore:
 
 
 def test_run_fes_candidate_edges_pair_order_is_directional() -> None:
-    # candidate_edges holds *ordered* pairs: (x, y) means "consider inserting
-    # x -> y", not "this undirected edge is a candidate". A caller who builds
-    # an undirected candidate set (e.g. from a federated fusion step) and
-    # forgets to include both (x, y) and (y, x) silently gets a degraded
-    # search: frozenset({(0, 2)}) allows the beneficial insert below, while
-    # frozenset({(2, 0)}) -- the same two nodes, opposite order -- allows
-    # nothing at all, even though the score only depends on the edge
-    # existing, not on which literal ordered pair the caller happened to
-    # list.
+    # candidate_edges holds ordered pairs: (x, y) means "consider inserting
+    # x -> y", not "this undirected edge is a candidate". A caller building an
+    # undirected candidate set, say from a federated fusion step, who lists
+    # only one ordering silently gets a degraded search: {(0, 2)} allows the
+    # insert below and {(2, 0)} allows nothing, even though the score depends
+    # only on the edge existing.
     score = _DirectedInsertScore()
     cpdag_allowed, changed_allowed = run_fes(score, PDAG(3), frozenset({(0, 2)}))
     assert changed_allowed is True
@@ -255,12 +238,9 @@ class _NonEmptyTScore:
 
 
 def test_best_insert_selects_non_empty_t_when_it_wins() -> None:
-    # Regression coverage for the non-empty-T path through valid_insert /
-    # insert_eval / apply_insert: no other test in this file exercises it,
-    # since every other fixture either starts from an empty PDAG (no
-    # candidate T exists at all) or has its winning Insert use T=empty
-    # anyway. Asserting directly on _best_insert's returned t pins that a
-    # non-empty T can in fact be selected when it scores higher.
+    # The non-empty-T path through valid_insert / insert_eval / apply_insert.
+    # Every other fixture here starts from an empty PDAG, where no candidate T
+    # exists, or has its winning Insert use T=empty anyway.
     pdag = PDAG(3)
     pdag.add_undirected(1, 2)
     score = _NonEmptyTScore()
@@ -269,12 +249,10 @@ def test_best_insert_selects_non_empty_t_when_it_wins() -> None:
 
 
 def test_run_fes_non_empty_t_orients_t_neighbor_into_y() -> None:
-    # Same fixture as above, run through the full run_fes loop instead of
-    # calling _best_insert directly: apply_insert force-flips every node in T
-    # towards y, so T={2} being selected must show up as a directed edge
-    # 2 -> 1 in the resulting CPDAG. It stays directed (not re-undirected by
-    # re-canonicalization) because 0 and 2 are non-adjacent, making
-    # 0 -> 1 <- 2 an unshielded collider, which Meek orientation preserves.
+    # apply_insert force-flips every node in T towards y, so selecting T={2}
+    # must show up as a directed 2 -> 1. Re-canonicalisation leaves it directed
+    # because 0 and 2 are non-adjacent, making 0 -> 1 <- 2 an unshielded
+    # collider, which Meek orientation preserves.
     pdag = PDAG(3)
     pdag.add_undirected(1, 2)
     score = _NonEmptyTScore()

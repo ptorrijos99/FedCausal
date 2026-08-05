@@ -139,11 +139,8 @@ class _DirectedInsertScore:
 
 
 def test_fes_only_candidate_edges_pair_order_is_directional() -> None:
-    # candidate_edges holds *ordered* pairs on the public API too: (x, y)
-    # means "consider inserting x -> y", not "this undirected edge is a
-    # candidate". frozenset({(0, 2)}) allows the beneficial insert below;
-    # frozenset({(2, 0)}) -- the same two nodes, opposite order -- allows
-    # nothing.
+    # candidate_edges holds ordered pairs on the public API too: {(0, 2)}
+    # allows the insert below, {(2, 0)} allows nothing.
     ds = _dummy_dataset(3)
     score = _DirectedInsertScore()
     g = GES(score)
@@ -185,13 +182,9 @@ def test_bes_only_candidate_edges_pair_order_is_directional() -> None:
 
 
 def test_fit_threads_candidate_edges_to_bes_phase() -> None:
-    # `fit` must restrict *both* phases with the same `candidate_edges`, not
-    # just FES: start from the fully-connected graph (so FES itself has
-    # nothing left to insert -- every pair is already adjacent) and confirm
-    # that excluding the spurious C-D pair from `candidate_edges` keeps BES
-    # from ever pruning it, exactly as the equivalent `run_bes`-level test
-    # (test_run_bes_restricted_candidate_edges_keeps_spurious_edge) pins for
-    # the private phase function.
+    # `fit` must restrict both phases, not just FES. Starting fully connected
+    # leaves FES nothing to insert, so excluding the spurious C-D pair can only
+    # show up as BES failing to prune it.
     ds = _dep_dataset()
     full = DAG.from_edges(4, [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     n = 4
@@ -203,15 +196,10 @@ def test_fit_threads_candidate_edges_to_bes_phase() -> None:
 
 
 def test_fit_threads_candidate_edges_to_fes_phase() -> None:
-    # Mirrors test_fit_threads_candidate_edges_to_bes_phase for the forward
-    # leg: candidate_edges restriction on FES is otherwise exercised only via
-    # fes_only, never through fit itself, so a fit that dropped
-    # candidate_edges on its run_fes call (while still forwarding it to
-    # run_bes) would pass every other test in this file. Since BES only ever
-    # deletes edges, restricting the A-B pair out of candidate_edges means
-    # the A-B edge can appear in the final result only if FES was allowed to
-    # insert it -- i.e. only if fit failed to forward the restriction to
-    # run_fes.
+    # A fit that forwarded candidate_edges to run_bes but dropped it on
+    # run_fes would pass every other test here. Since BES only deletes, an A-B
+    # edge in the result can only mean FES was allowed to insert it, so the
+    # restriction was not forwarded.
     ds = _dep_dataset()
     n = 4
     restricted = frozenset(
@@ -290,12 +278,9 @@ def _common_neighbour_dag() -> DAG:
 
 
 def test_ges_h_pool_threads_to_bes_and_changes_result() -> None:
-    # Demonstrates h_pool is not merely accepted and ignored: the same
-    # starting graph and score, run through bes_only under each pool,
-    # produce different final CPDAGs -- matching the divergence
-    # test_run_bes_pools_diverge_on_common_neighbourhood pins at the
-    # run_bes level, now exercised through the public GES API and its
-    # constructor argument instead of a direct run_bes(..., h_pool=...) call.
+    # h_pool must reach the search rather than being accepted and ignored: the
+    # same graph and score give different CPDAGs under each pool, through the
+    # public API rather than a direct run_bes call.
     ds = _dummy_dataset(4)
     score = _CommonNeighbourScore()
     start = _common_neighbour_dag()
@@ -311,12 +296,9 @@ def test_ges_h_pool_threads_to_bes_and_changes_result() -> None:
 
 
 def test_fit_uses_initial_graph_as_fes_start_not_empty() -> None:
-    # A non-default initial_graph must actually change fit's behaviour: with
-    # a starting DAG that already has the 0-1 edge, and a score under which
-    # inserting it from scratch would never be attractive (delta 0), fit
-    # must still keep the edge it started from -- proving initial_graph is
-    # really threaded into the FES start rather than fit always beginning
-    # from PDAG(n_vars) regardless of the argument.
+    # The score makes inserting 0-1 from scratch unattractive (delta 0), so the
+    # edge can only survive if initial_graph really seeds the FES start instead
+    # of fit always beginning from PDAG(n_vars).
     ds = _dummy_dataset(2)
 
     class _FlatScore:

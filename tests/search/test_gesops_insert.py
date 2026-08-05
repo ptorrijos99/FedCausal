@@ -52,11 +52,9 @@ def test_semidirected_blocked() -> None:
 
 
 def test_semidirected_blocked_route_against_arrowhead_is_not_a_path() -> None:
-    # Bug this catches: a direction-blind `adjacent(v)` traversal would treat
-    # 0 - 2 (via the directed edge 0 -> 2) as bidirectional and reach x=0
-    # from y=1 via 1 - 2, wrongly reporting "unblocked". The only route from
-    # y=1 to x=0 runs against the 0 -> 2 arrowhead, so it is not a
-    # semi-directed path at all, and the correct answer is "blocked".
+    # The only route from y=1 to x=0 runs against the 0 -> 2 arrowhead, so it
+    # is not a semi-directed path at all; the traversal must not treat a
+    # directed edge as bidirectional, or it would wrongly reach x via 1 - 2.
     p = PDAG(3)
     p.add_undirected(1, 2)  # y=1 - 2
     p.add_directed(0, 2)  # 0 -> 2 ; 2 cannot be left towards 0
@@ -64,9 +62,8 @@ def test_semidirected_blocked_route_against_arrowhead_is_not_a_path() -> None:
 
 
 def test_semidirected_blocked_directed_edge_leaving_source_is_a_path() -> None:
-    # Bug this catches: an implementation that only follows undirected edges
-    # (ignoring directed edges leaving the source) would miss the semi-directed
-    # path 1 -> 2 - 0 and wrongly report "blocked".
+    # A directed edge leaving the source is part of a semi-directed path too;
+    # the traversal must follow 1 -> 2 - 0, not just undirected edges.
     p = PDAG(3)
     p.add_directed(1, 2)  # y=1 -> 2
     p.add_undirected(2, 0)  # 2 - x=0
@@ -74,12 +71,10 @@ def test_semidirected_blocked_directed_edge_leaving_source_is_a_path() -> None:
 
 
 def test_semidirected_blocked_x_in_cond_is_blocked() -> None:
-    # Regression for the guard-order / "x in cond" bug fixed in a previous
-    # pass: `cond` seeds the "already visited" set before the traversal
-    # starts (matching Java's `close = new HashSet<>(naYXT)`), so a neighbour
-    # that is both `x` and already in `cond` must never be (re)discovered as
-    # "found". The pre-fix code checked `w == x` before `w in visited`, so it
-    # returned False (unblocked) here; the fix returns True (blocked).
+    # `cond` seeds the "already visited" set before the traversal starts
+    # (matching Java's `close = new HashSet<>(naYXT)`), so a neighbour that
+    # is both `x` and already in `cond` must never be (re)discovered as
+    # "found"; the visited check must run before the `w == x` check.
     p = PDAG(3)
     p.add_undirected(1, 2)
     p.add_directed(2, 0)
@@ -87,7 +82,7 @@ def test_semidirected_blocked_x_in_cond_is_blocked() -> None:
 
 
 def test_semidirected_blocked_y_in_cond_early_exit() -> None:
-    # Pins the `y in cond -> True` early-exit guard ported from Java.
+    # `y in cond` is an early-exit guard returning True, ported from Java.
     p = PDAG(3)
     p.add_undirected(1, 2)
     p.add_directed(2, 0)
@@ -95,7 +90,7 @@ def test_semidirected_blocked_y_in_cond_early_exit() -> None:
 
 
 def test_semidirected_blocked_y_equals_x_early_exit() -> None:
-    # Pins the `y == x -> False` early-exit guard ported from Java.
+    # `y == x` is an early-exit guard returning False, ported from Java.
     p = PDAG(3)
     p.add_undirected(1, 2)
     p.add_directed(2, 0)
@@ -132,15 +127,15 @@ def test_insert_eval_matches_local_score_difference() -> None:
 
 
 def test_insert_eval_combines_parents_na_and_t() -> None:
-    # Non-empty Pa(y), na, and t together, so this fails if the implementation
-    # drops pdag.parents(y), uses parents(x) instead, or forgets `| t`.
+    # insert_eval must use pdag.parents(y), not parents(x), and include t;
+    # this exercises non-empty Pa(y), na, and t together.
     s = _toy_score(p=5)
     p = PDAG(5)
     p.add_directed(3, 4)  # existing Pa(y=4) = {3}
     na = frozenset({1})
     t = frozenset({2})
     got = ops.insert_eval(s, p, x=0, y=4, t=t, na=na)
-    # Explicitly constructed expected parent sets: na | t | Pa(y) = {1, 2, 3}
+    # Expected parent sets: na | t | Pa(y) = {1, 2, 3}
     exp = s.local_score(4, (0, 1, 2, 3)) - s.local_score(4, (1, 2, 3))
     assert math.isclose(got, exp, rel_tol=1e-12)
 
@@ -154,13 +149,10 @@ def test_apply_insert_orients_t() -> None:
 
 
 def test_apply_insert_force_flips_wrongly_directed_t_edge() -> None:
-    # Regression for FIX A: restores Java `GESThread.insert`'s force-flip
-    # semantics (`removeEdge(node, y); addDirectedEdge(node, y)` for every
-    # node in T, unconditionally). A previous fix pass wrongly made
-    # apply_insert raise ValueError here instead of force-flipping; this
-    # pins the correct (reverted) behaviour: the pre-existing y -> w edge
-    # (the WRONG direction for a t node) is silently replaced by w -> y,
-    # with no exception.
+    # Java `GESThread.insert` force-flips every T member unconditionally
+    # (`removeEdge(node, y); addDirectedEdge(node, y)`, no guard): a
+    # pre-existing y -> w edge (the wrong direction for a t node) must be
+    # silently replaced by w -> y, not raise an exception.
     p = PDAG(3)
     p.add_directed(1, 2)  # y=1 -> w=2 : wrong direction for a t node
     ops.apply_insert(p, 0, 1, frozenset({2}))

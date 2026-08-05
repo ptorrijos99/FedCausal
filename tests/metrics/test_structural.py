@@ -21,10 +21,9 @@ from fedcausal.metrics.structural import (
 #   - 1 if the pair is an edge in exactly one graph (addition/deletion);
 #   - 1 (NOT 2) if both graphs have an edge between u and v but in opposite
 #     directions ("reversed arcs are counted only once", line 526).
-# Crucially, Utils.SHD takes two Dag objects directly and never CPDAG-ifies
-# them (confirmed by its only call site,
-# ExperimentUtils.calculateSHD:148, which passes two plain Dags) -- so this
-# is a DAG-vs-DAG exact-edge comparison, not a CPDAG comparison.
+# Utils.SHD takes two Dag objects directly and never CPDAG-ifies them (its
+# only call site, ExperimentUtils.calculateSHD:148, passes two plain Dags),
+# so this is a DAG-vs-DAG exact-edge comparison, not a CPDAG comparison.
 
 
 def test_shd_identical_graphs_is_zero() -> None:
@@ -61,9 +60,8 @@ def test_shd_reversed_reversible_edge_counts_one() -> None:
 
 
 def test_shd_reversed_compelled_and_reversible_edges_are_indistinguishable() -> None:
-    # Because Utils.SHD operates directly on DAGs (not CPDAGs), it has no
-    # notion of "compelled" vs. "reversible" edges -- both of the above cases
-    # produce the identical count (1), which is the point of this test.
+    # Utils.SHD operates directly on DAGs, not CPDAGs, so it has no notion of
+    # "compelled" vs. "reversible" edges; both cases below score 1.
     compelled_g1 = DAG.from_edges(3, [(0, 2), (1, 2)])
     compelled_g2 = DAG.from_edges(3, [(2, 0), (1, 2)])
     reversible_g1 = DAG.from_edges(3, [(0, 1), (1, 2)])
@@ -122,8 +120,6 @@ def test_smhd_moralization_changes_the_count_vs_shd_skeleton() -> None:
     # dag2: 0->1->2 (chain, no collider). moralize adds nothing:
     #   moral(dag2) = {0-1, 1-2} (path).
     # Symmetric difference of the moral graphs: {0-2} only -> smhd == 1.
-    # (Contrast with shd_skeleton(dag, dag2) == 2, computed above on the raw,
-    # non-moralized skeletons.)
     dag = DAG.from_edges(3, [(0, 2), (1, 2)])
     dag2 = DAG.from_edges(3, [(0, 1), (1, 2)])
     assert shd_skeleton(dag, dag2) == 2

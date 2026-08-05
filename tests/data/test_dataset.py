@@ -69,8 +69,8 @@ def test_from_csv_rejects_missing_values(tmp_path: Path) -> None:
 def test_from_csv_rejects_whitespace_only_field(tmp_path: Path) -> None:
     # A field that is present but blank/whitespace-only is still genuinely
     # missing data, even though pandas' default NA-token sniffing is
-    # disabled (which is what lets the literal string "None" survive as an
-    # ordinary category -- see test_from_csv_preserves_none_as_category).
+    # disabled, which is what lets the literal string "None" survive as an
+    # ordinary category.
     bad_csv = tmp_path / "bad.csv"
     bad_csv.write_text("A,B\nx,y\n  ,z\n")
     with pytest.raises(ValueError, match="missing"):
@@ -78,11 +78,10 @@ def test_from_csv_rejects_whitespace_only_field(tmp_path: Path) -> None:
 
 
 def test_from_csv_preserves_none_as_category() -> None:
-    # Regression test: pandas' default `read_csv` NA tokens include the
-    # literal string "None", which used to be silently coerced to NaN and
-    # then rejected by the missing-value guard. Some reference networks
-    # (e.g. child's DuctFlow, insurance's ThisCarDam) use "None" as a
-    # genuine category label, exactly as Weka/Tetrad read it.
+    # pandas' default `read_csv` NA tokens include the literal string "None".
+    # Reference networks such as child's DuctFlow and insurance's ThisCarDam
+    # use "None" as a genuine category label, exactly as Weka/Tetrad read it,
+    # so it must survive as an ordinary category rather than become NaN.
     ds = DiscreteDataset.from_csv(NONE_CATEGORY_CSV)
     assert ds.n_rows == 4
     a_idx = ds.names.index("A")
@@ -106,12 +105,12 @@ def test_from_pandas_rejects_nan() -> None:
 
 @pytest.mark.parametrize("blank", ["", "   ", "\t"])
 def test_from_pandas_rejects_blank_fields(blank: str) -> None:
-    """`from_pandas` must reject blanks too, not only `from_csv`.
+    """`from_pandas` must reject blank fields, not just missing (NaN) ones.
 
-    An empty string is not NaN, so the NaN guard above lets it through. Left
-    alone it becomes a level of its own, which inflates the column's
-    cardinality and quietly changes every BDeu score computed from it -- a
-    wrong answer rather than an error.
+    An empty string is not NaN, so it slips past a check that only looks for
+    NaN values. Left as a value it becomes a level of its own, inflating the
+    column's cardinality and quietly changing every BDeu score computed from
+    it: a wrong answer rather than an error.
     """
     df = pd.DataFrame({"A": ["x", blank], "B": ["y", "z"]})
     with pytest.raises(ValueError, match="missing"):
@@ -119,7 +118,7 @@ def test_from_pandas_rejects_blank_fields(blank: str) -> None:
 
 
 def test_from_pandas_keeps_none_as_a_genuine_level() -> None:
-    """The blank guard must not start eating `None` as a label.
+    """The blank-field guard must not treat `None` as blank.
 
     `child` and `insurance` both use "None" as a real level, so rejecting it
     would make two of the bundled networks unloadable.
@@ -278,5 +277,5 @@ def test_subset_preserves_fortran_order() -> None:
     )
     sub = ds.subset(np.array([0, 2, 3]))
     assert sub.values.flags["F_CONTIGUOUS"]
-    # And the data is still correct after the layout round-trip.
+    # The data is still correct after the layout round-trip.
     assert sub.values.tolist() == [[0, 1], [0, 0], [1, 1]]

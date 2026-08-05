@@ -9,9 +9,9 @@ import pytest
 
 from fedcausal.io import DiscreteBN, forward_sample, load_xbif
 
-# These tests exercise `load_xbif` itself, so they need a real file rather than
-# the parsed network `fedcausal.datasets` hands back. `as_file` yields one from
-# the packaged data; the ExitStack keeps it alive for the module's lifetime.
+# `load_xbif` takes a path, so these tests need a real file rather than the
+# parsed network `fedcausal.datasets` hands back. `as_file` yields one from the
+# packaged data; the ExitStack keeps it alive for the module's lifetime.
 _resources = ExitStack()
 atexit.register(_resources.close)
 ASIA_XBIF = _resources.enter_context(as_file(files("fedcausal.datasets") / "data" / "asia.xbif"))
@@ -110,12 +110,9 @@ def test_asia_dysp_cpt_values_pin_parent_order() -> None:
     # rows are the published Lauritzen & Spiegelhalter (1988) asia values
     # for dysp | (bronc, either): P(dysp=yes | bronc, either) is 0.9, 0.8,
     # 0.7, 0.1 for (yes,yes), (yes,no), (no,yes), (no,no) respectively.
-    # Crucially the (yes,no) and (no,yes) rows differ (0.8 vs 0.7), so this
-    # test can only pass under the correct row-major/first-parent-slowest
-    # convention -- a transposed convention would swap those two rows and
-    # fail the assertions below. (Verified by temporarily reversing the
-    # parent tuple used in the row-index computation and confirming this
-    # test fails.)
+    # The (yes,no) and (no,yes) rows differ (0.8 vs 0.7), so this test only
+    # passes under the correct row-major/first-parent-slowest convention; a
+    # transposed convention would swap those two rows and fail below.
     parents = bn.parent_order[dysp_idx]
     cards = [len(bn.outcomes[p]) for p in parents]
 
@@ -147,11 +144,9 @@ def test_asia_either_is_deterministic_or() -> None:
     assert bn.parent_order[either_idx] == (lung_idx, tub_idx)
 
     # <TABLE>1.0 0.0 1.0 0.0 1.0 0.0 0.0 1.0</TABLE> reshapes to (4, 2)
-    # row-major with lung slowest, tub fastest: either is a deterministic
-    # OR of its parents (P(either=yes)=1.0 unless both lung and tub are
-    # "no"). This is order-insensitive (OR is symmetric in its parents,
-    # unlike dysp above) but still pins the exact values for this second
-    # multi-parent node.
+    # row-major with lung slowest, tub fastest: either is a deterministic OR
+    # of its parents (P(either=yes)=1.0 unless both lung and tub are "no").
+    # OR is symmetric in its parents, so this table is order-insensitive.
     cpt = bn.cpts[either_idx]
     configs = [(0, 0), (0, 1), (1, 0), (1, 1)]  # (lung_outcome, tub_outcome)
     for row, (lung_outcome, tub_outcome) in enumerate(configs):
