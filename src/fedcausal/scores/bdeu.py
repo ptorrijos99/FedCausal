@@ -228,8 +228,8 @@ class BDeuScore:
         # Lock-free read on the hot path. ``dict.get`` is atomic under the GIL,
         # and because the kernel is pure a concurrent writer only ever installs
         # the *same* value under this key, so a hit never returns a wrong or
-        # torn result. GES hits this ~97% of the time (see the profile in note
-        # 2026-07-25), where taking the lock was pure overhead. The hit/miss
+        # torn result. GES hits this ~97% of the time, where taking the lock was pure
+        # overhead. The hit/miss
         # counters are updated without the lock and so are best-effort under
         # concurrency -- diagnostics only, never correctness.
         key = (node, key_parents)

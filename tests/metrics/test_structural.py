@@ -74,11 +74,9 @@ def test_shd_reversed_compelled_and_reversible_edges_are_indistinguishable() -> 
 # --- Hand-counted shd_skeleton examples ----------------------------------------
 #
 # shd_skeleton ignores direction entirely: it counts node pairs whose
-# adjacency (in either direction) differs between the two graphs. This is
-# the "undirected adjacency differences" count the brief asks for -- on two
-# purely-undirected graphs, Utils.SHDundir (line 552-568) degenerates to
-# exactly this same symmetric-difference count (no orientation cost applies
-# to an already-undirected edge).
+# adjacency (in either direction) differs between the two graphs. On two
+# purely-undirected graphs this is what the Java `Utils.SHDundir` degenerates
+# to, since no orientation cost applies to an already-undirected edge.
 
 
 def test_shd_skeleton_identical_graphs_is_zero() -> None:

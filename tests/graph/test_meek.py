@@ -58,11 +58,9 @@ def test_meek_r4_fires() -> None:
     # ``apply_meek_rules``'s rule ordering). Adding the undirected a-c edge
     # makes c adjacent to a, which is exactly the guard clause
     # ``if a in pdag.adjacent(c): continue`` in ``_meek_r1`` -- so R1 no
-    # longer fires for this parent, and R4 gets to run. This was verified by
-    # hand and confirmed empirically: disabling ``_meek_r4`` leaves a-b
-    # undirected after ``apply_meek_rules``, while the real R4 orients it
-    # a -> b, so the assertion below genuinely exercises R4 (and not a
-    # lower-precedence rule) through the public entry point.
+    # longer fires for this parent, and R4 gets to run. Disabling ``_meek_r4``
+    # leaves a-b undirected, while the real R4 orients it a -> b, so the
+    # assertion below exercises R4 and not a lower-precedence rule.
     p = PDAG(4)
     p.add_undirected(0, 1)  # a - b
     p.add_directed(2, 1)  # c -> b

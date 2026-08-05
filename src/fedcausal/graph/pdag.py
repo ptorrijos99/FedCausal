@@ -82,8 +82,8 @@ class PDAG:
     #
     # The public ``parents``/``children``/``undirected_neighbors``/``adjacent``
     # above each allocate a fresh ``frozenset`` on every call. In the GES search
-    # those are invoked hundreds of thousands of times per network (see the
-    # profile in note 2026-07-25), where the copy dominates. The accessors below
+    # those are invoked hundreds of thousands of times per network, where the copy
+    # dominates. The accessors below
     # hand back the *live* internal set (or, for ``adjacent_set``, a single fresh
     # plain set) so hot, read-only code can iterate and test membership without
     # that per-call allocation.

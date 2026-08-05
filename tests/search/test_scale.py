@@ -24,10 +24,10 @@ from fedcausal.search import GES
 
 _NETWORKS_ENV = "FEDCAUSAL_NETWORKS"
 
-# Wall-clock budgets, generous multiples of the measured runtimes recorded in
-# the perf-gate and phase-6 scaling notes (hepar2 ~1s, andes ~195s, pigs ~60s,
-# link/munin the ~1000-node target). Budgets are ~3x the measured incremental
-# times on the reference machine; a slower machine *skips* rather than fails.
+# Wall-clock budgets, roughly 3x the measured incremental times on the
+# reference machine (hepar2 ~1s, andes ~195s, pigs ~60s). They exist to catch a
+# runaway regression, not to grade a machine: a slower one *skips* rather than
+# fails.
 _BUDGET_SECONDS = {
     "hepar2": 120.0,
     "andes": 1200.0,
@@ -72,7 +72,7 @@ def test_ges_runs_at_scale(net: str, min_vars: int) -> None:
     if elapsed > budget:
         pytest.skip(
             f"{net} took {elapsed:.1f}s, over the {budget:.0f}s budget for this machine; "
-            "structure was still produced, see the perf-gate note"
+            "the structure was still produced"
         )
 
     assert isinstance(cpdag, PDAG)

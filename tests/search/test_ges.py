@@ -241,8 +241,7 @@ def test_fit_rejects_initial_graph_node_count_mismatch() -> None:
 
 def test_fes_only_rejects_initial_graph_node_count_mismatch() -> None:
     # fes_only routes through the same _check_node_count helper as fit
-    # (test_fit_rejects_initial_graph_node_count_mismatch above), but that
-    # sharing was previously untested on this method directly.
+    # (test_fit_rejects_initial_graph_node_count_mismatch above).
     ds = _dummy_dataset(3)
     mismatched = DAG(4)
     with pytest.raises(ValueError):
@@ -285,8 +284,8 @@ class _CommonNeighbourScore:
 def _common_neighbour_dag() -> DAG:
     # dag_to_cpdag of this DAG reproduces the fully-undirected 4-node
     # skeleton {0-1, 0-2, 1-2, 1-3} test_bes.py's `_common_neighbour_fixture`
-    # builds directly as a PDAG (verified empirically: no v-structure exists,
-    # since node 1's two parents 0 and 2 are themselves adjacent via 0->2).
+    # builds directly as a PDAG: no v-structure exists, since node 1's two
+    # parents 0 and 2 are themselves adjacent via 0->2.
     return DAG.from_edges(4, [(0, 2), (0, 1), (2, 1), (1, 3)])
 
 

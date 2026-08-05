@@ -151,8 +151,8 @@ def is_semidirected_blocked(pdag: PDAG, y: int, x: int, cond: frozenset[int]) ->
         # children) or along an undirected edge. This is a pure reachability
         # query -- whether x is reachable avoiding `cond` does not depend on the
         # order successors are visited -- so the raw internal sets are iterated
-        # directly, with no union or sort (both were the dominant cost here; see
-        # the profile in note 2026-07-25). Determinism of the FES/BES *result*
+        # directly, with no union or sort, both of which were the dominant cost here.
+        # Determinism of the FES/BES *result*
         # comes from the fixed candidate scan order in ges.py, not from this
         # internal traversal, whose only observable output is a boolean.
         for group in (pdag.children_set(v), pdag.undirected_set(v)):

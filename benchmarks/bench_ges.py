@@ -30,7 +30,6 @@ Usage::
    ``--timeout`` is enforced with ``signal.SIGALRM`` and is therefore a no-op
    on Windows, where a long run must be bounded externally instead (for
    example ``timeout 900 python benchmarks/bench_ges.py ...`` under Git Bash).
-   The measurements in the phase-2 perf-gate note were bounded that way.
 """
 
 from __future__ import annotations

@@ -17,42 +17,17 @@ must not be *materially* worse than causal-learn under our scorer,
 ``our_bdeu >= cl_bdeu - TOL`` with ``TOL = abs(cl_bdeu) * 1e-3``. It is never
 asserted that fedcausal is better, nor that the two graphs agree.
 
-**Verified empirically** (not merely assumed from the ``ges`` docstring):
 ``causal-learn``'s ``GeneralGraph.graph`` is an endpoint-encoded adjacency
-matrix using Tetrad-style codes -- ``-1`` tail, ``1`` arrowhead, ``0`` no
-edge. Checked on tiny synthetic examples before writing this module:
+matrix in Tetrad-style codes: ``-1`` tail, ``1`` arrowhead, ``0`` no edge, so
+``graph[i, j] == -1 and graph[j, i] == 1`` means ``i --> j`` and ``-1``/``-1``
+means an undirected edge. GES only ever returns a CPDAG, so bidirected and
+circle endpoints should not appear; :func:`_cl_graph_to_pdag` rejects them
+explicitly anyway, since ``fedcausal``'s ``PDAG`` cannot represent them.
 
-- A pure Markov chain ``A -> B -> C`` (no v-structure) recovers as the fully
-  undirected CPDAG ``A - B - C``: ``graph[i, j] == graph[j, i] == -1`` for
-  each adjacent pair, confirming the undirected encoding.
-- A collider ``A -> C <- B`` (``C`` a noisy OR of two independent parents,
-  chosen instead of an XOR collider because a noisy XOR's parents are each
-  *marginally* independent of the child, which stops greedy GES from ever
-  proposing the first edge) recovers with ``A --> C`` and ``B --> C``:
-  ``graph[i, j] == -1 and graph[j, i] == 1`` for the edge printed by
-  ``causal-learn`` itself as ``i --> j``, confirming ``-1`` is the tail end
-  and ``1`` is the arrowhead end, matching the module's own docstring
-  (``Record['G'].graph[j,i]=1 and Record['G'].graph[i,j]=-1`` means
-  ``i --> j``).
-
-No bidirected (``1``/``1``) or circle-endpoint (PAG-style ``2``) codes were
-observed from ``ges``'s CPDAG output, as expected: GES only ever returns a
-CPDAG (canonicalized via ``pdag2dag``/``dag2cpdag`` internally), never a PAG.
-:func:`_cl_graph_to_pdag` still checks for and rejects any such edge
-explicitly (skipping that network with a clear message) rather than silently
-misinterpreting or dropping it, since ``fedcausal``'s ``PDAG`` has no
-representation for a bidirected edge.
-
-Tested against ``causal-learn`` 0.1.4.8, via
-``causallearn.search.ScoreBased.GES.ges(data, score_func="local_score_BDeu",
-node_names=...)``, which returns a dict whose ``'G'`` key holds the learned
-``GeneralGraph``. ``local_score_BDeu``'s own priors (its defaults:
-``sample_prior=1``, ``structure_prior=1``, per-variable cardinalities
-inferred from the data actually observed) are used unmodified here -- they
-only drive causal-learn's *own* search and are never compared to our score
-directly, so a difference in priors from ``fedcausal.scores.BDeuScore``'s
-defaults does not affect the (one-sided, same-scorer) assertion this module
-makes.
+Tested against ``causal-learn`` 0.1.4.8. Its ``local_score_BDeu`` runs on its
+own default priors, which is deliberate: they drive only causal-learn's search,
+and both graphs are re-scored here with ours, so they cannot affect the
+assertion.
 """
 
 from __future__ import annotations

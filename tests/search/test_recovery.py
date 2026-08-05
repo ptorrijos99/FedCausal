@@ -45,11 +45,11 @@ SLOW_NETS = {
 # two independently chosen DAG extensions (see the module comment on its
 # extension-choice noise).
 #
-# `cancer` used to be here and no longer is. The default structure prior costs
+# `cancer` is deliberately not in this list. The default structure prior costs
 # exact recovery on it: five nodes and four edges do not carry enough evidence
-# to outweigh a per-parent penalty, so it now recovers SMHD 2 rather than 0.
-# That is the deliberate trade for large-network quality -- the same default
-# takes win95pts from 125 to 55 and link from 3098 to 987 -- and passing
+# to outweigh a per-parent penalty, so it recovers SMHD 2 rather than 0. That
+# is the deliberate trade for large-network quality (see docs/algorithms.md),
+# and passing
 # `structure_prior=0.0` restores exact recovery here. See docs/benchmarks.md.
 EXACT_RECOVERY_NETS = frozenset({"child"})
 
@@ -58,10 +58,8 @@ def _run_recovery(net: str, n_rows: int, max_smhd: int, max_shd: int) -> None:
     bn = load_network(net).network
     ds = forward_sample(bn, n_rows, seed=0)
     # forward_sample keeps bn.dag's node order (see its docstring's "same
-    # node order" guarantee) -- verified once against asia.xbif's actual
-    # bn.names / ds.names before writing this test, so no name->index remap
-    # is needed here; a future BN loader/sampler change that reordered
-    # columns would need to rebuild this alignment.
+    # node order" guarantee), so no name->index remap is needed. The assert
+    # below is what would catch a loader or sampler that stopped doing that.
     assert ds.names == tuple(bn.names)
     fitted = GES(BDeuScore(ds)).fit(ds)
     true_cpdag = dag_to_cpdag(bn.dag)
