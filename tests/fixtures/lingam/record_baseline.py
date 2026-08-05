@@ -47,17 +47,24 @@ def split(x: np.ndarray, n_clients: int) -> list[np.ndarray]:
 def digest16(x: np.ndarray) -> str:
     """Return a 16-hex-char SHA-256 digest of an array's float64 bytes.
 
-    Applied to ``b_true`` and ``noise``, the RNG's output, so a later
-    regeneration of the same synthetic data (e.g. by a test that reimplements
-    ``make_lingam_data``) can prove it drew the identical sequence before
-    comparing solver outputs, instead of silently desyncing the RNG call
-    sequence and failing in a way that looks like a solver bug.
+    Only ``b_true``'s digest is asserted by the test suite. It is built from
+    ``random``, ``uniform`` and ``choice``, which scale raw bits, so a later
+    regeneration of the same synthetic data can prove it drew the identical
+    sequence before comparing solver outputs, instead of silently desyncing
+    the RNG call sequence and failing in a way that looks like a solver bug.
 
-    Never applied to ``x``, which comes out of ``x @ b_true[j]``: its
-    summation order and FMA use depend on the BLAS kernel the CPU dispatches
-    to, so its bytes differ by ~1e-15 between machines while the draws behind
-    it stay identical. A digest of ``x`` pins the host CPU rather than the
-    generator; the data itself is pinned portably by ``cumulants`` below.
+    A byte digest is only safe for values that reach the array without a
+    transcendental transform. Two arrays here fail that test:
+
+    * ``x`` comes out of ``x @ b_true[j]``, whose summation order and FMA use
+      depend on the BLAS kernel the CPU dispatches to, so it is never hashed.
+    * ``noise`` comes out of ``laplace``, an inverse-CDF transform through
+      ``log``; libm's ``log`` differs by an ulp between platforms, so the
+      digest recorded here reproduces on the recording machine and not on a
+      different one. It is still recorded, as a record of what that machine
+      saw, but the suite does not assert it.
+
+    Both are pinned portably, to 1e-12, by ``cumulants`` below.
     """
     return hashlib.sha256(np.ascontiguousarray(x, dtype=np.float64).tobytes()).hexdigest()[:16]
 

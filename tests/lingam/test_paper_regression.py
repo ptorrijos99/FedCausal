@@ -87,18 +87,25 @@ def _clients(case: dict) -> list[np.ndarray]:
 def test_regenerated_draws_match_the_recording(case):
     """Fail here, and the generator drifted, not the solvers.
 
-    The digests cover the RNG's output (``b_true``, ``noise``), never the data
-    matrix ``x`` built from it. ``x`` comes out of ``x @ b_true[j]``, whose
-    summation order and FMA use depend on the BLAS kernel the host CPU
-    dispatches to, so its bytes move by ~1e-15 between machines while every
-    draw behind them stays identical. ``b_true`` and ``noise`` come straight
-    out of the ``Generator``, so they catch a desync without pinning the CPU.
-    The values in ``x`` are pinned to 1e-12 by
-    ``test_cumulants_match_the_recording``.
+    Only ``b_true`` is byte-pinned. It is built from ``random``, ``uniform``
+    and ``choice``, which scale raw bits and give the same bytes on every
+    platform.
+
+    ``noise`` is not, despite also coming from the ``Generator``: ``laplace``
+    is an inverse-CDF transform through ``log``, and libm's ``log`` differs by
+    an ulp between platforms. Windows and Linux therefore produce different
+    bytes for the same draws, which is the same class of problem as hashing
+    ``x`` (whose BLAS summation order is host-dependent) and the reason this
+    file stopped hashing ``x``. Recording ``noise_sha16`` was the earlier
+    attempt at this check; it is kept in the fixture as a record of what the
+    recording machine saw, and deliberately not asserted.
+
+    The noise values are still pinned, portably and to 1e-12, by
+    ``test_cumulants_match_the_recording``: a genuine RNG desync moves the
+    cumulants far more than that, while an ulp does not move them at all.
     """
-    _, b_true, noise = make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
+    _, b_true, _noise = make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
     assert _digest(b_true) == case["b_sha16"]
-    assert _digest(noise) == case["noise_sha16"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
