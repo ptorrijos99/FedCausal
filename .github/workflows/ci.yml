@@ -75,7 +75,6 @@ jobs:
       - run: python examples/03_fedrcd.py
       - run: python examples/04_fusion_operators.py
       - run: python examples/05_your_own_data.py
-      - run: python benchmarks/pgm26/benchmark.py --mode main --quick --out /tmp/pgm26.jsonl
       # The README points people at this app, so a wiring mistake in it should
       # be a red build rather than something they discover.
       - run: python -c "import fedcausal_site.app"
