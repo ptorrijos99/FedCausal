@@ -1,13 +1,25 @@
 """Record FedRCD reference outputs from the original FedLiNGAM implementation.
 
-Run this once, against the FedLiNGAM repository the PGM 2026 paper links to,
-*before* any porting work begins. The resulting fixture is what proves the port
-did not change the paper's results, so it must never be regenerated from ported
-code.
+Run this against the FedLiNGAM repository the PGM 2026 paper links to. The
+resulting `rcd_baseline.json` is what proves the port did not change the
+paper's results, so it **must never be regenerated from ported code**: that
+would make the test compare the port against itself.
 
 Usage::
 
     python tests/fixtures/lingam/record_baseline.py --fedlingam /path/to/FedLiNGAM
+
+Each case records eight methods. Four are FedRCD-family solvers (`fedrcd`,
+`fedrcd_noniterative`, `ishc`, `fedrcd_exact`); four are baselines (`fedishc`,
+`fedhc`, `hc_lingam`, `hc`). The last two are centralised and are recorded
+against the pooled data matrix rather than aggregated statistics. `fedhc`'s
+`B` is recorded as null because the original returns None for it, so only its
+causal order is checked.
+
+`cumulants` is recorded per case rather than per method: every method record
+sharing a `name` carries the same block. It is what pins the data values
+portably, and `tests/lingam/test_paper_regression.py` explains why that
+matters more than any byte digest.
 """
 
 from __future__ import annotations
