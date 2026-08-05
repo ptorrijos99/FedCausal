@@ -104,6 +104,30 @@ def test_from_pandas_rejects_nan() -> None:
         DiscreteDataset.from_pandas(df)
 
 
+@pytest.mark.parametrize("blank", ["", "   ", "\t"])
+def test_from_pandas_rejects_blank_fields(blank: str) -> None:
+    """`from_pandas` must reject blanks too, not only `from_csv`.
+
+    An empty string is not NaN, so the NaN guard above lets it through. Left
+    alone it becomes a level of its own, which inflates the column's
+    cardinality and quietly changes every BDeu score computed from it -- a
+    wrong answer rather than an error.
+    """
+    df = pd.DataFrame({"A": ["x", blank], "B": ["y", "z"]})
+    with pytest.raises(ValueError, match="missing"):
+        DiscreteDataset.from_pandas(df)
+
+
+def test_from_pandas_keeps_none_as_a_genuine_level() -> None:
+    """The blank guard must not start eating `None` as a label.
+
+    `child` and `insurance` both use "None" as a real level, so rejecting it
+    would make two of the bundled networks unloadable.
+    """
+    ds = DiscreteDataset.from_pandas(pd.DataFrame({"A": ["None", "yes"]}))
+    assert list(ds.categories[0]) == ["None", "yes"]
+
+
 def test_from_arrays_round_trip() -> None:
     values = np.array([[0, 1], [1, 0]])
     cardinalities = np.array([2, 2])

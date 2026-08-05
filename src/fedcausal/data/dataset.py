@@ -252,7 +252,8 @@ class DiscreteDataset:
         Raises
         ------
         ValueError
-            If any column contains missing values (``NaN``/``None``).
+            If any column contains missing values (``NaN``/``None``), or a
+            field that is empty or holds only whitespace.
         """
         names = [str(c) for c in df.columns]
         n_rows = len(df)
@@ -268,6 +269,15 @@ class DiscreteDataset:
                     "requires fully-observed discrete data"
                 )
             str_values = series.astype(str)
+            # Checked here rather than in `from_csv` so that both entry points
+            # enforce it: an empty string that survives becomes a category of
+            # its own, silently inflating the column's cardinality.
+            if bool((str_values.str.strip() == "").any()):
+                raise ValueError(
+                    f"column {col!r} contains missing values (an empty or "
+                    "whitespace-only field); DiscreteDataset requires "
+                    "fully-observed discrete data"
+                )
             levels = sorted(str_values.unique().tolist())
             coded = pd.Categorical(str_values, categories=levels)
             values[:, j] = coded.codes.astype(np.int32)
@@ -310,13 +320,6 @@ class DiscreteDataset:
             If any column contains an empty or whitespace-only field.
         """
         df = pd.read_csv(path, dtype=str, keep_default_na=False, na_filter=False)
-        for col in df.columns:
-            if bool((df[col].str.strip() == "").any()):
-                raise ValueError(
-                    f"column {col!r} contains missing values (an empty or "
-                    "whitespace-only field); DiscreteDataset requires "
-                    "fully-observed discrete data"
-                )
         return cls.from_pandas(df)
 
     def __repr__(self) -> str:
