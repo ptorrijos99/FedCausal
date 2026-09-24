@@ -1,10 +1,4 @@
-"""Continuous dataset representation for causal structure learning.
-
-This module provides :class:`ContinuousDataset`, a fully-observed dataset over
-real-valued variables. It is the input format consumed by the cumulant-based
-methods in :mod:`fedcausal.lingam`, and is the continuous counterpart of
-:class:`~fedcausal.data.DiscreteDataset`.
-"""
+"""Fully observed real-valued data, the input to the FedRCD family."""
 
 from __future__ import annotations
 
@@ -52,20 +46,8 @@ class ContinuousDataset:
 
     Notes
     -----
-    **Memory layout.** Unlike :class:`~fedcausal.data.DiscreteDataset`, which is
-    stored column-major for the BDeu kernel's per-column gathers, this class
-    keeps the default C order. The cumulant estimators consume whole-matrix
-    products (``X.T @ X``) rather than per-column slices, so the discrete side's
-    layout argument does not apply here.
-
-    **No missing values.** Cumulant estimators have no notion of a missing
-    entry, so non-finite values are rejected at construction rather than
-    producing silently meaningless statistics downstream.
-
-    **Shared, immutable metadata.** `subset` shares `names` by reference with
-    its parent, so every subset of the same dataset agrees exactly on variable
-    order. That matters in a federation, where edges and statistics travel as
-    bare column indices.
+    Non-finite values are rejected: the cumulant estimators have no notion of
+    a missing entry.
     """
 
     values: npt.NDArray[np.float64]
@@ -109,8 +91,7 @@ class ContinuousDataset:
         Returns
         -------
         ContinuousDataset
-            A new dataset over the selected rows only. `names` is shared by
-            reference with the parent, which is safe because it is a tuple.
+            The selected rows over the same variables.
         """
         subset_ds: ContinuousDataset = object.__new__(ContinuousDataset)
         subset_ds.values = np.ascontiguousarray(self.values[np.asarray(rows)])

@@ -1,4 +1,4 @@
-"""Data handling utilities for causal structure learning."""
+"""Datasets and the splits that simulate sites."""
 
 from __future__ import annotations
 
