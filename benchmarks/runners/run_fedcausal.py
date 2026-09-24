@@ -3,7 +3,7 @@
 Runs ``GES(BDeuScore(ds)).fit(ds)`` with ``h_pool="nayx"`` -- Chickering's
 correct Delete operator, which is ``fedcausal``'s default and the configuration
 any published result should use. (``h_pool="bayesfl"`` exists to replicate
-BayesFL's incomplete BES; the two are compared in ``bench_ges.py``, not here.)
+BayesFL's incomplete BES; the two are compared in ``compare_hpool.py``.)
 
 Usage::
 

@@ -192,6 +192,23 @@ def main() -> None:
             "the federated loop gives its clients after the first round."
         )
 
+    xc = final["link_cross_check"]
+    xc_rows = "\n".join(
+        f"| {label} | {edges} | {shd} | {smhd} | {bdeu:,.0f} |"
+        for label, edges, shd, smhd, bdeu in (
+            ("true structure", xc["true_edges"], 0, 0, xc["true_bdeu"]),
+            ("BayesFL (Java)", xc["java_edges"], xc["java_shd"], xc["java_smhd"], xc["java_bdeu"]),
+            (
+                "fedcausal",
+                xc["ours_sp0_edges"],
+                xc["ours_sp0_shd"],
+                xc["ours_sp0_smhd"],
+                xc["ours_sp0_bdeu"],
+            ),
+        )
+    )
+    xc_gap = abs(xc["java_bdeu"] - xc["ours_sp0_bdeu"])
+
     nb = final.get("numba_link") or {}
     if nb.get("speedup"):
         numba_text = (
@@ -267,17 +284,15 @@ The reference tests pin the search against the original Java implementation on n
 
 | | Edges | SHD | SMHD | BDeu |
 |---|---:|---:|---:|---:|
-| true structure | 1125 | 0 | 0 | -1,059,715 |
-| BayesFL (Java) | 1779 | 1597 | 3153 | -1,114,310 |
-| fedcausal | 1770 | 1591 | 3098 | -1,114,303 |
+{xc_rows}
 
-The two scores differ by 7 in 1.1 million, and the skeletons share 1666 edges. Both were scored without a structure prior, which is what the Java implementation effectively uses. fedcausal took 186 s against 2900 s.
+The two scores differ by {xc_gap:.0f} in {abs(xc["java_bdeu"]) / 1e6:.1f} million, and the skeletons share {xc["skeleton_overlap"]} edges. Both were scored without a structure prior, which is what the Java implementation effectively uses. fedcausal took {xc["ours_sp0_seconds"]:.0f} s against {xc["java_seconds"]:.0f} s.
 
 ## Structure quality on the largest networks
 
 The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.
 
-On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,714, so the result is 55,000 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
+On `link` (724 variables, {xc["true_edges"]} true edges) the search returns {xc["ours_sp0_edges"]} edges scoring {xc["ours_sp0_bdeu"]:,.0f}. The true structure scores {xc["true_bdeu"]:,.0f}, so the result is {xc["true_bdeu"] - xc["ours_sp0_bdeu"]:,.0f} worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at {xc["warm_start_from_truth_bdeu"]:,.0f}, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
 
 `max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
 
@@ -299,9 +314,9 @@ Every number comes from `benchmarks/results/`, so re-running the benchmarks and 
 export FEDCAUSAL_NETWORKS=/path/to/networks
 python benchmarks/scale_ges.py                    # the size ladder
 python benchmarks/compare_ges.py                  # fedcausal vs causal-learn
-python benchmarks/report_ges.py                   # render the results
 python benchmarks/compare_fedges.py               # quality against site count
-python benchmarks/report_fedges.py
+python benchmarks/compare_hpool.py                # the two H pools, ours and BayesFL's
+python benchmarks/build_docs.py                   # regenerate this page
 ```
 
 `FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks come from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/); the five smallest ship with the package under `tests/fixtures/networks/`.

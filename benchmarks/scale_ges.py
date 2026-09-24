@@ -1,31 +1,29 @@
-"""Scaling bench for the incremental GES engine. Asserts nothing.
-
-Times GES across the net-size ladder and, with ``--profile <net>``, dumps a
-cProfile top-cumulative breakdown for one network. Reads BayesFL's sampled CSVs
-(``FEDCAUSAL_NETWORKS``, default ``../BayesFL``). Consistent with ``bench_ges.py`` /
-``compare_ges.py``: a measurement tool, not a test.
+"""Time GES across networks of increasing size, or profile one. Asserts nothing.
 
 Usage::
 
-    python benchmarks/scale_ges.py                       # full ladder
+    python benchmarks/scale_ges.py                       # the full ladder
     python benchmarks/scale_ges.py --nets hepar2 pigs    # a subset
-    python benchmarks/scale_ges.py --profile link        # profile one net
+    python benchmarks/scale_ges.py --profile link        # profile one network
 """
 
 from __future__ import annotations
 
 import argparse
 import cProfile
-import os
 import pstats
+import sys
 import time
 from pathlib import Path
 
-from fedcausal.data import DiscreteDataset
-from fedcausal.scores import BDeuScore
-from fedcausal.search import GES
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-NETWORKS = Path(os.environ.get("FEDCAUSAL_NETWORKS", "../networks"))
+from compare_ges import load_net  # noqa: E402
+
+from fedcausal.data import DiscreteDataset  # noqa: E402
+from fedcausal.scores import BDeuScore  # noqa: E402
+from fedcausal.search import GES  # noqa: E402
+
 LADDER = [
     "asia",
     "child",
@@ -41,12 +39,12 @@ LADDER = [
 
 
 def _load(net: str) -> DiscreteDataset | None:
-    """Load ``<net>.0.csv`` from the BayesFL tree, or print+return None if absent."""
-    csv = NETWORKS / "res" / "networks" / "BBDD" / net / f"{net}.0.csv"
-    if not csv.exists():
-        print(f"  {net}: dataset not found ({csv}); skipping")
+    """Load a network's first sample, or say it is missing and return None."""
+    try:
+        return load_net(net)[0]
+    except FileNotFoundError as exc:
+        print(f"  {net}: {exc}; skipping")
         return None
-    return DiscreteDataset.from_csv(csv)
 
 
 def _time_ges(ds: DiscreteDataset) -> tuple[float, int]:

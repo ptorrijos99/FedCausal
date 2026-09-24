@@ -105,7 +105,7 @@ The two scores differ by 7 in 1.1 million, and the skeletons share 1666 edges. B
 
 The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.
 
-On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,714, so the result is 55,000 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
+On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,715, so the result is 54,588 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
 
 `max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
 
@@ -127,9 +127,9 @@ Every number comes from `benchmarks/results/`, so re-running the benchmarks and 
 export FEDCAUSAL_NETWORKS=/path/to/networks
 python benchmarks/scale_ges.py                    # the size ladder
 python benchmarks/compare_ges.py                  # fedcausal vs causal-learn
-python benchmarks/report_ges.py                   # render the results
 python benchmarks/compare_fedges.py               # quality against site count
-python benchmarks/report_fedges.py
+python benchmarks/compare_hpool.py                # the two H pools, ours and BayesFL's
+python benchmarks/build_docs.py                   # regenerate this page
 ```
 
 `FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks come from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/); the five smallest ship with the package under `tests/fixtures/networks/`.
