@@ -1,8 +1,7 @@
-"""Convergence criteria for the federated loop.
+"""Stopping rules for the FedGES loop.
 
-Each criterion is stateful and inspects the array of freshly built local models
-each round. ``Server`` calls :meth:`Convergence.check_convergence` after every
-client has rebuilt its model and breaks the round loop when it returns ``True``.
+The server asks its criterion after every site has rebuilt its model, and stops
+when it answers ``True``. Criteria keep state between rounds.
 """
 
 from __future__ import annotations
@@ -43,12 +42,7 @@ class NoneConvergence:
 
 
 class ScoreImprovement:
-    """Converged once the mean local score stops strictly improving.
-
-    the mean of the clients'
-    scores is compared with the previous round's; convergence is declared when
-    it fails to strictly increase.
-    """
+    """Converged once the mean local score stops strictly improving."""
 
     def __init__(self) -> None:
         self._last_mean = -math.inf
@@ -62,13 +56,7 @@ class ScoreImprovement:
 
 
 class ModelEquality:
-    """Converged when every client re-emits a model it has produced before.
-
-    each client keeps a set of
-    all models it has ever produced; convergence is declared when every client's
-    current model is already in its own set. Current models are added *after* the
-    check, so a first sighting never converges.
-    """
+    """Converged when every client produces a model it has produced before."""
 
     def __init__(self) -> None:
         self._seen: list[set[BNModel]] | None = None
@@ -88,12 +76,16 @@ class ModelEquality:
 
 
 class IterationEquality:
-    """Converged when the current models repeat a recent round's models.
+    """Converged when the current round repeats one of the last few.
 
-    keeps a sliding window of
-    the last ``max_models_saved`` model arrays. If the first model carries a
-    nonzero score, rounds are compared by score (``|delta| < 0.001`` per client);
-    otherwise by model equality.
+    Rounds are compared by score, each site within 0.001, when the models carry
+    scores, and by structure otherwise.
+
+    Parameters
+    ----------
+    max_models_saved : int
+        How many past rounds to compare against. A negative value compares
+        against every past round.
     """
 
     def __init__(self, max_models_saved: int) -> None:
@@ -101,41 +93,25 @@ class IterationEquality:
         self._history: list[tuple[BNModel, ...]] = []
 
     def check_convergence(self, local_models: Sequence[BNModel]) -> bool:
-        """Return ``True`` iff a windowed past round matches the current one."""
-        max_saved = self._max if self._max >= 0 else len(self._history)
+        """Return ``True`` iff a remembered round matches the current one."""
         by_score = local_models[0].score != 0
-        converged = (
-            self._check_stats(local_models, max_saved)
-            if by_score
-            else self._check_models(local_models, max_saved)
+        converged = any(
+            all(
+                abs(m.score - p.score) < 0.001 if by_score else m == p
+                for m, p in zip(local_models, past, strict=True)
+            )
+            for past in self._history
         )
         self._history.append(tuple(local_models))
-        if len(self._history) > max_saved:
+        if 0 <= self._max < len(self._history):
             self._history.pop(0)
         return converged
 
-    def _check_stats(self, local_models: Sequence[BNModel], max_saved: int) -> bool:
-        for k, past in enumerate(reversed(self._history)):
-            if k >= max_saved:
-                break
-            if all(abs(m.score - p.score) < 0.001 for m, p in zip(local_models, past, strict=True)):
-                return True
-        return False
-
-    def _check_models(self, local_models: Sequence[BNModel], max_saved: int) -> bool:
-        for k, past in enumerate(reversed(self._history)):
-            if k >= max_saved:
-                break
-            if all(m == p for m, p in zip(local_models, past, strict=True)):
-                return True
-        return False
-
 
 class MultipleConvergence:
-    """Converged when any sub-criterion converges (OR).
+    """Converged when any of its criteria is.
 
-    Every sub-criterion is
-    evaluated each round (they are stateful), so this never short-circuits.
+    Every criterion is asked every round, so each keeps its state up to date.
     """
 
     def __init__(self, criteria: Sequence[Convergence]) -> None:
