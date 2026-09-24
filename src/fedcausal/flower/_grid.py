@@ -1,10 +1,4 @@
-"""Message plumbing every fedcausal transport needs.
-
-Waiting for supernodes to register, broadcasting one message to all of them,
-collecting the replies without swallowing a failure, and reading control scalars
-back out. None of it knows what the messages carry, which is why FedGES and the
-FedRCD family share it as-is.
-"""
+"""Message plumbing shared by both transports: registration, broadcast, replies."""
 
 from __future__ import annotations
 
@@ -80,11 +74,7 @@ def broadcast(node_ids: Sequence[int], content: RecordDict) -> list[Message]:
 
 
 def usable_replies(replies: Iterable[Message], required: int, phase: str) -> list[Message]:
-    """Return the successful replies, or raise if too few came back.
-
-    A failure is never dropped quietly. A client that errors out shrinks what
-    the server aggregates, and a run that silently learns from four sites
-    instead of five gives you a number you cannot interpret.
+    """Return the successful replies, or raise if fewer than `required` came back.
 
     Raises
     ------
@@ -106,11 +96,7 @@ def usable_replies(replies: Iterable[Message], required: int, phase: str) -> lis
 
 
 def check_schemas(replies: Iterable[Message]) -> str:
-    """Return the fingerprint every client reported, or raise if they differ.
-
-    Everything on the wire is indexed by column position, so this is the only
-    place a mismatch can be caught before the server produces something
-    meaningless from it.
+    """Return the schema fingerprint every client reported, or raise if they differ.
 
     Raises
     ------

@@ -1,20 +1,12 @@
-"""How a ``ClientApp`` gets hold of its own data.
+"""How a ``ClientApp`` finds its own data.
 
-A supernode has to load its shard without the server, or anyone else, handing
-it the whole dataset. That is the difference between a simulation and a
-deployment, so it is a seam rather than an assumption: every client app takes a
-:class:`PartitionLoader`, and two implementations ship with it.
+- :class:`InMemoryPartitions` picks one of several in-memory datasets by
+  ``partition-id``. Simulation only: every actor holds every partition.
+- :class:`NodeConfigLoader` reads a CSV named in the supernode's own
+  ``node_config``, so each site opens its own file and nothing else.
 
-- :class:`InMemoryPartitions` indexes a list of datasets by ``partition-id``.
-  Simulation only; every actor holds every partition.
-- :class:`NodeConfigLoader` reads a path out of the supernode's own
-  ``node_config``, so each node opens its own file and nothing else. This is
-  the deployment path; see ``docs/deployment.md``.
-
-Both are generic over the dataset type, so the same two classes serve the
-discrete methods and the continuous ones. Anything matching the protocol works
-in their place, which makes loading from a database or an institutional extract
-a matter of writing one function.
+Any callable matching :class:`PartitionLoader` works in their place, for
+example one that reads from a database.
 """
 
 from __future__ import annotations
@@ -32,8 +24,6 @@ if TYPE_CHECKING:
 
 __all__ = ["InMemoryPartitions", "NodeConfigLoader", "PartitionLoader"]
 
-#: The dataset types a shipped loader can build. A caller who needs another one
-#: writes a callable matching `PartitionLoader` instead of subclassing these.
 DatasetT = TypeVar("DatasetT", DiscreteDataset, ContinuousDataset)
 DatasetT_co = TypeVar("DatasetT_co", covariant=True)
 
@@ -49,9 +39,6 @@ class PartitionLoader(Protocol[DatasetT_co]):
 
 class InMemoryPartitions(Generic[DatasetT]):
     """Serve one of several in-memory datasets, indexed by ``partition-id``.
-
-    For simulation. Every ``ClientApp`` actor closes over the whole list, which
-    is fine at study scale and impossible in a deployment.
 
     Parameters
     ----------
@@ -95,17 +82,15 @@ class InMemoryPartitions(Generic[DatasetT]):
 class NodeConfigLoader(Generic[DatasetT]):
     """Load a supernode's own CSV, named by a key in its ``node_config``.
 
-    The deployment path. Start each supernode with
-    ``--node-config "data-path='/path/to/my/shard.csv'"`` and it reads that file
-    and nothing else. Gzipped CSVs are read directly.
+    Start each supernode with ``--node-config "data-path='/path/to/shard.csv'"``.
+    Gzipped CSVs work too.
 
     Parameters
     ----------
     dataset_cls : type[DatasetT]
-        Which dataset to build: ``DiscreteDataset`` for the graph-fusion
-        methods, ``ContinuousDataset`` for the cumulant-based ones.
+        ``DiscreteDataset`` for FedGES, ``ContinuousDataset`` for FedRCD.
     key : str, optional
-        Which ``node_config`` key holds the path (default ``"data-path"``).
+        The ``node_config`` key holding the path. Default ``"data-path"``.
     """
 
     def __init__(self, dataset_cls: type[DatasetT], key: str = "data-path") -> None:

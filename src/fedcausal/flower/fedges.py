@@ -1,19 +1,11 @@
-"""FedGES over Flower: a ``ClientApp``, a ``ServerApp``, and the round loop.
+"""FedGES over Flower.
 
-The server owns the loop in a low-level ``@app.main()`` that follows
-:meth:`fedcausal.fedges.server.Server.run` step for step, so a Flower run and
-the in-process engine produce identical models round by round. Each iteration is
-two message round trips:
-
-1. **build** -- every client rebuilds its local model, warm-started from the
-   model in its ``context.state``, and replies with its local DAG and score.
-2. **fuse** -- the server fuses the local DAGs and broadcasts the global DAG;
-   every client fuses it into its own model, refines, and updates its state.
-
-``GESLearner``, the fusion operators and the convergence criteria are reused
-untouched; only the transport differs. Where a client's data comes from is a
-seam (:mod:`fedcausal.flower.loaders`), which is what lets the same app run in
-simulation and in a real deployment.
+Each round is two round trips. In **build**, every site rebuilds its local
+model, starting from the one in its ``context.state``, and replies with it and
+its score. In **fuse**, the server sends the fused global model and every site
+fuses it into its own. The server follows
+:meth:`fedcausal.fedges.server.Server.run` step for step, so a Flower run and an
+in-process run give the same models every round.
 """
 
 from __future__ import annotations
@@ -75,11 +67,7 @@ def handle_train_message(
     client_fusion: FusionOperator,
     refinement: Refinement = "None",
 ) -> Message:
-    """Handle one ``train`` message and return the reply.
-
-    The whole client side of a round, with no Flower app machinery around it,
-    so it can be driven by :func:`build_client_app`, by an app reading its
-    settings from ``run_config``, or by a test.
+    """Handle one ``train`` message, the whole client side of a round, and reply.
 
     Parameters
     ----------
@@ -166,10 +154,6 @@ def run_server_loop(
 ) -> BNModel | None:
     """Run the FedGES round loop over `grid` and return the final global model.
 
-    The whole server side, with no Flower app machinery around it, so an app
-    reading its settings from ``run_config`` can call it directly and a test can
-    drive it over an in-process stub grid with no Ray anywhere.
-
     Parameters
     ----------
     grid : Grid
@@ -186,13 +170,12 @@ def run_server_loop(
     num_nodes : int
         Variable count, needed to rebuild DAGs from replies.
     n_iterations : int, optional
-        Maximum number of rounds (default 5).
+        Maximum number of rounds. Default 5.
     observer : RoundObserver or None, optional
-        Receives build and server events as the loop runs.
+        Receives every local and global model as the loop runs.
     min_clients : int or None, optional
-        How many usable replies a round needs. Defaults to `n_clients`, so a
-        failed client aborts the run rather than silently shrinking the
-        ensemble. Lower it to tolerate dropouts.
+        How many usable replies a round needs. Default `n_clients`, so a
+        failed client stops the run; lower it to tolerate dropouts.
 
     Returns
     -------
@@ -260,7 +243,7 @@ def build_server_app(
 ) -> ServerApp:
     """Register :func:`run_server_loop` as a ``ServerApp``.
 
-    Takes the same arguments; see there. The final global model ends up on
+    Takes the same arguments. The final global model ends up on
     ``context.state["global_dag"]``.
     """
     app = ServerApp()
@@ -294,14 +277,9 @@ def run_flower_fedges(
 ) -> BNModel | None:
     """Run FedGES over a Flower simulation and return the final global model.
 
-    :func:`fedcausal.fedges.run_fedges` over the Flower transport: splits `data`
-    into `n_clients` contiguous partitions and drives the same round loop. Both
-    read their defaults from :mod:`fedcausal.fedges.defaults`, so the two
-    transports cannot drift apart.
-
-    Simulation runs every site inside one process and needs Flower's Ray-based
-    engine (``fedcausal[flower-simulation]``). A deployment across real machines
-    needs neither; see ``docs/deployment.md``.
+    The Flower counterpart of :func:`fedcausal.fedges.run_fedges`, with the same
+    defaults. Needs ``fedcausal[flower-simulation]``; a deployment across real
+    machines does not, see ``docs/deployment.md``.
 
     Parameters
     ----------
@@ -310,11 +288,11 @@ def run_flower_fedges(
     n_clients : int
         Number of clients and supernodes.
     n_iterations : int, optional
-        Maximum number of rounds (default 5).
+        Maximum number of rounds. Default 5.
     client_fusion, server_fusion : FusionOperator or None, optional
-        Fusion operators; default to ``ConsensusUnion()`` / ``Consensus(50)``.
+        Fusion operators. Default ``ConsensusUnion()`` and ``Consensus(50)``.
     convergence : Convergence or None, optional
-        Stopping criterion; defaults to ``ScoreImprovement or ModelEquality``.
+        Stopping criterion. Default ``ScoreImprovement or ModelEquality``.
     refinement : {"None", "FES", "BES", "GES"}, optional
         Client refinement stage.
     observer : RoundObserver or None, optional

@@ -1,22 +1,11 @@
-"""Serialization of DAGs and control scalars for the Flower transport.
+"""How DAGs, control values and moment sums travel in Flower messages.
 
-A DAG travels as a single ``(2, n_edges)`` int64 array in an ``ArrayRecord``
-(row 0 = sources, row 1 = targets). The node count is *not* recoverable from
-that array -- a DAG with isolated nodes is ambiguous -- so it is carried
-alongside, as are the other control scalars, in a ``ConfigRecord``. This is the
-one place graphs are packed; there are no per-algorithm serializers.
-
-Because edges travel as bare indices, every client must agree on variable
-order. :func:`schema_fingerprint` reduces a dataset's names and cardinalities
-to one string so the server can check that up front; :func:`names_fingerprint`
-is its continuous counterpart, used where there are no cardinalities to fold
-in, and `schema_fingerprint` is built on top of it.
-
-Fourth-order raw moment sums (the sufficient statistics of the FedRCD family,
-see :mod:`fedcausal.lingam.cumulants`) travel the same way a DAG does: a fixed
-list of arrays in an ``ArrayRecord``, with the sample count carried separately
-as a control scalar. :func:`stats_to_record` and :func:`record_to_stats` pack
-and unpack that list.
+A DAG is a ``(2, n_edges)`` int64 array of sources and targets; the node count
+travels separately, since isolated nodes leave no trace in the edges. Moment
+sums are a fixed list of arrays with the row count sent separately. Everything
+is indexed by column position, so the sites must agree on their variables,
+which :func:`schema_fingerprint` and :func:`names_fingerprint` let the server
+check.
 """
 
 from __future__ import annotations
@@ -45,12 +34,7 @@ __all__ = [
     "record_to_stats",
 ]
 
-# This tuple IS the wire format: append-only, never reorder. `stats_to_record`
-# and `record_to_stats` agree on which array is which purely by position, so
-# reordering these names would silently swap the meaning of every field
-# between a client and server built against mismatched versions -- and
-# nothing would catch it, since both functions derive from the same tuple and
-# a round-trip test is structurally blind to a reorder.
+# The wire format: arrays are matched by position, so only ever append.
 _STATS_KEYS = (
     "sum_x",
     "sum_xx",
@@ -65,34 +49,15 @@ _STATS_KEYS = (
 
 
 def names_fingerprint(names: Sequence[str]) -> str:
-    r"""Return a short stable digest of a variable-name sequence.
+    r"""Return a short digest of the variable names, in order.
 
-    Two clients produce the same fingerprint exactly when they agree on the
-    variables they are learning over, in the same order -- the condition under
-    which exchanging column indices between them is meaningful.
-
-    Notes
-    -----
-    Names are joined with ``\x1f`` and not otherwise escaped, so a name that
-    itself contains ``\x1e`` or ``\x1f`` can collide with a different split of
-    the same characters across adjacent names (e.g. ``["A\x1e2\x1f2"]`` and
-    ``["A\x1e2", "2"]``). Vanishingly unlikely for CSV-derived variable names,
-    but variable names must not contain those two characters.
+    Names must not contain the separator characters ``\x1e`` or ``\x1f``.
     """
     return hashlib.sha256("\x1f".join(names).encode("utf-8")).hexdigest()[:16]
 
 
 def schema_fingerprint(data: DiscreteDataset) -> str:
-    """Return a short stable digest of `data`'s variable names and cardinalities.
-
-    Two clients produce the same fingerprint exactly when they agree on the
-    variables they are learning over, in the same order, with the same numbers
-    of levels -- the condition under which exchanging edges as bare node
-    indices is meaningful.
-
-    Row counts and the data itself are deliberately excluded: clients are
-    supposed to hold different observations of the same variables.
-    """
+    """Return a short digest of `data`'s variable names and numbers of levels, in order."""
     composite = [
         f"{name}\x1e{card}"
         for name, card in zip(data.names, data.cardinalities.tolist(), strict=True)
@@ -137,11 +102,6 @@ def stats_to_record(stats: RawStats) -> ArrayRecord:
     ------
     ValueError
         If `stats` lacks the fourth-order entries.
-
-    Notes
-    -----
-    The sample count is a scalar and travels in the message's ``ConfigRecord``
-    rather than here, so :func:`record_to_stats` takes it as an argument.
     """
     missing = [key for key in _STATS_KEYS if key not in stats]
     if missing:
