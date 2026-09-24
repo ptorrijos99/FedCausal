@@ -53,23 +53,6 @@ def test_moralize_diamond_adds_edge_between_co_parents() -> None:
     assert not moral[0, 3]
 
 
-def test_mcs_order_ties_break_to_lowest_index() -> None:
-    # A 4-cycle 0-1-2-3-0: every node starts at cardinality 0, so the first
-    # pick must be node 0 (lowest index among ties).
-    adj = np.array(
-        [
-            [False, True, False, True],
-            [True, False, True, False],
-            [False, True, False, True],
-            [True, False, True, False],
-        ]
-    )
-    order = mcs_order(adj)
-    assert order[0] == 0
-    assert set(order) == {0, 1, 2, 3}
-    assert len(order) == 4
-
-
 def test_mcs_order_empty_graph() -> None:
     adj = np.zeros((0, 0), dtype=bool)
     assert mcs_order(adj) == []

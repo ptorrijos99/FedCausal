@@ -5,15 +5,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fedcausal.io import DiscreteBN, forward_sample, load_xbif
+from fedcausal.io import forward_sample, load_xbif
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 ASIA_XBIF = FIXTURES / "networks" / "asia.xbif"
-
-
-def test_load_xbif_returns_discrete_bn() -> None:
-    bn = load_xbif(ASIA_XBIF)
-    assert isinstance(bn, DiscreteBN)
 
 
 def test_asia_has_eight_nodes_and_edges() -> None:

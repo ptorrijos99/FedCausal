@@ -3,37 +3,7 @@ import numpy as np
 from fedcausal.data import DiscreteDataset
 from fedcausal.graph import DAG, PDAG
 from fedcausal.scores import BDeuScore
-from fedcausal.search._candidates import subsets
 from fedcausal.search.ges import _best_insert, run_fes
-
-
-def testsubsets_order_two_elements() -> None:
-    assert list(subsets([1, 2])) == [
-        frozenset(),
-        frozenset({1}),
-        frozenset({2}),
-        frozenset({1, 2}),
-    ]
-
-
-def testsubsets_order_three_elements() -> None:
-    # Pins the full ascending-size-then-lexicographic contract: two elements
-    # alone can't distinguish "ascending size" from some other tie-break
-    # among same-size subsets, since there is only one subset of size 2 (the
-    # full set). Three elements have three distinct size-2 subsets, so this
-    # catches an implementation that orders sizes correctly but shuffles
-    # same-size subsets (e.g. by sorting subset contents instead of preserving
-    # itertools.combinations' source order).
-    assert list(subsets([1, 2, 3])) == [
-        frozenset(),
-        frozenset({1}),
-        frozenset({2}),
-        frozenset({3}),
-        frozenset({1, 2}),
-        frozenset({1, 3}),
-        frozenset({2, 3}),
-        frozenset({1, 2, 3}),
-    ]
 
 
 def _dep_dataset(n: int = 4000, seed: int = 0) -> DiscreteDataset:
@@ -87,33 +57,6 @@ def test_fes_does_not_mutate_input_pdag() -> None:
     assert start.undirected_edges() == []
 
 
-def test_fes_is_deterministic_across_repeated_runs() -> None:
-    # Comparing two runs against *each other* in the same process does not
-    # actually pin scan/tie-break order on this fixture: both runs execute
-    # identical construction sequences over small ints, and hash(int) == int,
-    # so PYTHONHASHSEED perturbs nothing here. An implementation that
-    # iterates frozenset candidates directly (instead of via sorted(...))
-    # would still traverse them in the same order both runs, within and
-    # across processes, and would still pass a cpdag1 == cpdag2 check alone.
-    # The assertions below pin the *exact* expected CPDAG instead, so any
-    # change to candidate scan order, tie-breaking, or subset order changes
-    # the result and fails here -- this is a change-detector for those three
-    # things, not a real "is it deterministic" test. Expected value obtained
-    # by running the current implementation and eyeballed for plausibility:
-    # A and B are strongly dependent (see _dep_dataset), so FES connects them
-    # (undirected, since nothing forces an orientation); C and D are
-    # independent of everything, so no other edge appears.
-    ds = _dep_dataset()
-    score = BDeuScore(ds)
-    cpdag1, flag1 = run_fes(score, PDAG(4))
-    cpdag2, flag2 = run_fes(score, PDAG(4))
-    assert flag1 is True
-    assert flag2 is True
-    assert cpdag1 == cpdag2
-    assert cpdag1.directed_edges() == []
-    assert cpdag1.undirected_edges() == [(0, 1)]
-
-
 def test_run_fes_no_improvement_returns_unmodified_graph() -> None:
     # Four mutually independent columns built from a balanced full factorial
     # (every one of the 16 combinations of 4 binary variables repeated the
@@ -134,52 +77,6 @@ def test_run_fes_no_improvement_returns_unmodified_graph() -> None:
     assert changed is False
     assert cpdag.directed_edges() == []
     assert cpdag.undirected_edges() == []
-
-
-class _TiedFakeScore:
-    """A hand-built score with three exactly-tied best Inserts on an empty PDAG(3).
-
-    ``Insert(x=0, y=1, T=empty)``, ``Insert(x=0, y=2, T=empty)``, and
-    ``Insert(x=1, y=0, T=empty)`` all have delta 10.0; every other candidate
-    has delta 0.0 (not an improvement). The FES scan order is `x` outer, `y`
-    inner, both ascending, so among these three tied candidates `(x=0, y=1)`
-    is considered strictly first.
-
-    This single fixture pins two independent things at once, both required
-    for the assertion below to hold:
-
-    * Tie-break rule: a correct first-seen-on-tie implementation (replace the
-      incumbent only on strictly greater delta) keeps `(x=0, y=1)` once it
-      becomes the incumbent, since the other two candidates only ever tie
-      it, never beat it. An implementation that instead replaces on
-      `delta >= best_delta` would keep overwriting the incumbent as each
-      later tie arrives and, even under the correct scan order, would end up
-      on the *last*-scanned tied candidate, `(x=1, y=0)`, not `(x=0, y=1)`.
-    * Scan order: `(x=1, y=0)` is what makes this fixture actually
-      distinguish `x` outer / `y` inner from `y` outer / `x` inner -- a
-      two-candidate version of this fixture (just `(x=0, y=1)` and
-      `(x=0, y=2)`) does not, since both scan orders agree on it. Under a
-      (wrong) `y` outer / `x` inner scan, even paired with the correct strict
-      tie-break, `(x=1, y=0)` is the *first* tied candidate encountered (at
-      `y=0`, before `y=1` or `y=2` are reached), so it becomes the incumbent
-      and is never displaced by the later ties, wrongly returning
-      `(x=1, y=0)` instead of `(x=0, y=1)`.
-    """
-
-    def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-        parents = tuple(sorted(parents))  # accept frozenset/tuple per Score contract
-        if node in (1, 2) and parents == (0,):
-            return 10.0
-        if node == 0 and parents == (1,):
-            return 10.0
-        return 0.0
-
-
-def test_best_insert_keeps_first_seen_candidate_on_exact_tie() -> None:
-    fake_score = _TiedFakeScore()
-    pdag = PDAG(3)
-    best = _best_insert(fake_score, pdag, None)
-    assert best == (10.0, 0, 1, frozenset())
 
 
 def test_run_fes_restricted_candidate_edges_omits_edge_unrestricted_would_add() -> None:

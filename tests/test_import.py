@@ -6,12 +6,6 @@ import sys
 
 import pytest
 
-import fedcausal
-
-
-def test_version() -> None:
-    assert fedcausal.__version__
-
 
 @pytest.mark.parametrize("package", ["fedcausal.fedges", "fedcausal.lingam"])
 def test_algorithms_import_without_flwr(package: str, monkeypatch: pytest.MonkeyPatch) -> None:

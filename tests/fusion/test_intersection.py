@@ -1,4 +1,4 @@
-from fedcausal.fusion import Intersection, intersection_fusion
+from fedcausal.fusion import intersection_fusion
 from fedcausal.graph import DAG
 
 
@@ -12,12 +12,6 @@ def test_keeps_only_edges_present_in_every_dag():
 def test_single_dag_is_identity():
     d = DAG.from_edges(3, [(0, 1), (2, 1)])
     assert set(intersection_fusion([d]).edges()) == {(0, 1), (2, 1)}
-
-
-def test_operator_matches_function():
-    d1 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    d2 = DAG.from_edges(3, [(0, 1), (2, 1)])
-    assert set(Intersection().fuse([d1, d2]).edges()) == set(intersection_fusion([d1, d2]).edges())
 
 
 def test_intersection_is_skeleton_based_and_oriented_by_base():

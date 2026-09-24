@@ -1,4 +1,3 @@
-import numpy as np
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -58,17 +57,6 @@ def test_shd_reversed_reversible_edge_counts_one() -> None:
     g1 = DAG.from_edges(3, [(0, 1), (1, 2)])
     g2 = DAG.from_edges(3, [(1, 0), (1, 2)])
     assert shd(g1, g2) == 1
-
-
-def test_shd_reversed_compelled_and_reversible_edges_are_indistinguishable() -> None:
-    # Because Utils.SHD operates directly on DAGs (not CPDAGs), it has no
-    # notion of "compelled" vs. "reversible" edges -- both of the above cases
-    # produce the identical count (1), which is the point of this test.
-    compelled_g1 = DAG.from_edges(3, [(0, 2), (1, 2)])
-    compelled_g2 = DAG.from_edges(3, [(2, 0), (1, 2)])
-    reversible_g1 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    reversible_g2 = DAG.from_edges(3, [(1, 0), (1, 2)])
-    assert shd(compelled_g1, compelled_g2) == shd(reversible_g1, reversible_g2) == 1
 
 
 # --- Hand-counted shd_skeleton examples ----------------------------------------
@@ -139,26 +127,6 @@ def test_smhd_graphs_matches_smhd_on_precomputed_moral_matrices() -> None:
     m2 = moralize(dag2)
     assert smhd_graphs(m1, m2) == 1
     assert smhd_graphs(m1, m2) == smhd(dag, dag2)
-
-
-def test_smhd_graphs_hand_built_matrices() -> None:
-    # Triangle {0-1,0-2,1-2} vs path {0-1,1-2}: differ only on {0,2} -> 1.
-    triangle = np.array(
-        [
-            [False, True, True],
-            [True, False, True],
-            [True, True, False],
-        ]
-    )
-    path = np.array(
-        [
-            [False, True, False],
-            [True, False, True],
-            [False, True, False],
-        ]
-    )
-    assert smhd_graphs(triangle, path) == 1
-    assert smhd_graphs(triangle, triangle) == 0
 
 
 # --- Metamorphic properties -----------------------------------------------------

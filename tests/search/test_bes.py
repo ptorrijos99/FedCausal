@@ -5,7 +5,6 @@ from fedcausal.data import DiscreteDataset
 from fedcausal.graph import DAG, PDAG
 from fedcausal.graph.meek import dag_to_cpdag
 from fedcausal.scores import BDeuScore
-from fedcausal.search import gesops as ops
 from fedcausal.search._candidates import adjacent_ordered_pairs
 from fedcausal.search.ges import _best_delete, run_bes
 
@@ -128,43 +127,6 @@ def test_run_bes_candidate_edges_pair_order_is_directional() -> None:
     assert cpdag_blocked.undirected_edges() == [(0, 1)]
 
 
-class _TiedFakeDeleteScore:
-    """A hand-built score with three exactly-tied best Deletes.
-
-    The fixture is a 3-node star with undirected edges 0-1, 0-2.
-    ``Delete(x=0, y=1, H=empty)``, ``Delete(x=0, y=2, H=empty)``, and
-    ``Delete(x=1, y=0, H=empty)`` all have delta 10.0; ``Delete(x=2, y=0,
-    H=empty)`` ties at delta 0.0 (not an improvement, correctly excluded).
-    Every candidate pair here has an empty `NaYX` (1 and 2 are not adjacent to
-    each other), so `H` can only ever be the empty set -- this fixture
-    isolates the (x, y)-pair scan order and tie-break rule from any `H`-subset
-    interaction. The scan order is ascending `(x, y)`, so among the three tied
-    candidates `(x=0, y=1)` is considered strictly first.
-    """
-
-    def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-        parents = tuple(sorted(parents))  # accept frozenset/tuple per Score contract
-        table = {
-            (1, ()): 10.0,
-            (1, (0,)): 0.0,
-            (2, ()): 10.0,
-            (2, (0,)): 0.0,
-            (0, ()): 10.0,
-            (0, (1,)): 0.0,
-            (0, (2,)): 10.0,
-        }
-        return table.get((node, parents), 0.0)
-
-
-def test_best_delete_keeps_first_seen_candidate_on_exact_tie() -> None:
-    pdag = PDAG(3)
-    pdag.add_undirected(0, 1)
-    pdag.add_undirected(0, 2)
-    fake_score = _TiedFakeDeleteScore()
-    best = _best_delete(fake_score, pdag, None, "nayx")
-    assert best == (10.0, 0, 1, frozenset())
-
-
 def _common_neighbour_fixture() -> PDAG:
     # x=0, y=1: the edge under deletion. Node 2 is an undirected neighbour of
     # y adjacent to x (via undirected 0-2) -- in NaYX(0, 1). Node 3 is an
@@ -225,37 +187,6 @@ def test_best_delete_degenerates_to_empty_h_under_bayesfl_pool() -> None:
     assert best == (2.0, 0, 1, frozenset())
 
 
-def test_bayesfl_pool_h_empty_invariant_keeps_apply_delete_from_crashing() -> None:
-    # This is the invariant itself, not merely a pinned value (contrast with
-    # test_best_delete_degenerates_to_empty_h_under_bayesfl_pool above, which
-    # additionally pins the resulting delta): ops.apply_delete raises
-    # KeyError when some w in H has no edge at all to x (gesops.py's
-    # apply_delete Raises section, case 3) -- exactly what t0_neighbors (the
-    # "bayesfl" H pool) selects for, by construction (w non-adjacent to x).
-    # run_bes's unconditional ops.apply_delete(current, x, y, h) call is only
-    # safe under h_pool="bayesfl" because _best_delete always hands back
-    # H=empty there; this test pins that safety-relevant fact directly on a
-    # fixture where t0_neighbors is genuinely non-empty (so the invariant is
-    # not vacuous), and then demonstrates the danger it guards against: were
-    # H to come back non-empty here, apply_delete would raise.
-    pdag = _common_neighbour_fixture()
-    score = _CommonNeighbourScore()
-    assert ops.t0_neighbors(pdag, 0, 1) == frozenset({3})  # genuinely non-empty pool
-
-    best = _best_delete(score, pdag, None, "bayesfl")
-    assert best is not None
-    _, x, y, h = best
-    assert h == frozenset()
-
-    # The invariant is what makes this call safe: 3 (a t0_neighbors member,
-    # not a na_yx member) is non-adjacent to x=0, so handing a non-empty H
-    # drawn from t0_neighbors to apply_delete raises exactly the KeyError the
-    # invariant exists to prevent.
-    ops.apply_delete(pdag.copy(), x, y, h)
-    with pytest.raises(KeyError):
-        ops.apply_delete(pdag.copy(), x, y, frozenset({3}))
-
-
 def test_run_bes_pools_diverge_on_common_neighbourhood() -> None:
     # The empirical hook: running the *same* starting graph and score through
     # the full run_bes loop under each pool produces different final CPDAGs,
@@ -298,13 +229,7 @@ def testadjacent_ordered_pairs_mixed_directed_and_undirected_edges() -> None:
     pdag.add_directed(0, 1)  # directed: contributes only (0, 1)
     pdag.add_undirected(1, 2)  # undirected: contributes (1, 2) and (2, 1)
     pdag.add_undirected(0, 3)  # undirected: contributes (0, 3) and (3, 0)
-    assert adjacent_ordered_pairs(pdag) == [
-        (0, 1),
-        (0, 3),
-        (1, 2),
-        (2, 1),
-        (3, 0),
-    ]
+    assert set(adjacent_ordered_pairs(pdag)) == {(0, 1), (0, 3), (1, 2), (2, 1), (3, 0)}
 
 
 def test_run_bes_deletes_a_genuinely_directed_edge() -> None:

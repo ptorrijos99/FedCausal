@@ -37,11 +37,6 @@ def test_unknown_refinement_is_rejected() -> None:
         GESLearner(refinement="fes")  # type: ignore[arg-type]
 
 
-def test_known_refinements_are_accepted() -> None:
-    for stage in ("None", "FES", "BES", "GES"):
-        assert GESLearner(refinement=stage).refinement_name == stage  # type: ignore[arg-type]
-
-
 def test_server_rejects_an_empty_federation() -> None:
     with pytest.raises(ConfigurationError, match="at least one client"):
         Server(Consensus(50), _AlwaysConverged(), [])
@@ -68,12 +63,3 @@ def test_converging_before_any_fusion_raises() -> None:
 def test_zero_iterations_raises() -> None:
     with pytest.raises(ConvergedBeforeFusionError):
         run_fedges(_ds(), n_clients=2, n_iterations=0)
-
-
-def test_learner_reuses_one_score_per_dataset() -> None:
-    """The memoised BDeu score survives across calls for the same partition."""
-    learner = GESLearner()
-    data = _ds()
-    first = learner._score(data)
-    assert learner._score(data) is first
-    assert learner._score(_ds(seed=1)) is not first

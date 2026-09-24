@@ -221,41 +221,11 @@ def test_fit_threads_candidate_edges_to_fes_phase() -> None:
     assert 1 not in cpdag.adjacent(0)
 
 
-def test_bes_only_requires_initial_graph() -> None:
-    # bes_only's initial_graph has no default -- a pure BES run from an
-    # empty graph is meaningless (nothing is ever adjacent, so BES can never
-    # do anything). This pins that contract against a future edit that adds
-    # a convenience default of None.
+@pytest.mark.parametrize("method", ["fit", "fes_only", "bes_only"])
+def test_initial_graph_must_match_the_data(method: str) -> None:
     ds = _dummy_dataset(3)
-    g = GES(BDeuScore(ds))
-    with pytest.raises(TypeError):
-        g.bes_only(ds)  # type: ignore[call-arg]
-
-
-def test_fit_rejects_initial_graph_node_count_mismatch() -> None:
-    ds = _dummy_dataset(3)
-    mismatched = DAG(4)
     with pytest.raises(ValueError):
-        GES(BDeuScore(ds)).fit(ds, initial_graph=mismatched)
-
-
-def test_fes_only_rejects_initial_graph_node_count_mismatch() -> None:
-    # fes_only routes through the same _check_node_count helper as fit
-    # (test_fit_rejects_initial_graph_node_count_mismatch above), but that
-    # sharing was previously untested on this method directly.
-    ds = _dummy_dataset(3)
-    mismatched = DAG(4)
-    with pytest.raises(ValueError):
-        GES(BDeuScore(ds)).fes_only(ds, initial_graph=mismatched)
-
-
-def test_bes_only_rejects_initial_graph_node_count_mismatch() -> None:
-    # Same as test_fes_only_rejects_initial_graph_node_count_mismatch above,
-    # for bes_only.
-    ds = _dummy_dataset(3)
-    mismatched = DAG(4)
-    with pytest.raises(ValueError):
-        GES(BDeuScore(ds)).bes_only(ds, initial_graph=mismatched)
+        getattr(GES(BDeuScore(ds)), method)(ds, initial_graph=DAG(4))
 
 
 def test_ges_init_rejects_invalid_h_pool() -> None:

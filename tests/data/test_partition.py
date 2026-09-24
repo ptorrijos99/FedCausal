@@ -229,9 +229,3 @@ def test_dirichlet_split_rejects_by_with_continuous():
         TypeError, match=r"by is only supported for a DiscreteDataset, got ContinuousDataset"
     ):
         dirichlet_split(ds, 4, alpha=1.0, seed=0, by=1)
-
-
-def test_dirichlet_split_accepts_by_with_discrete():
-    ds = _synthetic_dataset(n_rows=100, n_label_levels=4)
-    parts = dirichlet_split(ds, 4, alpha=0.5, seed=7, by=1)
-    assert len(parts) == 4

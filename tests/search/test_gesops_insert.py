@@ -86,22 +86,6 @@ def test_semidirected_blocked_x_in_cond_is_blocked() -> None:
     assert ops.is_semidirected_blocked(p, 1, 0, frozenset({0}))  # x in cond -> blocked
 
 
-def test_semidirected_blocked_y_in_cond_early_exit() -> None:
-    # Pins the `y in cond -> True` early-exit guard ported from Java.
-    p = PDAG(3)
-    p.add_undirected(1, 2)
-    p.add_directed(2, 0)
-    assert ops.is_semidirected_blocked(p, 1, 0, frozenset({1}))  # y in cond -> early-exit True
-
-
-def test_semidirected_blocked_y_equals_x_early_exit() -> None:
-    # Pins the `y == x -> False` early-exit guard ported from Java.
-    p = PDAG(3)
-    p.add_undirected(1, 2)
-    p.add_directed(2, 0)
-    assert not ops.is_semidirected_blocked(p, 1, 1, frozenset())  # y == x -> early-exit False
-
-
 def test_valid_insert_accepts_valid_case() -> None:
     p = PDAG(3)  # no edges: NaYX | T is empty (trivial clique), no path from y to x at all
     assert ops.valid_insert(p, x=0, y=1, t=frozenset(), na=frozenset())

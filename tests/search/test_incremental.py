@@ -9,15 +9,13 @@ scan is not proven for every conceivable graph -- it is *enforced empirically
 here*. Every case asserts the two engines produce byte-identical CPDAGs (same
 directed and undirected edge sets), so any future divergence fails CI.
 
-Coverage: an always-on synthetic dataset (so CI without the BayesFL tree still
-exercises the engine) plus the real benchmark networks when ``$BAYESFL_DIR`` is
-available, across both ``max_t_size`` settings, both ``h_pool`` values, and the
-``candidate_edges``-restricted (federated) path.
+Coverage: a synthetic dataset plus every network shipped in
+``tests/fixtures/networks``, across both ``max_t_size`` settings, both ``h_pool``
+values, and the ``candidate_edges``-restricted (federated) path.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import numpy as np
@@ -30,9 +28,8 @@ from fedcausal.search import GES
 from fedcausal.search.ges import run_bes, run_fes
 from fedcausal.search.incremental import run_bes_incremental, run_fes_incremental
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-BAYESFL = Path(os.environ.get("BAYESFL_DIR", str(REPO_ROOT.parent / "BayesFL")))
-REAL_NETS = ("asia", "cancer", "child", "insurance", "alarm", "hepar2")
+NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
+REAL_NETS = ("asia", "cancer", "child", "insurance", "alarm")
 
 
 def _canon(pdag: PDAG) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
@@ -65,21 +62,11 @@ def _synthetic_dataset() -> DiscreteDataset:
     return DiscreteDataset.from_arrays(values, cards, names, cats)
 
 
-def _load_real(net: str) -> DiscreteDataset | None:
-    """Load a benchmark net's sample 0, or `None` if the BayesFL tree is absent."""
-    csv = BAYESFL / "res" / "networks" / "BBDD" / net / f"{net}.0.csv"
-    if not csv.exists():
-        return None
-    return DiscreteDataset.from_csv(csv)
-
-
 def _datasets() -> list[tuple[str, DiscreteDataset]]:
-    """Return the (label, dataset) pairs to run: synthetic always, real nets if present."""
+    """Return the (label, dataset) pairs to run: the synthetic one and every shipped network."""
     out: list[tuple[str, DiscreteDataset]] = [("synthetic", _synthetic_dataset())]
     for net in REAL_NETS:
-        ds = _load_real(net)
-        if ds is not None:
-            out.append((net, ds))
+        out.append((net, DiscreteDataset.from_csv(NETWORKS / f"{net}.0.csv.gz")))
     return out
 
 

@@ -50,14 +50,13 @@ def test_maxfreq1_and_maxparents_p_equal_union(p: int, data: st.DataObject) -> N
 def test_fuses_real_ges_output_on_asia() -> None:
     """End-to-end: three clients learn asia by GES, then fuse to an acyclic DAG.
 
-    Proves the fusion consumes real GES output. The SMHD bound is generous;
-    the binding assertions are acyclicity and a non-degenerate result.
+    Proves the fusion consumes real GES output: the result is acyclic, covers
+    every client's adjacencies, and is not empty.
     """
     xbif = NETWORKS / "asia.xbif"
 
     from fedcausal.data.partition import contiguous_split
     from fedcausal.io import forward_sample, load_xbif
-    from fedcausal.metrics import smhd
     from fedcausal.scores import BDeuScore
     from fedcausal.search import GES
 
@@ -69,4 +68,5 @@ def test_fuses_real_ges_output_on_asia() -> None:
     fused = consensus_union(client_dags)
     assert len(fused.topological_order()) == fused.num_nodes  # acyclic
     assert fused.num_edges > 0
-    assert smhd(fused, bn.dag) <= 30  # generous; recorded from first green run
+    fused_skeleton = {frozenset(e) for e in fused.edges()}
+    assert all(frozenset(e) in fused_skeleton for d in client_dags for e in d.edges())

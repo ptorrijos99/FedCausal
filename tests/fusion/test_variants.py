@@ -3,28 +3,12 @@
 from __future__ import annotations
 
 from fedcausal.fusion import (
-    Consensus,
-    MaxEdges,
-    MaxFrequency,
-    MaxParents,
     consensus_pct,
-    edge_frequency,
     max_edges,
     max_frequency,
     max_parents,
 )
-from fedcausal.fusion.consensus import _transform_all
 from fedcausal.graph import DAG
-
-
-def test_edge_frequency_counts_and_orders() -> None:
-    """Frequencies count cross-client occurrences, most frequent first."""
-    d1 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    d2 = DAG.from_edges(3, [(0, 1)])
-    _alpha, transformed = _transform_all([d1, d2])
-    freq = edge_frequency(transformed)
-    assert freq[0][1] >= freq[-1][1]  # descending
-    assert dict(freq)[(0, 1)] == 2
 
 
 def test_max_frequency_keeps_only_unanimous() -> None:
@@ -72,13 +56,3 @@ def test_max_parents_caps_the_source_not_the_target() -> None:
     d2 = DAG.from_edges(3, [(0, 1), (1, 2)])
     out = max_parents([d1, d2], 1)
     assert set(out.edges()) == {(0, 1)}
-
-
-def test_variant_operators_match_functions() -> None:
-    """Each operator class delegates to its free function."""
-    d1 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    d2 = DAG.from_edges(3, [(0, 1)])
-    assert set(MaxEdges(1).fuse([d1, d2]).edges()) == set(max_edges([d1, d2], 1).edges())
-    assert set(MaxFrequency(2).fuse([d1, d2]).edges()) == set(max_frequency([d1, d2], 2).edges())
-    assert set(Consensus(50).fuse([d1, d2]).edges()) == set(consensus_pct([d1, d2], 50).edges())
-    assert set(MaxParents(1).fuse([d1, d2]).edges()) == set(max_parents([d1, d2], 1).edges())

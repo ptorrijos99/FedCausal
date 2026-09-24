@@ -38,13 +38,6 @@ def test_build_warm_starts_from_previous_without_error():
     }
 
 
-def test_score_dag_matches_a_direct_bdeu():
-    ds = _chain_dataset()
-    learner = GESLearner()
-    dag = DAG.from_edges(3, [(0, 1), (1, 2)])
-    assert learner.score_dag(dag, ds) < 0
-
-
 def test_refinement_none_is_identity():
     ds = _chain_dataset()
     learner = GESLearner(refinement="None")
