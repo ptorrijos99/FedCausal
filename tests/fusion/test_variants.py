@@ -44,15 +44,10 @@ def test_max_edges_int_budget() -> None:
     assert (0, 1) in out.edges()  # highest frequency added first
 
 
-def test_max_parents_caps_the_source_not_the_target() -> None:
-    """The cap is on the *source's* parent count -- BayesFL's bug, replicated.
+def test_max_parents_caps_each_nodes_in_degree() -> None:
+    """With cap 1, a collider keeps one of its two parents and a chain keeps both edges."""
+    collider = DAG.from_edges(3, [(0, 2), (1, 2)])
+    assert max_parents([collider, collider.copy()], 1).num_edges == 1
 
-    On a shared chain ``0 -> 1 -> 2`` with cap 1, the highest-frequency edge
-    ``0 -> 1`` is added first, giving node ``1`` one parent. When ``1 -> 2`` is
-    considered, its *source* ``1`` already has one parent, so the (buggy) cap
-    blocks it even though target ``2`` has none. See :func:`max_parents`.
-    """
-    d1 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    d2 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    out = max_parents([d1, d2], 1)
-    assert set(out.edges()) == {(0, 1)}
+    chain = DAG.from_edges(3, [(0, 1), (1, 2)])
+    assert set(max_parents([chain, chain.copy()], 1).edges()) == {(0, 1), (1, 2)}

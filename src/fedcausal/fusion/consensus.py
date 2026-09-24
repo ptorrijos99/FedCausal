@@ -185,23 +185,11 @@ def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
 
 
 def max_parents(dags: Sequence[DAG], limit: int) -> DAG:
-    """Union edges in frequency order under the original (buggy) parent cap.
-
-    The operator intends to cap each node's in-degree at
-    `limit`,
-    but reads ``edge.getNode1()`` as the "child" whenever ``endpoint1`` is
-    ``TAIL`` -- which, for a ``TAIL -> ARROW`` arc ``a -> b``, is the *source*
-    ``a``. It therefore caps the **source's** parent count, not the target's.
-    This is a real bug in the Java implementation; it is replicated verbatim (not fixed) so this
-    fusion matches published results, and documented
-    so
-    the divergence from the intended semantics is on record.
-    """
+    """Union edges in frequency order, giving no node more than `limit` parents."""
     _alpha, transformed = _transform_all(dags)
     out = DAG(dags[0].num_nodes)
     for (parent, child), _count in edge_frequency(transformed):
-        # Caps the source's in-degree, not the target's, reproducing the original.
-        if len(out.parents(parent)) < limit:
+        if len(out.parents(child)) < limit:
             out.add_edge(parent, child)
     return out
 

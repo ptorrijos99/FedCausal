@@ -44,8 +44,6 @@ All of them transform the input graphs into one shared topological order, then u
 
 Anything with a `fuse(dags)` method works in their place.
 
-**A caveat on `MaxParents`.** It caps the *source* node's parent count rather than the target's in-degree, which is not what the name suggests. This reproduces a quirk of the original Java implementation so that published results stay comparable. If you need a genuine in-degree cap, this is not the operator.
-
 ## Convergence criteria
 
 | Criterion | Stops when |
@@ -85,8 +83,8 @@ Local scores are memoised, and that cache carries most of the search's performan
 
 ## Compatibility options
 
-Three settings exist to reproduce the original Java implementation, [BayesFL](https://github.com/ptorrijos99/BayesFL), bit for bit. They are quirks of that codebase rather than part of the published method, so reach for them when you need to match previously published numbers, not because they are the better choice.
+Two settings exist to reproduce the original Java implementation, [BayesFL](https://github.com/ptorrijos99/BayesFL), bit for bit. They are quirks of that codebase rather than part of the published method, so reach for them when you need to match previously published numbers, not because they are the better choice.
 
 `h_pool="bayesfl"` draws deletion subsets from the neighbours of `y` *not* adjacent to `x`, rather than from `NaYX(x, y)` as Chickering's Definition 13 specifies. Those two sets are disjoint, so the score is insensitive to which subset is picked, every subset ties, and the first-seen tie rule keeps the empty one. The backward phase therefore only ever deletes edges with an empty subset. fedcausal implements both pools honestly rather than hardcoding the shortcut, so the degeneracy falls out of the ordinary scan and can be tested. On the networks where the two pools have been compared, up to 223 variables, they agree exactly.
 
-`empty_t_gate=True` and `MaxParents`'s source-cap behaviour are the other two, described above. Of the three, only `empty_t_gate` demonstrably costs you a worse structure.
+`empty_t_gate=True` is the other. It skips a candidate edge unless it improves with an empty conditioning set, and it demonstrably costs you a worse structure: on `child` it is the whole reason the Java result scores lower.

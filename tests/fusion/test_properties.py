@@ -47,6 +47,16 @@ def test_maxfreq1_and_maxparents_p_equal_union(p: int, data: st.DataObject) -> N
     assert set(max_parents(dags, p).edges()) == union
 
 
+@given(st.integers(3, 6), st.integers(0, 3), st.data())
+@settings(max_examples=50)
+def test_max_parents_respects_the_cap(p: int, limit: int, data: st.DataObject) -> None:
+    """No node gets more than `limit` parents, and nothing outside the union appears."""
+    dags = [data.draw(_dag_over(p)) for _ in range(data.draw(st.integers(1, 3)))]
+    out = max_parents(dags, limit)
+    assert all(len(out.parents(v)) <= limit for v in range(p))
+    assert set(out.edges()) <= set(consensus_union(dags).edges())
+
+
 def test_fuses_real_ges_output_on_asia() -> None:
     """End-to-end: three clients learn asia by GES, then fuse to an acyclic DAG.
 
