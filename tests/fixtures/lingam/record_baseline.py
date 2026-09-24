@@ -13,7 +13,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -21,9 +20,7 @@ from pathlib import Path
 import numpy as np
 
 
-def make_lingam_data(
-    seed: int, n_samples: int, n_vars: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> np.ndarray:
     """Generate a linear non-Gaussian SEM in a fixed causal order 0..n_vars-1."""
     rng = np.random.default_rng(seed)
     b_true = np.zeros((n_vars, n_vars))
@@ -36,30 +33,12 @@ def make_lingam_data(
     x = np.zeros((n_samples, n_vars))
     for j in range(n_vars):
         x[:, j] = x @ b_true[j] + noise[:, j]
-    return x, b_true, noise
+    return x
 
 
 def split(x: np.ndarray, n_clients: int) -> list[np.ndarray]:
     """Contiguous horizontal split, matching the experiments' partitioning."""
     return [part for part in np.array_split(x, n_clients, axis=0)]
-
-
-def digest16(x: np.ndarray) -> str:
-    """Return a 16-hex-char SHA-256 digest of an array's float64 bytes.
-
-    Applied to ``b_true`` and ``noise``, the RNG's output, so a later
-    regeneration of the same synthetic data (e.g. by a test that reimplements
-    ``make_lingam_data``) can prove it drew the identical sequence before
-    comparing solver outputs, instead of silently desyncing the RNG call
-    sequence and failing in a way that looks like a solver bug.
-
-    Never applied to ``x``, which comes out of ``x @ b_true[j]``: its
-    summation order and FMA use depend on the BLAS kernel the CPU dispatches
-    to, so its bytes differ by ~1e-15 between machines while the draws behind
-    it stay identical. A digest of ``x`` pins the host CPU rather than the
-    generator; the data itself is pinned portably by ``cumulants`` below.
-    """
-    return hashlib.sha256(np.ascontiguousarray(x, dtype=np.float64).tobytes()).hexdigest()[:16]
 
 
 CASES = [
@@ -97,14 +76,13 @@ def main() -> None:
 
     records = []
     for case in CASES:
-        x, b_true, noise = make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
-        draws = {"b_sha16": digest16(b_true), "noise_sha16": digest16(noise)}
+        x = make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
         clients = split(x, case["n_clients"])
         raw = [compute_local_raw_stats(part, order=4) for part in clients]
         stats = aggregate_and_compute_cumulants(raw)
 
         # Per-case aggregated cumulants, shared by every method record of this
-        # case (same as the draw digests already are). These pin the values that a
+        # case. These pin the values that a
         # bias-correction bug in cumulants.py could quietly perturb without
         # ever flipping a causal order -- see
         # tests/lingam/test_paper_regression.py::test_cumulants_match_the_recording.
@@ -133,7 +111,6 @@ def main() -> None:
                     "method": method,
                     "causal_order": [int(v) for v in causal_order],
                     "B": None if b_est is None else np.asarray(b_est, dtype=float).tolist(),
-                    **draws,
                     "cumulants": cumulants,
                 }
             )
@@ -148,7 +125,6 @@ def main() -> None:
                     "method": method,
                     "causal_order": [int(v) for v in model.causal_order_],
                     "B": np.asarray(model.adjacency_matrix_, dtype=float).tolist(),
-                    **draws,
                     "cumulants": cumulants,
                 }
             )
