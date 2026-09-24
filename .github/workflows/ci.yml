@@ -50,7 +50,7 @@ jobs:
       - run: pytest -m "not bigdata" --tb=short
 
   accel:
-    name: numba fast path
+    name: search with numba and causal-learn
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -58,9 +58,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      # The JIT path is byte-identical to the pure-Python one by design, and
-      # nothing else in CI would notice if that stopped being true.
-      - run: pip install -e ".[dev,accel]"
+      # The numba path must agree with the pure-Python one, and GES must not
+      # fall behind causal-learn's; nothing else in CI installs either.
+      - run: pip install -e ".[dev,accel,compare]"
       - run: pytest tests/search -m "not bigdata" --tb=short
 
   examples:
