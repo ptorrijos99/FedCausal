@@ -110,8 +110,7 @@ def tau_matrix_4th_from_data(
 
     Notes
     -----
-    Provided for single-machine diagnostics. The federated path never calls it:
-    it needs the raw data, which is exactly what does not leave a client.
+    Needs the raw data, so only for use on a single machine.
     """
     cols = list(range(x.shape[1])) if columns is None else list(columns)
     size = len(cols)

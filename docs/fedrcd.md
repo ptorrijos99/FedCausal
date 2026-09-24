@@ -20,7 +20,7 @@ Never a row of data. Each client computes `compute_local_raw_stats(x, order=4)` 
 | `sum_x3y1` | `(p, p)` | Σ xᵢ³xⱼ |
 | `sum_x2y2` | `(p, p)` | Σ xᵢ²xⱼ² |
 
-Every one of them is additive across disjoint row subsets, which is the only property the server needs. It sums each array across clients (`aggregate_and_compute_cumulants`), centres by the pooled mean, and applies bias-corrected k-statistic formulas to get unbiased third- and fourth-order cumulant estimates. A client's contribution cannot be recovered from its nine arrays: they are aggregates over its whole local sample, not a reversible encoding of it.
+Every one of them is additive across disjoint row subsets, which is the only property the server needs. It sums each array across clients (`aggregate_and_compute_cumulants`), centres by the pooled mean, and applies bias-corrected k-statistic formulas to get unbiased third- and fourth-order cumulant estimates. The arrays are sums over a site's rows rather than the rows themselves, but they are not a formal privacy guarantee: the fewer rows a site holds, the more its sums reveal about them, and with a single row they are the row.
 
 Over Flower (`fedcausal.flower.lingam`, needs the `flower` extra) that is one round trip for every solver except `fedrcd_exact`. The server broadcasts a `train` message, each supernode replies with its nine arrays, its row count and a fingerprint of its variable names, and the server checks the fingerprints agree before aggregating.
 

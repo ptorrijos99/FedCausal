@@ -1,26 +1,11 @@
-"""Cumulant estimators for causal discovery.
+"""Unbiased third- and fourth-order cumulants, computable across sites.
 
-This module provides unbiased estimators for 3rd- and 4th-order cumulants and
-cross-cumulants, designed for both local (single-machine) and federated
-learning scenarios.
-
-Architecture
-------------
-The module is organized in two layers:
-
-1. **Raw moment computation** -- `compute_local_raw_stats`. Computes additive
-   sufficient statistics (sums of powers / cross-products) from a local
-   dataset. These are the *only* quantities that leave each client in a
-   federated setting.
-2. **Aggregation & cumulant estimation** -- `aggregate_and_compute_cumulants`.
-   Aggregates raw moment sums from one or more clients, centers them using the
-   global mean, and applies bias-corrected (k-statistic) formulas to obtain
-   unbiased cumulant estimates up to 4th order.
-
-A third layer of single-vector convenience wrappers (`unbiased_cumulant3`,
-`unbiased_cumulant4`, `cross_cumulants3`, `cross_cumulants4`) presents the same
-API as the original single-machine estimators, for callers that already hold
-the raw vectors and have no need for the raw-stats pipeline.
+Each site reduces its rows to additive moment sums
+(:func:`compute_local_raw_stats`); the server adds them up, centres them on the
+pooled mean and applies the k-statistic bias corrections
+(:func:`aggregate_and_compute_cumulants`). The result equals what the pooled
+data would give. The ``unbiased_*`` and ``cross_cumulants*`` functions compute
+the same estimators directly from vectors.
 
 References
 ----------
@@ -68,45 +53,19 @@ _MIN_SAMPLES_4TH: int = 4
 
 
 def _n_samples(stats: Cumulants) -> int:
-    """Look up the total sample count, raising if the aggregator omitted it.
-
-    Shared by every solver in :mod:`fedcausal.lingam` that needs the sample
-    count to scale its Lasso penalty (:mod:`fedcausal.lingam.rcd` and
-    :mod:`fedcausal.lingam.ishc`); byte-identical between the two before being
-    hoisted here.
-
-    Parameters
-    ----------
-    stats : Cumulants
-        Aggregated statistics from :func:`aggregate_and_compute_cumulants`.
-
-    Returns
-    -------
-    int
-        The ``"n"`` entry.
-
-    Raises
-    ------
-    KeyError
-        If ``"n"`` is missing. A silent default would quietly mis-scale the
-        Lasso penalty.
-    """
+    """Return ``stats["n"]``, raising `KeyError` if it is missing rather than guessing."""
     if "n" not in stats:
         raise KeyError("stats is missing 'n'; the aggregator always sets it")
     return int(stats["n"])
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# §1  Raw Moment Computation (client-side, privacy-safe)
+# Moment sums, computed by each site
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawStats:
-    """Compute local raw moment sums suitable for federated aggregation.
-
-    All returned quantities are *additive* across disjoint subsets of samples,
-    which is the key property that enables secure aggregation without sharing
-    raw data.
+    """Return the moment sums of `x`, which add up across disjoint sets of rows.
 
     Parameters
     ----------
@@ -200,7 +159,7 @@ def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawSt
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# §2  Aggregation & Global Cumulant Estimation (server-side)
+# Aggregation into cumulants, done by the server
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -210,9 +169,8 @@ def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulan
     Parameters
     ----------
     client_stats : Sequence[dict]
-        Each element is the output of :func:`compute_local_raw_stats` from one
-        client. All clients must share the same variable set (i.e. horizontal
-        FL).
+        :func:`compute_local_raw_stats` of each site, all over the same
+        variables.
 
     Returns
     -------
@@ -275,9 +233,6 @@ def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulan
 
     result.update({"c4": c4, "c13": c13, "c31": c31, "c22": c22})
     return result
-
-
-# ── Private helpers for aggregation ───────────────────────────────────────
 
 
 def _aggregate_raw_stats(stats_list: Sequence[RawStats], p: int, has_4th: bool) -> RawStats:
@@ -439,7 +394,7 @@ def _compute_4th_order(
                 - 3 * mj * s_x1y2[i, j]
                 + 3 * mi * mj * s_xx[j, j]
                 + 3 * mj**2 * s_xx[i, j]
-                - 3 * n * mi * mj**3  # ← μⱼ³ (not μⱼ²)
+                - 3 * n * mi * mj**3
             )
 
             # --- M₃₁ = Σ(xᵢ − μᵢ)³(xⱼ − μⱼ)  [swap i ↔ j roles in M₁₃] ---
@@ -451,7 +406,7 @@ def _compute_4th_order(
                 - 3 * mi * s_x2y1[i, j]
                 + 3 * mj * mi * s_xx[i, i]
                 + 3 * mi**2 * s_xx[i, j]
-                - 3 * n * mj * mi**3  # ← μᵢ³ (not μᵢ²)
+                - 3 * n * mj * mi**3
             )
 
             # --- M₂₂ = Σ(xᵢ − μᵢ)²(xⱼ − μⱼ)² ---
@@ -482,10 +437,8 @@ def _compute_4th_order(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# §3  Convenience Wrappers (single-vector API)
+# The same estimators on vectors
 # ═══════════════════════════════════════════════════════════════════════════
-
-# ── Single-vector estimators ──────────────────────────────────────────────
 
 
 def unbiased_cumulant3(
@@ -515,7 +468,7 @@ def unbiased_cumulant3(
     Raises
     ------
     ValueError
-        If fewer than `_MIN_SAMPLES_3RD` samples are given.
+        If fewer than 3 samples are given.
     """
     x = np.asarray(x, dtype=float)
     if y is None:
@@ -539,8 +492,6 @@ def unbiased_cumulant3(
 def unbiased_cumulant4(x: npt.NDArray[np.float64]) -> float:
     """Return the unbiased 4th-order marginal cumulant.
 
-    This is the excess-kurtosis numerator.
-
     Parameters
     ----------
     x : numpy.ndarray
@@ -555,7 +506,7 @@ def unbiased_cumulant4(x: npt.NDArray[np.float64]) -> float:
     Raises
     ------
     ValueError
-        If fewer than `_MIN_SAMPLES_4TH` samples are given.
+        If fewer than 4 samples are given.
     """
     x = np.asarray(x, dtype=float)
     n = len(x)
@@ -568,9 +519,6 @@ def unbiased_cumulant4(x: npt.NDArray[np.float64]) -> float:
 
     d = (n - 1) * (n - 2) * (n - 3)
     return float((n * (n + 1) * m4 - 3 * (n - 1) * m2**2) / d)
-
-
-# ── Pairwise cross-cumulant estimators ────────────────────────────────────
 
 
 def cross_cumulants3(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> tuple[float, float]:
@@ -591,7 +539,7 @@ def cross_cumulants3(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> 
     Raises
     ------
     ValueError
-        If fewer than `_MIN_SAMPLES_3RD` samples are given.
+        If fewer than 3 samples are given.
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -629,7 +577,7 @@ def cross_cumulants4(
     Raises
     ------
     ValueError
-        If fewer than `_MIN_SAMPLES_4TH` samples are given.
+        If fewer than 4 samples are given.
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
