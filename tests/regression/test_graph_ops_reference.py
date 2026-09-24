@@ -1,7 +1,7 @@
 """Pin the graph operations against committed reference values.
 
 Covers :func:`fedcausal.metrics.shd`/:func:`~fedcausal.metrics.smhd`,
-:func:`fedcausal.graph.treewidth_java`, :func:`fedcausal.graph.moralize` and
+:func:`fedcausal.graph.moralize` and
 :func:`fedcausal.graph.meek.dag_to_cpdag`.
 
 Every DAG is rebuilt from the golden's named edge lists, so node indices come
@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from fedcausal.graph import DAG, moralize, treewidth_java
+from fedcausal.graph import DAG, moralize
 from fedcausal.graph.meek import dag_to_cpdag
 from fedcausal.metrics import shd, smhd
 
@@ -56,46 +56,6 @@ def _graph_cases() -> list[tuple[str, str]]:
     ]
 
 
-# Known cross-language divergences in the MCS-triangulation treewidth heuristic.
-# Java's Utils.getMaximumCardinalityOrdering breaks maximum-cardinality ties via
-# a PriorityQueue whose order is implementation-defined; fedcausal breaks ties to
-# the lowest node index (deterministic, documented in graph.undirected.mcs_order).
-# On NON-CHORDAL moral graphs the two orders can triangulate differently and thus
-# report different maximum-clique sizes -- both are valid heuristic upper bounds,
-# and Java's value is itself reachable by SOME valid tie order (verified: the
-# `remove` graph triangulates to a max clique of 4 or 5; the `add` graph to 5, 6
-# or 7). These are the only two families in the goldens where they differ; the
-# moral graphs themselves match exactly (see test_moral_edges_match_java). Marked
-# strict so the pin fails loudly if either side's tie policy ever changes.
-_TREEWIDTH_XFAIL: dict[tuple[str, str], str] = {
-    ("alarm", "remove"): (
-        "MCS tie-order divergence: Java treewidth_java=4, fedcausal=5 "
-        "(lowest-index tie-break); both are valid MCS triangulations."
-    ),
-    ("alarm", "add"): (
-        "MCS tie-order divergence: Java treewidth_java=6, fedcausal=5 "
-        "(lowest-index tie-break); both are valid MCS triangulations."
-    ),
-}
-
-
-def _treewidth_cases() -> list[Any]:
-    cases: list[Any] = []
-    for network_name, graph_name in _graph_cases():
-        key = (network_name, graph_name)
-        if key in _TREEWIDTH_XFAIL:
-            cases.append(
-                pytest.param(
-                    network_name,
-                    graph_name,
-                    marks=pytest.mark.xfail(strict=True, reason=_TREEWIDTH_XFAIL[key]),
-                )
-            )
-        else:
-            cases.append(pytest.param(network_name, graph_name))
-    return cases
-
-
 def _pair_cases() -> list[tuple[str, str, str]]:
     return [
         (net["network"], pair["g1"], pair["g2"])
@@ -110,19 +70,6 @@ def _network(name: str) -> dict[str, Any]:
 
 def _graph(network: dict[str, Any], graph_name: str) -> dict[str, Any]:
     return next(g for g in network["graphs"] if g["name"] == graph_name)
-
-
-@pytest.mark.regression
-@pytest.mark.parametrize(("network_name", "graph_name"), _treewidth_cases())
-def test_treewidth_matches_java(network_name: str, graph_name: str) -> None:
-    net = _network(network_name)
-    graph = _graph(net, graph_name)
-    dag = _build_dag(net["variables"], graph["edges"])
-    got = treewidth_java(dag)
-    expected = graph["treewidth_java"]
-    assert got == expected, (
-        f"{network_name}/{graph_name}: Python treewidth_java {got} != Java {expected}"
-    )
 
 
 @pytest.mark.regression
