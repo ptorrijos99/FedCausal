@@ -1,11 +1,7 @@
-"""Scale tests: prove the GES engine runs on large benchmark networks.
+"""GES completes on networks of up to 1041 variables.
 
-These need networks too large to ship with the package (up to 1041 variables),
-so they are marked `bigdata` and skip unless ``FEDCAUSAL_NETWORKS`` points at a
-directory laid out as ``<net>/<net>.0.csv``. See `docs/benchmarks.md`.
-
-They assert structure, not wall-clock: timings belong in the benchmarks, where
-they are measured properly, not in a pass/fail check.
+They are too large to ship, so these skip unless ``FEDCAUSAL_NETWORKS`` points
+at a directory laid out as ``<net>/<net>.0.csv``. See docs/benchmarks.md.
 """
 
 from __future__ import annotations

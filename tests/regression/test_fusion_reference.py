@@ -1,14 +1,8 @@
-"""Pin structural fusion against committed reference runs, by edge-set equality.
+"""Structural fusion matches the reference implementation's recorded runs.
 
-The reference (`fusion_runs.json`) is committed, so this test is
-self-contained.
-
-Every tie-robust output -- the consensus order, each minimal-I-map transform,
-the full union, and the frequency and percentage variants -- is
-asserted exactly. ``max_edges`` is a top-k cut through frequencies that tie,
-so Java (HashMap order) and fedcausal (lexicographic) legitimately pick
-different edges among equal-frequency ties; it is checked by cardinality and
-union-subset only. See the ``DumpFusion`` docstring.
+Everything is compared exactly except ``max_edges``, which cuts through
+frequency ties that the two implementations break differently; there only the
+edge count and membership of the union are checked.
 """
 
 from __future__ import annotations
@@ -46,7 +40,7 @@ def test_fusion_matches_java(sc: dict[str, Any]) -> None:
     for d, beta_edges in zip(dags, sc["betas"], strict=True):
         assert set(beta_to_alpha(d, alpha).edges()) == _edges(beta_edges, index)
 
-    # Full union and the threshold/cap variants: exact.
+    # Full union and the frequency and percentage variants: exact.
     union = _edges(sc["union"], index)
     assert set(consensus_union(dags).edges()) == union
     v = sc["variants"]

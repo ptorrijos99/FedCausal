@@ -1,9 +1,4 @@
-"""Flower transport for the one-shot FedRCD family.
-
-The equivalence claim, that the transport does not change the answer, is
-driven over the in-process `StubGrid`, so it runs everywhere. Only the check
-through a real simulation needs Ray.
-"""
+"""The one-shot FedRCD solvers over Flower."""
 
 from __future__ import annotations
 
@@ -31,13 +26,7 @@ from ._stubs import StubGrid, continuous_chain  # noqa: E402
 
 
 def test_flower_matches_the_in_process_solver_exactly() -> None:
-    """The transport must not change the answer. This is the equivalence claim.
-
-    Drives `run_server_loop` over the in-process `StubGrid`, so this runs
-    everywhere and is never skipped: it exercises the real `handle_stats_message`
-    handler and the real `stats_to_record` / `record_to_stats` serialisation, and
-    depends on nothing but `flwr` itself.
-    """
+    """The transport does not change the answer."""
     from fedcausal.lingam import fedrcd
     from fedcausal.lingam.cumulants import (
         aggregate_and_compute_cumulants,
@@ -69,19 +58,10 @@ def test_disagreeing_schemas_are_rejected() -> None:
 
 
 def test_same_names_different_order_is_rejected() -> None:
-    """The case `_check_schemas` exists for -- and the one the other test above misses.
+    """The same variables in a different order must be rejected.
 
-    A count mismatch (3 vs 4 variables, see `test_disagreeing_schemas_are_rejected`) is
-    caught incidentally by numpy's broadcasting rules inside
-    `aggregate_and_compute_cumulants` even with no schema check at all: the moment-sum
-    arrays have mismatched shapes and something raises regardless.
-
-    Same names, same count, different order is different: every array has an identical
-    shape on both clients, so nothing raises on its own. Without `_check_schemas`, the
-    server would silently aggregate cumulants across columns that mean different things
-    on different clients, and hand back a confident, meaningless causal order. This is
-    the only scenario where removing the check would corrupt the result instead of
-    raising -- so it is the one that actually needs a test.
+    The arrays have the same shapes, so nothing else would fail: the server would
+    add up statistics of different variables and return a meaningless order.
     """
     rng = np.random.default_rng(0)
     values = rng.normal(size=(500, 3))

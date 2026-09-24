@@ -34,11 +34,7 @@ def _chain_dataset(seed: int = 0, n_rows: int = 2000) -> DiscreteDataset:
 
 
 def test_default_cap_recovers_the_chain() -> None:
-    """The default search (now ``max_t_size=2``) recovers the chain's skeleton.
-
-    The default cap is 2, not unbounded; a chain never needs ``|T| > 0``, so
-    the default recovers it exactly, as would ``max_t_size=None``.
-    """
+    """The default search recovers the chain's skeleton."""
     ds = _chain_dataset()
     cpdag = GES(BDeuScore(ds)).fit(ds)
     dag = cpdag.to_dag()
@@ -48,12 +44,7 @@ def test_default_cap_recovers_the_chain() -> None:
 
 
 def test_cap_zero_still_finds_the_chain() -> None:
-    """``max_t_size=0`` (only ``T = {}``) suffices on a chain.
-
-    A chain never needs a non-empty ``T``: each Insert's ``NaYX`` is empty, so
-    the harshest possible cap loses nothing here. This pins that the cap
-    changes *which* operators are considered, not whether the search runs.
-    """
+    """``max_t_size=0`` loses nothing on a chain, which never needs a non-empty T."""
     ds = _chain_dataset()
     cpdag = GES(BDeuScore(ds), max_t_size=0).fit(ds)
     dag = cpdag.to_dag()
@@ -63,12 +54,7 @@ def test_cap_zero_still_finds_the_chain() -> None:
 
 
 def test_cap_never_beats_unbounded_score() -> None:
-    """Capping ``T`` cannot improve on the unbounded search's optimum.
-
-    The capped operator set is a strict subset of the unbounded one, so its
-    reachable optima are a subset too. A cap scoring *better* would mean the
-    unbounded scan is missing an operator it should have considered.
-    """
+    """A cap only removes operators, so it can never score higher than no cap."""
     ds = _chain_dataset(seed=7)
     score = BDeuScore(ds)
 

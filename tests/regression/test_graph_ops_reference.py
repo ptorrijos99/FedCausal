@@ -1,12 +1,6 @@
-"""Pin the graph operations against committed reference values.
+"""SHD, SMHD, moralisation and CPDAG conversion match committed reference values.
 
-Covers :func:`fedcausal.metrics.shd`/:func:`~fedcausal.metrics.smhd`,
-:func:`fedcausal.graph.moralize` and
-:func:`fedcausal.graph.meek.dag_to_cpdag`.
-
-Every DAG is rebuilt from the golden's named edge lists, so node indices come
-from the golden's ``variables`` order and any variable-order difference is
-irrelevant.
+Graphs are rebuilt from named edges, so variable order does not matter.
 """
 
 from __future__ import annotations

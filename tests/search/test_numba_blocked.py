@@ -1,8 +1,6 @@
-"""The optional numba reachability path must be byte-identical to the set walk.
+"""The numba path check gives the same answers as the pure-Python one.
 
-Skipped when numba is not installed. Compares the numba fast path against the
-pure-Python traversal both directly (random graphs + queries) and end-to-end
-(a full GES fit), so the accelerated path can never silently diverge.
+Skipped when numba is not installed.
 """
 
 from __future__ import annotations

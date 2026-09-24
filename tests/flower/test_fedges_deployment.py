@@ -1,9 +1,4 @@
-"""The documented deployment path works: each site reads only its own file.
-
-Exercises what `docs/deployment.md` tells people to do, with real CSVs on
-disk and each supernode given nothing but a path to its own. If this passes, the
-walkthrough in the docs is not lying.
-"""
+"""The deployment in docs/deployment.md works: each site reads only its own file."""
 
 from __future__ import annotations
 
@@ -28,10 +23,9 @@ N_SITES = 3
 
 
 def _write_sites(tmp_path, n_rows: int = 1800, seed: int = 11, drop_column: int = -1):  # type: ignore[no-untyped-def]
-    """Write one CSV per site and return their paths.
+    """Write one CSV per site and return the paths.
 
-    `drop_column` removes a column from the last site's file, which is how a
-    schema mismatch gets simulated.
+    `drop_column` removes a column from the last site's file.
     """
     rng = np.random.default_rng(seed)
     x0 = rng.integers(0, 2, n_rows)

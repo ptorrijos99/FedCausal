@@ -1,15 +1,9 @@
-"""Hold ``GES`` against committed reference search runs.
+"""GES never ends worse than the reference implementation's recorded runs.
 
-The reference runs come from the implementation fedcausal was validated
-against, in its compatibility configuration (``h_pool="bayesfl"``); see
-``docs/algorithms.md``. They are compared on BDeu rather than on edges: a
-search returns one arbitrary member of a Markov equivalence class, while BDeu
-is identical across every DAG extension of a CPDAG.
-
-The claim is one-sided. fedcausal must never end on a worse optimum than the
-reference, and where it ends on the same one it must be the same equivalence
-class. On ``child`` and ``alarm`` it ends on a strictly better one; see
-``docs/validation.md`` for why.
+The runs use the compatibility setting ``h_pool="bayesfl"``. They are compared
+on BDeu, which every member of an equivalence class shares, and on the CPDAG
+when the scores tie. On ``child`` and ``alarm`` fedcausal finds a better
+optimum; see ``docs/validation.md``.
 """
 
 from __future__ import annotations
@@ -65,11 +59,7 @@ def test_ges_is_never_worse_than_the_reference(run: dict[str, Any]) -> None:
 
 @pytest.mark.regression
 def test_the_empty_t_gate_explains_child() -> None:
-    """On ``child`` the reference only falls short because it gates FES on ``T = {}``.
-
-    Turning the same gate on here must land on the reference's own equivalence
-    class, which is what pins that diagnosis rather than just asserting it.
-    """
+    """With the reference's empty-T gate on, GES lands exactly on its ``child`` result."""
     run = next(r for r in GOLDEN["runs"] if r["net"] == "child")
     ds = DiscreteDataset.from_csv(NETWORKS / f"{run['dataset']}.gz")
 

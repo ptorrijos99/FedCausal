@@ -1,17 +1,8 @@
-"""Differential test: the incremental FES/BES engine equals the full scan, byte-for-byte.
+"""The incremental engine gives the same CPDAG as the full scan.
 
-The incremental engine (:mod:`fedcausal.search.incremental`) is a performance
-optimization of the full-scan GES (:mod:`fedcausal.search.ges`): it re-scores
-only the candidate pairs whose neighbourhood changed after each operator. Its
-score-delta invalidation is provably complete, but operator *validity* is not
-fully local (semi-directed-path and clique checks), so equality with the full
-scan is not proven for every conceivable graph -- it is *enforced empirically
-here*. Every case asserts the two engines produce byte-identical CPDAGs (same
-directed and undirected edge sets), so any future divergence fails CI.
-
-Coverage: a synthetic dataset plus every network shipped in
-``tests/fixtures/networks``, across both ``max_t_size`` settings, both ``h_pool``
-values, and the ``candidate_edges``-restricted (federated) path.
+Its validity checks are not provably local, so this is checked rather than
+derived: on a synthetic dataset and every shipped network, for both caps, both
+H pools and restricted candidate sets.
 """
 
 from __future__ import annotations
@@ -38,12 +29,7 @@ def _canon(pdag: PDAG) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
 
 
 def _synthetic_dataset() -> DiscreteDataset:
-    """Build a small dataset with genuine dependencies GES can recover.
-
-    A fixed-seed chain/collider structure over 9 binary/ternary variables, so the
-    search actually applies inserts and deletes (an all-independent dataset would
-    make the comparison vacuous).
-    """
+    """Nine variables with chains and colliders, so the search has work to do."""
     rng = np.random.default_rng(20260725)
     n = 1500
     a = rng.integers(0, 2, n)
@@ -122,11 +108,7 @@ def test_incremental_fes_respects_candidate_edges(label: str, ds: DiscreteDatase
 
 @pytest.mark.parametrize("label,ds", DATASETS, ids=[d[0] for d in DATASETS])
 def test_incremental_bes_respects_candidate_edges(label: str, ds: DiscreteDataset) -> None:
-    """The federated candidate-edge restriction is honoured identically by both BES engines.
-
-    Mirrors ``GESLearner._refine_bes``: run BES from a populated CPDAG, restricted
-    to a subset of its own edges' orderings.
-    """
+    """Both BES engines honour a restricted candidate set identically."""
     score = BDeuScore(ds)
     fes_cpdag, _ = run_fes(score, PDAG(ds.n_vars), None, 2, False)
     # Candidate deletes: both orderings of a deterministic third of the edges.

@@ -1,11 +1,7 @@
-"""Record FedRCD reference outputs from the original FedLiNGAM implementation.
+"""Record the original FedLiNGAM implementation's outputs as the regression fixture.
 
-Run this once, against the original FedLiNGAM repository,
-*before* any porting work begins. The resulting fixture is what proves the port
-did not change the paper's results, so it must never be regenerated from ported
-code.
-
-Usage::
+Run against the original repository, never against this package, or the test
+would compare the package with itself. Usage::
 
     python tests/fixtures/lingam/record_baseline.py --fedlingam /path/to/FedLiNGAM
 """
@@ -70,9 +66,7 @@ def main() -> None:
     from src.fedrcd.core import ishc as ishc_beta_orig  # noqa: PLC0415
     from src.hclingam.hclingam import HCLiNGAM  # noqa: PLC0415
 
-    # `src.fedrcd.core.ishc` (beta/OLS deflation) and `src.fedishc.core.ishc`
-    # (alpha-ratio deflation) are two different functions that happen to
-    # share a name across modules -- aliased above to keep them apart.
+    # Two different functions named `ishc`, aliased above to keep them apart.
 
     records = []
     for case in CASES:
@@ -81,11 +75,7 @@ def main() -> None:
         raw = [compute_local_raw_stats(part, order=4) for part in clients]
         stats = aggregate_and_compute_cumulants(raw)
 
-        # Per-case aggregated cumulants, shared by every method record of this
-        # case. These pin the values that a
-        # bias-correction bug in cumulants.py could quietly perturb without
-        # ever flipping a causal order -- see
-        # tests/lingam/test_reference_implementation.py::test_cumulants_match_the_recording.
+        # The same for every method of a case; see test_cumulants_match_the_recording.
         cumulants = {
             key: np.asarray(stats[key], dtype=float).tolist()
             for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22")
@@ -98,10 +88,7 @@ def main() -> None:
             ("ishc", ishc_beta_orig(stats)),
             ("fedrcd_exact", fedrcd_exact(clients)),
             ("fedishc", fedishc_orig(stats)),
-            # `fedhc_orig` is `hc()` from fedishc/core.py, called with its
-            # default `iterative=False`. It deliberately returns `None` for
-            # B -- the no-deflation ablation leaves B estimation to the
-            # caller -- so `b_est` is `None` for this one record only.
+            # The original `hc()` returns None for B.
             ("fedhc", fedhc_orig(stats)),
         ]:
             causal_order, b_est = order_and_b

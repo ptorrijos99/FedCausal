@@ -1,8 +1,7 @@
-"""The ported solvers must reproduce the original FedLiNGAM implementation.
+"""fedcausal.lingam reproduces the original FedLiNGAM implementation.
 
-The fixtures come from the original FedLiNGAM implementation; see
-tests/fixtures/lingam/README.md. A failure here means the port changed the
-paper's results and must be fixed, not re-baselined.
+The fixtures come from that implementation; see tests/fixtures/lingam/README.md.
+If this fails, fix the code: never re-record the fixtures from it.
 """
 
 import json
@@ -45,12 +44,7 @@ CENTRALISED_SOLVERS = {
 
 
 def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> np.ndarray:
-    """Regenerate a recorded problem.
-
-    Must reproduce ``tests/fixtures/lingam/record_baseline.py``'s generator
-    exactly: the RNG is stateful, so the *sequence* of draws matters, and
-    batching or reordering them produces different data.
-    """
+    """Regenerate a recorded problem, drawing in exactly the recorder's order."""
     rng = np.random.default_rng(seed)
     b_true = np.zeros((n_vars, n_vars))
     for child in range(1, n_vars):
@@ -89,11 +83,7 @@ def test_port_reproduces_the_original(case):
     assert list(result.causal_order) == case["causal_order"]
 
     if case["B"] is None:
-        # fedhc's original (`hc()` in fedishc/core.py, iterative=False)
-        # returns None for B: the no-deflation ablation deliberately leaves B
-        # estimation to the caller, so there is nothing recorded from the
-        # original to bit-check the port's B against. Only the causal order
-        # is pinned for this method.
+        # The original returns no B for fedhc.
         return
 
     np.testing.assert_allclose(result.b, np.array(case["B"]), rtol=1e-9, atol=1e-9)
@@ -101,15 +91,10 @@ def test_port_reproduces_the_original(case):
 
 @pytest.mark.parametrize("case", PROBLEMS, ids=lambda c: c["name"])
 def test_cumulants_match_the_recording(case):
-    """Pin the aggregated cumulants themselves, not just the order they induce.
+    """The aggregated cumulants match, not just the order they lead to.
 
-    Once the causal order is fixed, ``B`` is re-estimated from ``cov`` alone
-    -- no solver ever reads ``c3``/``c4``/etc. again. So a subtle bias-
-    correction bug in ``cumulants.py`` only shows up in
-    ``test_port_reproduces_the_original`` if it happens to be large enough to
-    flip the tau ranking; a smaller error would pass that gate silently. This
-    test checks the eight aggregated arrays directly, with no regression step
-    in between to absorb a discrepancy.
+    B is estimated from the covariance alone, so a small error in the higher
+    cumulants could pass the other test unless it flipped the order.
     """
     stats = aggregate_and_compute_cumulants(
         [compute_local_raw_stats(c, order=4) for c in _clients(case)]

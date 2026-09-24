@@ -9,13 +9,11 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _task_identity() -> Iterator[None]:
-    """Give the process the task identity Flower's runtime would.
+    """Record the task identity Flower's runtime would.
 
-    Since flwr 1.38 a ``Message`` is stamped with the run and node of the task
-    that builds it, which the runtime records before any app code runs. The
-    transport tests drive the real handlers and server loops directly, outside
-    that runtime, so they record it themselves. Older releases have no such
-    identity and need nothing.
+    Since flwr 1.38 a ``Message`` carries the run and node of the task that builds
+    it, which the runtime records before any app code runs. These tests call the
+    handlers directly, outside the runtime. Older releases need nothing.
     """
     try:
         from flwr.supercore.task_identity import TaskIdentity

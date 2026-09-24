@@ -12,10 +12,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 TOY_CSV = FIXTURES / "toy.csv"
 NONE_CATEGORY_CSV = FIXTURES / "none_category.csv"
 
-# Expected sorted-lexicographic encoding of tests/fixtures/toy.csv:
-#   A: b,a,c,a,b,a,c,b -> sorted levels [a,b,c] -> codes [1,0,2,0,1,0,2,1]
-#   B: lo,hi,lo,hi,lo,hi,hi,lo -> sorted levels [hi,lo] -> codes [1,0,1,0,1,0,0,1]
-#   C: q,p,r,q,p,r,q,p -> sorted levels [p,q,r] -> codes [1,0,2,1,0,2,1,0]
+# Level codes follow the sorted order of each column's labels in toy.csv.
 EXPECTED_VALUES = np.array(
     [
         [1, 1, 1],
@@ -56,10 +53,7 @@ def test_from_csv_rejects_missing_values(tmp_path: Path) -> None:
 
 
 def test_from_csv_rejects_whitespace_only_field(tmp_path: Path) -> None:
-    # A field that is present but blank/whitespace-only is still genuinely
-    # missing data, even though pandas' default NA-token sniffing is
-    # disabled (which is what lets the literal string "None" survive as an
-    # ordinary category -- see test_from_csv_preserves_none_as_category).
+    # A blank field is missing data, even though strings like "None" are labels.
     bad_csv = tmp_path / "bad.csv"
     bad_csv.write_text("A,B\nx,y\n  ,z\n")
     with pytest.raises(ValueError, match="missing"):
@@ -67,11 +61,7 @@ def test_from_csv_rejects_whitespace_only_field(tmp_path: Path) -> None:
 
 
 def test_from_csv_preserves_none_as_category() -> None:
-    # Regression test: pandas' default `read_csv` NA tokens include the
-    # literal string "None", which used to be silently coerced to NaN and
-    # then rejected by the missing-value guard. Some reference networks
-    # (e.g. child's DuctFlow, insurance's ThisCarDam) use "None" as a
-    # genuine category label, exactly as Weka/Tetrad read it.
+    # "None" is a real level in some networks (child's DuctFlow, insurance's ThisCarDam).
     ds = DiscreteDataset.from_csv(NONE_CATEGORY_CSV)
     assert ds.n_rows == 4
     a_idx = ds.names.index("A")

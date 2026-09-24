@@ -19,12 +19,7 @@ def _toy_dataset() -> DiscreteDataset:
 def _synthetic_dataset(
     n_rows: int = 100, n_label_levels: int = 4, seed: int = 0
 ) -> DiscreteDataset:
-    """Build a dataset with a bijective ``id`` column for tracing rows.
-
-    Column 0 (``id``) holds the code ``i`` for original row ``i``, so a
-    partitioner's output can be checked for an exact row partition by
-    collecting the ``id`` column across all clients.
-    """
+    """Build a dataset whose ``id`` column gives each row's original index."""
     rng = np.random.default_rng(seed)
     id_values = np.arange(n_rows, dtype=np.int32)
     label_values = rng.integers(0, n_label_levels, size=n_rows).astype(np.int32)

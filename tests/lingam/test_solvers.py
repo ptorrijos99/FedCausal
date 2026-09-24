@@ -38,18 +38,9 @@ def test_result_is_lower_triangular_in_the_given_order():
 
 
 def test_lasso_shrinks_towards_zero_but_keeps_the_true_edges():
-    """Shrinkage is a Lasso-vs-OLS statement, not a Lasso-vs-ground-truth one.
+    """The Lasso estimate is strictly smaller than OLS's, in L1, and keeps both edges.
 
-    The ground truth is not what Lasso is shrinking relative to -- the OLS
-    estimate on the same covariance is. Comparing against `b_true` instead
-    would pass even when Lasso's L1 norm is *larger* than OLS's, which is the
-    opposite of shrinkage.
-
-    The comparison must be strict: on this fixture (seed 2), OLS's L1 norm is
-    ~1.4044 and Lasso's is ~1.3762, a ~2% margin that is comfortable, not
-    floating-point noise. A `<=` here would still pass for a "Lasso" that
-    performs no shrinkage at all and just returns the OLS estimate -- `<`
-    is the only version of this assertion a no-op implementation can fail.
+    Strict, so a "Lasso" that returned the OLS estimate unchanged would fail.
     """
     x, _ = _sem(2)
     cov = np.cov(x, rowvar=False)

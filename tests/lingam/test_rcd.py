@@ -58,13 +58,7 @@ def test_to_dag_threshold_drops_weak_coefficients():
 
 
 def _skewed_chain_clients(seed: int, n: int = 6000, n_clients: int = 3):
-    """Same chain, but with skewed noise.
-
-    Third-order cumulants of a symmetric distribution are zero, so the
-    order-3 path has no signal on the Laplace data the other tests use --
-    it would be measuring sampling noise. Centred exponential noise has
-    skewness 2, which is what the third-order discriminator needs.
-    """
+    """The same chain with skewed noise, which the third-order discriminator needs."""
     rng = np.random.default_rng(seed)
     e = rng.exponential(1.0, size=(n, 4)) - 1.0
     x = np.zeros((n, 4))

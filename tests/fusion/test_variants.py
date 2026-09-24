@@ -22,11 +22,7 @@ def test_max_frequency_keeps_only_unanimous() -> None:
 
 
 def test_consensus_pct_threshold_with_four_clients() -> None:
-    """At 50% of 4 clients (lim=2), a 2/4 edge is kept and a 1/4 edge dropped.
-
-    Java's ``lim = percent * n / 100`` truncates: this uses four clients so
-    the 50% threshold lands exactly on ``lim = 2`` rather than a truncated 1.
-    """
+    """At 50% of four clients an edge needs two of them."""
     d01 = DAG.from_edges(3, [(0, 1)])
     dags = [d01, d01.copy(), DAG.from_edges(3, [(1, 2)]), DAG(3)]
     out = consensus_pct(dags, 50)

@@ -30,12 +30,7 @@ def test_row_sum_ranks_the_source_lowest():
 
 
 def _skewed_chain(seed: int, n: int = 4000) -> np.ndarray:
-    """x0 -> x1 -> x2, centred exponential noise. The causal order is 0, 1, 2.
-
-    Third-order tau needs skew to have any signal, and Laplace has none (its
-    third cumulants are zero in expectation): using the Laplace-based
-    ``_chain`` here would test pure finite-sample noise, not the method.
-    """
+    """x0 -> x1 -> x2 with skewed noise, which the third-order tau needs."""
     rng = np.random.default_rng(seed)
     e = rng.exponential(1.0, size=(n, 3)) - 1.0
     x0 = e[:, 0]

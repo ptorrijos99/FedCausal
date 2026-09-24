@@ -83,9 +83,7 @@ def test_fill_in_produces_chordal_graph_via_perfect_elimination_check() -> None:
     triangulated = fill_in(adj, order)
     assert _symmetric_and_hollow(triangulated)
 
-    # A graph is chordal iff running MCS again and checking the "earlier
-    # neighbours of v form a clique" condition holds for every node
-    # (perfect elimination ordering test).
+    # Chordal iff, in an MCS order, each node's earlier neighbours form a clique.
     check_order = mcs_order(triangulated)
     position = {node: idx for idx, node in enumerate(check_order)}
     for i in range(len(check_order) - 1, -1, -1):

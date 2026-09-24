@@ -1,8 +1,4 @@
-"""Property-based invariants for consensus fusion, robust to tie-breaking.
-
-These hold regardless of how ties are resolved, so they validate the port
-independently of the committed reference runs, which pin one specific tie order.
-"""
+"""Properties of consensus fusion that hold however ties are broken."""
 
 from __future__ import annotations
 
@@ -58,11 +54,7 @@ def test_max_parents_respects_the_cap(p: int, limit: int, data: st.DataObject) -
 
 
 def test_fuses_real_ges_output_on_asia() -> None:
-    """End-to-end: three clients learn asia by GES, then fuse to an acyclic DAG.
-
-    Proves the fusion consumes real GES output: the result is acyclic, covers
-    every client's adjacencies, and is not empty.
-    """
+    """Fusing GES output from three sites gives an acyclic union of their adjacencies."""
     xbif = NETWORKS / "asia.xbif"
 
     from fedcausal.data.partition import contiguous_split

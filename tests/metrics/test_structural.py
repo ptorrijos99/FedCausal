@@ -12,18 +12,9 @@ from fedcausal.metrics.structural import (
     smhd_graphs,
 )
 
-# --- Hand-counted SHD examples -------------------------------------------------
+# --- SHD -------------------------------------------------------------------
 #
-# Utils.SHD(Dag bn1, Dag bn2) (Utils.java lines 523-536, countDifferences at
-# 658-669) sums, per unordered node pair {u, v}:
-#   - 0 if both graphs agree (same directed edge, or both non-adjacent);
-#   - 1 if the pair is an edge in exactly one graph (addition/deletion);
-#   - 1 (NOT 2) if both graphs have an edge between u and v but in opposite
-#     directions ("reversed arcs are counted only once", line 526).
-# Crucially, Utils.SHD takes two Dag objects directly and never CPDAG-ifies
-# them (confirmed by its only call site,
-# ExperimentUtils.calculateSHD:148, which passes two plain Dags) -- so this
-# is a DAG-vs-DAG exact-edge comparison, not a CPDAG comparison.
+# Per node pair: 1 if only one graph has the edge, 1 if both have it reversed.
 
 
 def test_shd_identical_graphs_is_zero() -> None:
@@ -40,9 +31,7 @@ def test_shd_one_extra_edge_is_one() -> None:
 
 
 def test_shd_reversed_compelled_edge_counts_one() -> None:
-    # 0->2, 1->2 is a v-structure/collider: both edges are "compelled" in the
-    # CPDAG sense (reversing either would destroy the collider). Reverse the
-    # 0-2 edge only.
+    # A collider: both edges are compelled. Reverse one.
     g1 = DAG.from_edges(3, [(0, 2), (1, 2)])
     g2 = DAG.from_edges(3, [(2, 0), (1, 2)])
     # Pair {0,2}: 0->2 vs 2->0 -> reversed, counts 1 (not 2).
@@ -51,22 +40,13 @@ def test_shd_reversed_compelled_edge_counts_one() -> None:
 
 
 def test_shd_reversed_reversible_edge_counts_one() -> None:
-    # 0->1->2 is a chain with no v-structure: both edges are "reversible" in
-    # the CPDAG sense (the whole chain's Markov equivalence class allows
-    # flipping either edge). Reverse the 0-1 edge only.
+    # A chain: both edges are reversible. Reverse one.
     g1 = DAG.from_edges(3, [(0, 1), (1, 2)])
     g2 = DAG.from_edges(3, [(1, 0), (1, 2)])
     assert shd(g1, g2) == 1
 
 
-# --- Hand-counted shd_skeleton examples ----------------------------------------
-#
-# shd_skeleton ignores direction entirely: it counts node pairs whose
-# adjacency (in either direction) differs between the two graphs. This is
-# the "undirected adjacency differences" count the brief asks for -- on two
-# purely-undirected graphs, Utils.SHDundir (line 552-568) degenerates to
-# exactly this same symmetric-difference count (no orientation cost applies
-# to an already-undirected edge).
+# --- Skeleton SHD ------------------------------------------------------------
 
 
 def test_shd_skeleton_identical_graphs_is_zero() -> None:
@@ -91,14 +71,9 @@ def test_shd_skeleton_counts_differing_pairs() -> None:
     assert shd_skeleton(dag, dag2) == 2
 
 
-# --- Hand-counted SMHD examples -------------------------------------------------
+# --- SMHD ------------------------------------------------------------------
 #
-# Utils.SMHD(Graph bn1, Graph bn2) (lines 449-454) moralizes both graphs
-# (Utils.moralize, lines 1275-1299: skeleton + an edge between every pair of
-# parents sharing a child) then calls SMHDwithoutMoralize (lines 475-485),
-# which sums, over each graph's (undirected, so unordered-pair-unique) edge
-# set, the edges absent from the other graph -- i.e. the symmetric
-# difference of the two moral skeletons.
+# The number of pairs adjacent in exactly one of the two moral graphs.
 
 
 def test_smhd_identical_graphs_is_zero() -> None:
@@ -107,13 +82,8 @@ def test_smhd_identical_graphs_is_zero() -> None:
 
 
 def test_smhd_moralization_changes_the_count_vs_shd_skeleton() -> None:
-    # dag: 0->2, 1->2 (collider). moralize adds {0,1} (co-parents of 2):
-    #   moral(dag) = {0-1, 0-2, 1-2} (triangle).
-    # dag2: 0->1->2 (chain, no collider). moralize adds nothing:
-    #   moral(dag2) = {0-1, 1-2} (path).
-    # Symmetric difference of the moral graphs: {0-2} only -> smhd == 1.
-    # (Contrast with shd_skeleton(dag, dag2) == 2, computed above on the raw,
-    # non-moralized skeletons.)
+    # The collider's moral graph is a triangle, the chain's a path: they differ on
+    # one pair, while their skeletons differ on two.
     dag = DAG.from_edges(3, [(0, 2), (1, 2)])
     dag2 = DAG.from_edges(3, [(0, 1), (1, 2)])
     assert shd_skeleton(dag, dag2) == 2
@@ -221,9 +191,7 @@ def test_edge_scores_true_nonempty_est_empty_is_zero() -> None:
 
 
 def test_edge_scores_partial_overlap() -> None:
-    # true: 0->1, 1->2.  est: 0->1, 2->1 (reversed).
-    # Directed: TP={0->1}, so precision = 1/2, recall = 1/2, f1 = 1/2.
-    # Skeleton: both pairs {0,1} and {1,2} adjacent in both -> perfect skeleton.
+    # One edge right, one reversed: half the directed edges, every adjacency.
     true = DAG.from_edges(3, [(0, 1), (1, 2)])
     est = DAG.from_edges(3, [(0, 1), (2, 1)])
     scores = edge_scores(true, est)

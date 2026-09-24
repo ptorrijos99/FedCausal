@@ -1,9 +1,4 @@
-"""The FedGES server loop's failure handling, driven over a stub grid.
-
-The failure cases -- a client erroring out, clients disagreeing on their
-variables -- are easy to set up in-process and awkward through a real
-simulation, which is what `StubGrid` is for.
-"""
+"""How the FedGES server loop handles failed clients and mismatched variables."""
 
 from __future__ import annotations
 

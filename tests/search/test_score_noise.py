@@ -1,11 +1,4 @@
-"""Rounding residue must not look like a score improvement.
-
-Both operator evaluations subtract two local scores of similar magnitude, so the
-difference keeps far fewer significant digits than its inputs. On a large
-network the residue reaches tens of ulps, which is above a fixed 1e-12
-threshold, and the search was inserting edges that existed only in the
-rounding. The tolerance is relative now; these pin that.
-"""
+"""Rounding in a score difference must not count as an improvement."""
 
 from __future__ import annotations
 

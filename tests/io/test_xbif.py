@@ -92,19 +92,8 @@ def test_asia_dysp_cpt_values_pin_parent_order() -> None:
     # <GIVEN>either</GIVEN>, so parent_order must preserve that order.
     assert bn.parent_order[dysp_idx] == (bronc_idx, either_idx)
 
-    # <TABLE>0.9 0.1 0.8 0.2 0.7 0.3 0.1 0.9</TABLE> reshapes to (4, 2)
-    # row-major with the first declared GIVEN (bronc) slowest and the
-    # second (either) fastest; outcome index 0 = "yes" for both parents
-    # (asia.xbif declares every OUTCOME as "yes" then "no"). These four
-    # rows are the published Lauritzen & Spiegelhalter (1988) asia values
-    # for dysp | (bronc, either): P(dysp=yes | bronc, either) is 0.9, 0.8,
-    # 0.7, 0.1 for (yes,yes), (yes,no), (no,yes), (no,no) respectively.
-    # Crucially the (yes,no) and (no,yes) rows differ (0.8 vs 0.7), so this
-    # test can only pass under the correct row-major/first-parent-slowest
-    # convention -- a transposed convention would swap those two rows and
-    # fail the assertions below. (Verified by temporarily reversing the
-    # parent tuple used in the row-index computation and confirming this
-    # test fails.)
+    # Rows run with the first parent (bronc) slowest. The (yes, no) and (no, yes)
+    # rows differ, 0.8 against 0.7, so a transposed layout would fail.
     parents = bn.parent_order[dysp_idx]
     cards = [len(bn.outcomes[p]) for p in parents]
 
@@ -135,12 +124,7 @@ def test_asia_either_is_deterministic_or() -> None:
     # <GIVEN>tub</GIVEN>.
     assert bn.parent_order[either_idx] == (lung_idx, tub_idx)
 
-    # <TABLE>1.0 0.0 1.0 0.0 1.0 0.0 0.0 1.0</TABLE> reshapes to (4, 2)
-    # row-major with lung slowest, tub fastest: either is a deterministic
-    # OR of its parents (P(either=yes)=1.0 unless both lung and tub are
-    # "no"). This is order-insensitive (OR is symmetric in its parents,
-    # unlike dysp above) but still pins the exact values for this second
-    # multi-parent node.
+    # either is a deterministic OR of lung and tub.
     cpt = bn.cpts[either_idx]
     configs = [(0, 0), (0, 1), (1, 0), (1, 1)]  # (lung_outcome, tub_outcome)
     for row, (lung_outcome, tub_outcome) in enumerate(configs):
