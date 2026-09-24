@@ -1,28 +1,8 @@
-"""XMLBIF (``.xbif``) reader for discrete Bayesian networks.
+"""Reader for XMLBIF (``.xbif``) discrete Bayesian networks.
 
-This module parses the XMLBIF v0.3 dialect produced by SamIam (the format
-used for the ground-truth networks in the standard network repository) using only
-the standard library's :mod:`xml.etree.ElementTree`. It builds a
-:class:`DiscreteBN`: a :class:`~fedcausal.graph.DAG` plus, per variable, its
-declared outcome labels and conditional probability table.
-
-XMLBIF dialect notes (observed in ``asia.xbif``)
--------------------------------------------------
-- Tags are upper-case: ``NETWORK``, ``VARIABLE``, ``NAME``, ``OUTCOME``,
-  ``DEFINITION``, ``FOR``, ``GIVEN``, ``TABLE``, ``PROPERTY``.
-- A ``VARIABLE`` element declares a variable's name (its ``NAME`` child) and
-  its outcome labels, in declaration order, one per ``OUTCOME`` child.
-- A ``DEFINITION`` element gives one variable's conditional probability
-  table: ``FOR`` names the variable, zero or more ``GIVEN`` elements name
-  its parents (in declaration order), and ``TABLE`` holds the flattened
-  probabilities as whitespace-separated floats (any mix of spaces and
-  newlines; a trailing separator is common).
-- The flattened ``TABLE`` reshapes to ``(q, r)`` in row-major (C) order,
-  where ``r`` is the variable's own outcome count and ``q`` is the product
-  of its parents' cardinalities taken in ``GIVEN`` declaration order (the
-  first ``GIVEN`` varies slowest, the last varies fastest) -- confirmed
-  against ``asia.xbif``'s ``dysp`` table, which is given ``bronc`` then
-  ``either``.
+Each ``<TABLE>`` is read as shape ``(q, r)`` in row-major order: ``r`` is the
+variable's number of outcomes, and its parents' configurations run with the
+first ``<GIVEN>`` varying slowest.
 """
 
 from __future__ import annotations
@@ -54,22 +34,13 @@ class DiscreteBN:
         Variable names, in the order they were declared in the source
         file. `dag` node `j` corresponds to `names[j]`.
     outcomes : list[list[str]]
-        Outcome (level) labels per variable, **in XBIF declaration order**
-        (not resorted). ``outcomes[j][k]`` is the label of the `k`-th
-        outcome of variable `j`.
+        Outcome labels per variable, in declaration order.
     parent_order : list[tuple[int, ...]]
-        Parent node indices per variable, in `GIVEN` declaration order.
-        ``parent_order[j]`` gives the column order used to enumerate the
-        parent configurations that index the rows of ``cpts[j]``.
+        Parents per variable, in ``<GIVEN>`` order, which is the order that
+        indexes the rows of ``cpts[j]``.
     cpts : list[np.ndarray]
-        Conditional probability tables. ``cpts[j]`` has shape
-        ``(q_j, r_j)`` where ``r_j == len(outcomes[j])`` and ``q_j`` is
-        the product of the cardinalities of ``parent_order[j]`` (``1``
-        when the variable has no parents). Row `i` is the distribution
-        over variable `j`'s outcomes conditional on the `i`-th parent
-        configuration, enumerated in row-major order of
-        ``parent_order[j]`` (the first parent varies slowest). Each row
-        sums to 1.
+        ``cpts[j]`` has one row per parent configuration (first parent varying
+        slowest) and one column per outcome of variable `j`. Rows sum to 1.
     """
 
     dag: DAG
@@ -80,25 +51,7 @@ class DiscreteBN:
 
 
 def _text(elem: ET.Element, tag: str) -> str:
-    """Return the stripped text of `elem`'s first `tag` child.
-
-    Parameters
-    ----------
-    elem : xml.etree.ElementTree.Element
-        Parent element to search.
-    tag : str
-        Child tag name to look for.
-
-    Returns
-    -------
-    str
-        The stripped text content of the first matching child.
-
-    Raises
-    ------
-    ValueError
-        If `elem` has no `tag` child, or that child has no text.
-    """
+    """Return the stripped text of `elem`'s first `tag` child, or raise `ValueError`."""
     child = elem.find(tag)
     if child is None or child.text is None:
         raise ValueError(f"expected a <{tag}> element with text inside <{elem.tag}>")
@@ -123,21 +76,12 @@ def load_xbif(path: str | Path) -> DiscreteBN:
     FileNotFoundError
         If `path` does not exist.
     ValueError
-        If the file is missing expected elements (a ``<VARIABLE>``
-        without a ``<NAME>``, a ``<DEFINITION>`` referencing an unknown
-        variable, a ``<TABLE>`` whose flattened value count does not
-        match its expected ``(q, r)`` shape, or a ``<TABLE>`` whose rows
-        do not sum to 1 after reshaping -- the latter signals an
-        ambiguous or corrupt table layout).
-
-    Notes
-    -----
-    Only the stdlib :mod:`xml.etree.ElementTree` is used; no external XML
-    or BIF-parsing library is required.
+        If an element is missing, a definition names an unknown variable, or
+        a table has the wrong size or rows that do not sum to 1.
     """
     path_str = str(path)
     try:
-        tree = ET.parse(path_str)  # noqa: S314 - trusted, locally-authored fixture files
+        tree = ET.parse(path_str)
     except FileNotFoundError:
         raise
     except OSError as exc:
@@ -148,7 +92,6 @@ def load_xbif(path: str | Path) -> DiscreteBN:
     if network is None:
         raise ValueError(f"{path_str}: no <NETWORK> element found")
 
-    # --- Pass 1: variables, in declaration order. ---
     names: list[str] = []
     outcomes: list[list[str]] = []
     name_to_index: dict[str, int] = {}
@@ -168,7 +111,6 @@ def load_xbif(path: str | Path) -> DiscreteBN:
     cpts: list[np.ndarray | None] = [None for _ in range(num_nodes)]
     edges: list[tuple[int, int]] = []
 
-    # --- Pass 2: definitions (CPTs), one <DEFINITION> per variable. ---
     for def_elem in network.findall("DEFINITION"):
         for_name = _text(def_elem, "FOR")
         if for_name not in name_to_index:

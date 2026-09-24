@@ -1,28 +1,13 @@
-"""Structural distance and edge-recovery metrics for causal structure learning.
+"""Structural distances and edge-recovery scores between two DAGs.
 
-The counting rules are pinned to the original implementation, and are worth
-stating because several differ from what the names suggest.
-
-**SHD** (:func:`shd`) compares two DAGs' exact directed edge sets -- *not* their
-CPDAGs, despite the usual convention in the literature. Per unordered pair:
-0 when both graphs agree, 1 when an edge is in exactly one of them, and 1 (not
-2) when both have the edge with opposite orientations. Because the comparison
-happens at the DAG level, a reversed compelled edge and a reversed reversible
-edge are indistinguishable -- both cost 1.
-
-**SMHD** (:func:`smhd`) moralises both DAGs and takes the symmetric difference
-of the resulting undirected skeletons. Moral graphs have no orientation to
-reverse, so every pair adjacent in exactly one of them costs 1. It is invariant
-across a Markov equivalence class, which SHD is not.
-:func:`smhd_graphs` is the same count over two graphs already moralised.
-
-**Skeleton SHD** (:func:`shd_skeleton`) counts undirected adjacency differences.
-
-**Precision, recall, F1** (:func:`edge_scores`) have no counterpart in the
-original implementation, which never divides. For both the directed and the
-skeleton group, all three are ``1.0`` when both edge sets are empty (a trivial
-exact match on "no edges"), ``0.0`` when exactly one side is empty, and the
-standard formulas otherwise.
+* :func:`shd` compares the DAGs' directed edges, not their CPDAGs. Per node
+  pair it costs 1 if only one graph has the edge and 1 if both have it in
+  opposite directions. It is not invariant across a Markov equivalence class.
+* :func:`smhd` compares the moral graphs, so it is invariant across the class.
+  :func:`smhd_graphs` does the same for graphs already moralised.
+* :func:`shd_skeleton` compares adjacencies, ignoring direction.
+* :func:`edge_scores` gives precision, recall and F1: ``1.0`` when both edge
+  sets are empty, ``0.0`` when only one is.
 """
 
 from __future__ import annotations
@@ -79,27 +64,7 @@ def _skeleton(adjacency: np.ndarray) -> np.ndarray:
 
 
 def _prf(tp: int, n_pred: int, n_true: int) -> tuple[float, float, float]:
-    """Compute precision/recall/F1 under this module's zero-division policy.
-
-    Parameters
-    ----------
-    tp : int
-        Number of true positives.
-    n_pred : int
-        Number of predicted (estimated) positives -- the precision
-        denominator.
-    n_true : int
-        Number of actual (true) positives -- the recall denominator.
-
-    Returns
-    -------
-    tuple[float, float, float]
-        `(precision, recall, f1)`. Both empty (`n_pred == n_true == 0`)
-        yields `(1.0, 1.0, 1.0)`; exactly one empty yields
-        `(0.0, 0.0, 0.0)`; otherwise the standard formulas, with `f1`
-        guarded against the residual `precision + recall == 0` case (both
-        nonempty but zero overlap).
-    """
+    """Return ``(precision, recall, f1)``, with the empty-set rules in the module docstring."""
     if n_pred == 0 and n_true == 0:
         return 1.0, 1.0, 1.0
     if n_pred == 0 or n_true == 0:
@@ -111,12 +76,7 @@ def _prf(tp: int, n_pred: int, n_true: int) -> tuple[float, float, float]:
 
 
 def shd(g1: DAG, g2: DAG) -> int:
-    """Structural Hamming distance between two DAGs (port of ``Utils.SHD``).
-
-    Counts, per unordered node pair, 0 if the two DAGs agree (same directed
-    edge, or neither adjacent), 1 if the pair is an edge in exactly one
-    graph, and 1 (not 2) if both graphs have an edge between the pair but in
-    opposite directions. See the module docstring for the derivation.
+    """Return the structural Hamming distance between two DAGs.
 
     Parameters
     ----------
@@ -172,12 +132,7 @@ def shd_skeleton(g1: DAG, g2: DAG) -> int:
 
 
 def smhd_graphs(m1: np.ndarray, m2: np.ndarray) -> int:
-    """Structural moralized Hamming distance between two adjacency matrices.
-
-    Port of ``Utils.SMHDwithoutMoralize``: counts the symmetric difference
-    of two undirected graphs' edge sets, given as symmetric adjacency
-    matrices (typically already-moralized graphs). No moralization is
-    performed here -- see :func:`smhd` for the moralizing variant.
+    """Return the number of node pairs adjacent in exactly one of two undirected graphs.
 
     Parameters
     ----------
@@ -206,11 +161,7 @@ def smhd_graphs(m1: np.ndarray, m2: np.ndarray) -> int:
 
 
 def smhd(g1: DAG, g2: DAG) -> int:
-    """Structural moralized Hamming distance between two DAGs.
-
-    Port of ``Utils.SMHD``: moralizes both DAGs (via
-    :func:`fedcausal.graph.undirected.moralize`), then counts the symmetric
-    difference of the two moral skeletons' edge sets (:func:`smhd_graphs`).
+    """Return the structural moral Hamming distance between two DAGs.
 
     Parameters
     ----------
@@ -236,7 +187,7 @@ def smhd(g1: DAG, g2: DAG) -> int:
 
 
 def edge_scores(true: DAG, est: DAG) -> EdgeScores:
-    """Precision/recall/F1 of `est`'s edges against `true`.
+    """Return the precision, recall and F1 of `est`'s edges against `true`.
 
     Parameters
     ----------
@@ -248,9 +199,7 @@ def edge_scores(true: DAG, est: DAG) -> EdgeScores:
     Returns
     -------
     EdgeScores
-        Directed-edge and skeleton precision/recall/F1. See the module
-        docstring for the zero-division policy applied when one or both
-        edge sets are empty.
+        Directed-edge and skeleton scores.
 
     Raises
     ------

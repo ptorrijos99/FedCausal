@@ -24,8 +24,7 @@ class FedCausalError(Exception):
 class ConfigurationError(FedCausalError, ValueError):
     """An argument or federation setting is invalid.
 
-    Also a :class:`ValueError`, so existing ``except ValueError`` handlers keep
-    working.
+    Also a :class:`ValueError`, so ``except ValueError`` catches it too.
     """
 
 
@@ -42,9 +41,8 @@ class ConvergedBeforeFusionError(FedCausalError):
 class SchemaMismatchError(FedCausalError):
     """Clients disagree about the variables they are learning over.
 
-    Structures travel between clients as bare edge indices, so every
-    participant must agree on variable names, order, and cardinalities.
-    Detected up front, because the alternative is a silently wrong result.
+    Structures and statistics travel as bare column indices, so every site must
+    agree on the variables, their order and, for discrete data, their levels.
     """
 
 
