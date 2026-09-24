@@ -56,7 +56,7 @@ def test_fuse_before_build_raises() -> None:
 
 def test_converging_before_any_fusion_raises() -> None:
     """A criterion firing on round 1 leaves no global model; say so, don't assert."""
-    with pytest.raises(ConvergedBeforeFusionError, match="without fusing"):
+    with pytest.raises(ConvergedBeforeFusionError, match="no global model"):
         run_fedges(_ds(), n_clients=2, n_iterations=3, convergence=_AlwaysConverged())
 
 

@@ -1,12 +1,8 @@
-"""The local structure learner each federated client runs.
+"""The local learner each FedGES site runs.
 
-A client learns its local model with GES, warm-started from the model it
-produced last round. After the server broadcasts a global structure, an
-optional refinement re-runs FES or BES over just the edges the fused and
-pre-fusion models disagree on, which is far cheaper than a full re-search.
-
-Every model is scored as it is produced, so the convergence criteria always
-have a score to inspect.
+A site learns with GES, starting from its previous model. After fusing in the
+global model it can re-run the forward or backward phase over just the edges
+the two disagree on, which is much cheaper than a full search.
 """
 
 from __future__ import annotations
@@ -59,12 +55,7 @@ class LocalLearner(Protocol):
 
 
 def _diff_candidates(have: DAG, base: DAG) -> frozenset[tuple[int, int]]:
-    """Directed candidates for each skeleton pair in `have` but not `base`.
-
-    For every edge whose
-    skeleton pair is present in `have` and absent in `base`, emit *both*
-    orientations as candidates.
-    """
+    """Return both orientations of every adjacency `have` has and `base` lacks."""
     base_skel = {frozenset(e) for e in base.edges()}
     out: set[tuple[int, int]] = set()
     for u, v in have.edges():
@@ -126,13 +117,10 @@ class GESLearner:
         return self._refinement
 
     def _score(self, data: DiscreteDataset) -> BDeuScore:
-        """Return a `BDeuScore` over `data`, reusing the last one built for it.
+        """Return a `BDeuScore` over `data`, reusing the last one if `data` is the same object.
 
-        A learner is reused across rounds for one client's partition, so keeping
-        the score object alive keeps its memoised local scores alive too --
-        which is where the search spends most of its time. Keyed on dataset
-        identity, so a learner handed a different partition rebuilds rather
-        than returning the wrong score.
+        Keeping it across rounds keeps its cache, where the search spends most
+        of its time.
         """
         if self._score_cache is not None and self._score_cache[0] is data:
             return self._score_cache[1]
@@ -167,17 +155,14 @@ class GESLearner:
             dag = self._refine_fes(score, old.dag, fused.dag)
         elif self._refinement == "BES":
             dag = self._refine_bes(score, old.dag, fused.dag)
-        else:  # "GES": forward pass, then backward over the fused differences
+        else:
             fes_dag = self._refine_fes(score, old.dag, fused.dag)
             dag = self._refine_bes(score, fes_dag, fused.dag)
         return BNModel(dag, score.score_dag(dag))
 
     def _refine_fes(self, score: BDeuScore, old: DAG, target: DAG) -> DAG:
-        candidates = _diff_candidates(target, old)  # edges target has, old lacks
-        # Incremental engine (byte-exact with the full scan, see
-        # tests/search/test_incremental.py): even a candidate-restricted full
-        # scan iterates all O(n^2) pairs per step, which the incremental engine
-        # avoids -- and this runs every round for every client.
+        candidates = _diff_candidates(target, old)
+        # The full scan visits every pair on every step even when restricted.
         pdag, _ = run_fes_incremental(
             score,
             dag_to_cpdag(old),
@@ -188,7 +173,7 @@ class GESLearner:
         return pdag.to_dag()
 
     def _refine_bes(self, score: BDeuScore, old: DAG, target: DAG) -> DAG:
-        candidates = _diff_candidates(old, target)  # edges old has, target lacks
+        candidates = _diff_candidates(old, target)
         pdag, _ = run_bes_incremental(
             score,
             dag_to_cpdag(old),

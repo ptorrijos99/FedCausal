@@ -1,14 +1,10 @@
-"""The federated server loop, and a one-call runner for the whole federation.
+"""The FedGES server loop, and :func:`run_fedges`, which runs a whole federation.
 
-Each round every client rebuilds its local model, the server checks convergence,
-fuses the local models into a global model, and broadcasts it back for each
-client to fuse locally.
-
-The loop is transport-agnostic and holds no client data: the model score is a
-client output (carried on :class:`~fedcausal.fedges.model.BNModel`), and
-structural metrics against a ground-truth network are emitted through an optional
-:class:`~fedcausal.fedges.observer.RoundObserver` rather than computed inline.
-This is what lets the Flower ``ServerApp`` reuse the exact same sequence.
+Each round every site rebuilds its local model, the server checks convergence,
+fuses the local models, and sends the result back for each site to fuse in.
+The server holds no data: scores come from the sites, and metrics against a
+true network go through an optional observer. The Flower transport runs the
+same sequence.
 """
 
 from __future__ import annotations
@@ -51,9 +47,9 @@ class Server:
     clients : Sequence[Client]
         Participating clients; assigned ids ``0..n-1`` in order.
     n_iterations : int, optional
-        Maximum number of rounds (default 5).
+        Maximum number of rounds. Default 5.
     initial_global : BNModel or None, optional
-        Optional starting global model.
+        Global model to start from.
 
     Attributes
     ----------
@@ -104,7 +100,7 @@ class Server:
                 break
 
             fused_dag = self.global_fusion.fuse([m.dag for m in local_models])
-            self.global_model = BNModel(fused_dag)  # server holds no data -> no score
+            self.global_model = BNModel(fused_dag)  # no data here, so no score
             if observer is not None:
                 observer.on_round("server", iteration, -1, self.global_model)
 
@@ -123,11 +119,7 @@ def run_fedges(
     refinement: Refinement = "None",
     truth: DAG | None = None,
 ) -> tuple[BNModel, list[RoundStats]]:
-    """Wire and run FedGES end-to-end on a single dataset.
-
-    Splits `data` into `n_clients` contiguous partitions
-    (:func:`~fedcausal.data.contiguous_split`) and runs the default wiring
-    unless overridden; see :mod:`fedcausal.fedges.defaults`.
+    """Run FedGES in one process on `data`, split into contiguous blocks, one per site.
 
     Parameters
     ----------
@@ -136,34 +128,32 @@ def run_fedges(
     n_clients : int
         Number of clients.
     n_iterations : int, optional
-        Maximum number of rounds (default 5).
+        Maximum number of rounds. Default 5.
     client_fusion, server_fusion : FusionOperator or None, optional
-        Fusion operators; default to ``ConsensusUnion()`` / ``Consensus(50)``.
+        Fusion operators. Default ``ConsensusUnion()`` and ``Consensus(50)``.
     convergence : Convergence or None, optional
-        Stopping criterion; defaults to ``ScoreImprovement or ModelEquality``.
+        Stopping criterion. Default ``ScoreImprovement or ModelEquality``.
     refinement : {"None", "FES", "BES", "GES"}, optional
         Client refinement stage passed to :class:`GESLearner`.
     truth : DAG or None, optional
-        Ground-truth DAG; when given, the returned rows carry SHD/SMHD.
+        True DAG. When given, the returned rows carry SHD and SMHD.
 
     Returns
     -------
     tuple[BNModel, list[RoundStats]]
-        The final global model and the per-round stats collected by an
-        internal :class:`~fedcausal.fedges.observer.MetricsObserver`.
+        The final global model and one stats row per reported model.
 
     Raises
     ------
-    ConfigurationError
-        If `n_clients` or `n_iterations` is invalid, or `refinement` is not a
-        recognised stage.
+    ValueError
+        If `n_clients` is not positive, `n_iterations` is negative, or
+        `refinement` is unknown.
     ConvergedBeforeFusionError
         If the loop stopped before producing any global model.
     """
     parts = contiguous_split(data, n_clients)
     fusion = client_fusion or default_client_fusion()
-    # One learner per client: each keeps its own memoised score for its own
-    # partition, which a shared instance would thrash on every client switch.
+    # One learner per client, so each keeps the score cache for its own data.
     clients = [Client(fusion, GESLearner(refinement=refinement), p) for p in parts]
     server = Server(
         server_fusion or default_server_fusion(),
@@ -174,8 +164,10 @@ def run_fedges(
     observer = MetricsObserver(truth)
     global_model = server.run(observer)
     if global_model is None:
-        raise ConvergedBeforeFusionError(
-            f"the loop stopped after {n_iterations} iteration(s) without fusing a "
-            "global model; the convergence criterion fired on the first round"
+        reason = (
+            "n_iterations is 0"
+            if n_iterations == 0
+            else "the convergence criterion fired on the first round"
         )
+        raise ConvergedBeforeFusionError(f"no global model was fused: {reason}")
     return global_model, observer.rows

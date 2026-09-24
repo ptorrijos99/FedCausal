@@ -1,10 +1,4 @@
-"""The unit exchanged in the federated loop: a DAG plus its cached score.
-
-Two models are equal iff they have the same node count and the same set of
-directed edges, and the hash is taken over that edge set. The score is metadata
-only and never participates in equality, so a model compares the same however
-it was scored.
-"""
+"""The unit the FedGES loop exchanges: a DAG and its score."""
 
 from __future__ import annotations
 
@@ -17,15 +11,17 @@ __all__ = ["BNModel"]
 
 
 class BNModel:
-    """A learned structure and its (BDeu) score.
+    """A learned structure and its score.
+
+    Two models are equal when their DAGs have the same nodes and edges; the
+    score does not take part.
 
     Parameters
     ----------
     dag : DAG
-        The directed acyclic graph.
+        The structure.
     score : float, optional
-        Cached score of `dag` (BDeu on the owning client's local data).
-        Default ``0.0``, matching ``BN``'s uninitialised score.
+        Its score on the data of the site that learned it. Default ``0.0``.
     """
 
     __slots__ = ("dag", "score")

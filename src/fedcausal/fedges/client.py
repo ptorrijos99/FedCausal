@@ -1,9 +1,4 @@
-"""A single federated participant.
-
-Holds local data, a local learner, and a client-side fusion operator. Each round
-it rebuilds its local model (warm-started from the previous one) and, after the
-server broadcasts the global model, fuses local + global and optionally refines.
-"""
+"""A site in the FedGES loop: it learns locally, then fuses in the global model."""
 
 from __future__ import annotations
 
@@ -32,7 +27,7 @@ class Client:
     data : DiscreteDataset
         The client's local data partition.
     initial_model : BNModel or None, optional
-        Optional starting local model (default ``None`` -> GES from empty).
+        Model to start from. Default ``None``, the empty graph.
 
     Attributes
     ----------
@@ -65,7 +60,7 @@ class Client:
         return self.local_model
 
     def fuse(self, global_model: BNModel) -> BNModel:
-        """Fuse local + global, then refine, updating and returning the local model.
+        """Fuse the global model into the local one, refine, and return the result.
 
         Raises
         ------

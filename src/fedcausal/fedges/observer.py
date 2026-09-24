@@ -1,11 +1,8 @@
-"""Round observation for the federated loop, decoupled from transport and truth.
+"""Observers of the FedGES loop.
 
-The loop core emits one event per built local model and per server fusion; an
-optional observer turns those into whatever the caller needs. ``MetricsObserver``
-is the study's observer: it records structural metrics against a ground-truth
-DAG. A real federation attaches no observer (or a logging one) and never needs
-the truth network -- SHD/SMHD are graph-vs-graph, and the model's BDeu score is
-carried by the client that computed it.
+The loop reports every built local model and every fused global model to an
+optional observer. :class:`MetricsObserver` scores them against a known true
+network; a real federation needs no such network.
 """
 
 from __future__ import annotations
@@ -70,7 +67,8 @@ class MetricsObserver:
     Parameters
     ----------
     truth : DAG or None, optional
-        Ground-truth DAG for SHD/SMHD (default ``None`` -> those stay ``None``).
+        True DAG to compute SHD and SMHD against. Default ``None``, which
+        leaves them ``None``.
     """
 
     def __init__(self, truth: DAG | None = None) -> None:
@@ -86,12 +84,10 @@ class MetricsObserver:
 
 
 class ModelCollector:
-    """Collects the full per-round models, transport-agnostically.
+    """Keeps every model the loop reports.
 
-    Used by the transport-equivalence test to compare the sequence of global
-    models an in-process run and a Flower run produce. ``globals`` holds one
-    :class:`~fedcausal.fedges.model.BNModel` per server fusion (in round
-    order); ``builds`` holds every built local model.
+    ``globals`` holds the global model of each round, in order; ``builds``
+    holds every local model the sites built.
     """
 
     def __init__(self) -> None:
