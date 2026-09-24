@@ -49,17 +49,29 @@ def test_contiguous_split_sizes() -> None:
     assert [p.n_rows for p in parts] == [3, 3, 2]
 
 
-def test_contiguous_split_matches_java_ceil_boundaries() -> None:
-    # BN_DataSet.divideDataSet uses ceil boundaries, which for a non-divisible
-    # (n, N) differ from numpy.array_split's front-loaded blocks. n=10, N=4:
-    # bucketSize=2.5 -> boundaries [0, 3, 5, 8, 10] -> sizes [3, 2, 3, 2]
-    # (array_split would give [3, 3, 2, 2]).
+def test_contiguous_split_spreads_the_remainder() -> None:
     ds = _synthetic_dataset(n_rows=10)
     parts = contiguous_split(ds, 4)
     assert [p.n_rows for p in parts] == [3, 2, 3, 2]
-    # still an exact, order-preserving partition (trace via the id column)
-    reconstructed = np.concatenate([p.values for p in parts], axis=0)
-    assert np.array_equal(reconstructed[:, 0], np.arange(10))
+
+
+class _RowCounter:
+    """A dataset stand-in that records which rows each block asked for."""
+
+    def __init__(self, n_rows: int) -> None:
+        self.n_rows = n_rows
+        self.n_vars = 1
+
+    def subset(self, rows: np.ndarray) -> tuple[int, int]:
+        return (int(rows[0]), int(rows[-1]) + 1) if rows.size else (0, 0)
+
+
+@pytest.mark.parametrize("n_rows", [7, 5000, 16_777_217, 50_000_003])
+@pytest.mark.parametrize("n_clients", [3, 7, 10, 12])
+def test_contiguous_split_covers_every_row_once(n_rows: int, n_clients: int) -> None:
+    blocks = [b for b in contiguous_split(_RowCounter(n_rows), n_clients) if b != (0, 0)]  # type: ignore[type-var]
+    assert blocks[0][0] == 0 and blocks[-1][1] == n_rows
+    assert all(a[1] == b[0] for a, b in zip(blocks, blocks[1:], strict=False))
 
 
 def test_contiguous_split_reproduces_original_rows_in_order() -> None:
