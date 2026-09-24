@@ -1,6 +1,6 @@
 """The ported solvers must reproduce the original FedLiNGAM implementation.
 
-The fixtures come from the code the PGM 2026 paper links to; see
+The fixtures come from the original FedLiNGAM implementation; see
 tests/fixtures/lingam/README.md. A failure here means the port changed the
 paper's results and must be fixed, not re-baselined.
 """

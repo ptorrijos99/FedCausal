@@ -2,7 +2,7 @@
 
 `fedcausal.lingam` learns a causal order and a linear coefficient matrix from continuous data spread across sites. Each client reduces its rows to a handful of moment sums, the server aggregates those into unbiased cumulant estimates, and a causal order and coefficient matrix (`RCDResult.causal_order`, `RCDResult.b`) fall out of a tau discriminator applied to them. FedGES federates by exchanging graphs; this family federates by exchanging sufficient statistics.
 
-The method assumes a linear, non-Gaussian structural equation model: `x = Bx + e`, with `B` acyclic and each `e_i` non-Gaussian. Non-Gaussianity is what makes the causal order identifiable at all. Under Gaussian noise the joint distribution cannot distinguish a DAG from its Markov-equivalent alternatives, which is why the benchmark generator leaves `gaussian` out of its noise catalogue (see [`benchmarks/pgm26/README.md`](../benchmarks/pgm26/README.md)).
+The method assumes a linear, non-Gaussian structural equation model: `x = Bx + e`, with `B` acyclic and each `e_i` non-Gaussian. Non-Gaussianity is what makes the causal order identifiable at all. Under Gaussian noise the joint distribution cannot distinguish a DAG from its Markov-equivalent alternatives, and no solver here can recover the order.
 
 ## What actually crosses the network
 
@@ -39,20 +39,15 @@ Both are the same classes the discrete side uses, so [Deployment](deployment.md)
 | `ishc_beta` | 1 | The same loop as `fedrcd`, but only ever using the third-order tau discriminator. Kept for comparison against the fourth-order default. |
 | `fedrcd_exact` | p - 1 | One full communication round per variable removed. Clients deflate their *own rows* by the broadcast `(source, beta)` and send fresh moment sums computed from the residuals, so every round's cumulants come from real data. The exact federated counterpart of centralised HC. |
 
-`fedrcd`'s deflation is exact in the population limit. On real samples it is not: each step operates on already-deflated statistics, so the error in an early deflation carries into every later one. `fedrcd_exact` pays `p - 1` rounds of O(p²) statistics to avoid that drift, and the extra traffic earns its keep when finite-sample noise or a mildly misspecified model would let the drift matter, which tends to mean small `p` or noise close to the Gaussian boundary where the tau signal is weak to begin with. For well-separated non-Gaussian noise at moderate `p` the one-shot solvers are usually good enough and much cheaper. For the actual numbers rather than a rule of thumb, see `benchmarks/pgm26/README.md`'s `main` grid.
+`fedrcd`'s deflation is exact in the population limit. On real samples it is not: each step operates on already-deflated statistics, so the error in an early deflation carries into every later one. `fedrcd_exact` pays `p - 1` rounds of O(p²) statistics to avoid that drift, and the extra traffic earns its keep when finite-sample noise or a mildly misspecified model would let the drift matter, which tends to mean small `p` or noise close to the Gaussian boundary where the tau signal is weak to begin with. For well-separated non-Gaussian noise at moderate `p` the one-shot solvers are usually good enough and much cheaper.
 
 `fedrcd_noniterative`, `fedrcd`, `ishc_beta`, `fedishc` and `fedhc` take the aggregated `Cumulants` dict directly and never touch client data. They are pure functions of the statistics, so anything that can produce that dict can drive them: the in-process aggregator, the Flower transport, a stub in a test. `fedrcd_exact` is the exception, since each of its rounds needs fresh statistics from each client's *current* data rather than the previous round's aggregate.
 
-## Baselines, and where they come from
+## Other methods in the package
 
-`fedcausal.lingam` ports several algorithms besides the FedRCD family itself, for comparison in the PGM 2026 experiments:
+`fedcausal.lingam` also implements the methods FedRCD is usually compared against:
 
 - **`fedishc` / `fedhc`** from Chen, W., et al., "FedISHC: Federated Causal Discovery via Higher-Order Cumulants" (AAAI / arXiv, 2025). `fedishc` deflates iteratively using the alpha-ratio rather than `fedrcd`'s OLS beta; `fedhc` is the no-deflation ablation, sorting once by the initial third-order tau row sums.
 - **`hc_lingam` / `hc`** from Chen, W., et al., "Higher Order Cumulants-Based Method for Direct and Efficient Causal Discovery" (IEEE TNNLS, 2025). Centralised, single-machine baselines: `hc_lingam` sorts once by a global fourth-order tau matrix, `hc` iterates the same deflate-and-resort loop as `fedrcd` but directly on centred data. Both are ported line for line from the original implementation, including its default OLS coefficient estimator.
-- **`DirectLiNGAM` / `ICALiNGAM`**, external non-federated comparison points via the [`lingam`](https://github.com/cdt15/lingam) package. Not part of `fedcausal.lingam`; pulled in only by `benchmarks/pgm26/benchmark.py` under the `lingam-experiments` extra, and skipped if that extra is not installed.
 
 All of them return the same `RCDResult` (`causal_order`, `b`, `to_dag(threshold)`), so they are interchangeable in code that only cares about the recovered structure.
-
-## Reproducing the paper's numbers
-
-[`benchmarks/pgm26/README.md`](../benchmarks/pgm26/README.md) reproduces the two experiments the PGM 2026 paper's own repository documents as its reproduction commands: the main `p x K x noise-distribution` grid, and the variance-stratification diagnostic that separates the noise regimes where the third- and fourth-order tau discriminators do and do not have signal. It also documents one known deviation from the original: this port splits clients into deterministic contiguous blocks rather than shuffling first, which is statistically equivalent for freshly generated i.i.d. rows but means runs are not bit-identical to the paper's.

@@ -1,8 +1,8 @@
 # LiNGAM regression fixtures
 
-`rcd_baseline.json` holds causal orders and B matrices produced by the **original** FedLiNGAM implementation (github.com/ptorrijos99/FedLiNGAM), the code the PGM 2026 paper links to, on three fixed synthetic problems.
+`rcd_baseline.json` holds causal orders and B matrices produced by the **original** FedLiNGAM implementation (github.com/ptorrijos99/FedLiNGAM), where the FedRCD family was first published, on three fixed synthetic problems.
 
-It exists so the port into `fedcausal.lingam` can be shown not to have changed the paper's results. **Do not regenerate it from ported code**: that would make the test compare the port against itself. Regenerate only with `record_baseline.py`, in this directory, pointed at the original repository.
+It exists so the port into `fedcausal.lingam` can be shown not to have changed that implementation's results. **Do not regenerate it from ported code**: that would make the test compare the port against itself. Regenerate only with `record_baseline.py`, in this directory, pointed at the original repository.
 
 Each case carries eight method records. Four are FedRCD-family solvers: `fedrcd`, `fedrcd_noniterative`, `ishc` (the beta/OLS-deflation ISHC) and `fedrcd_exact`. The other four are comparison baselines: `fedishc` (the published alpha-ratio-deflation ISHC), `fedhc`, `hc_lingam` and `hc`. `fedishc` and `fedhc` are recorded from `src.fedishc.core.ishc` and `src.fedishc.core.hc`, which take aggregated-stats input like the FedRCD family. `hc_lingam` and `hc` are recorded from `src.hclingam.HCLiNGAM(method='hc-lingam' | 'hc').fit(x)` against the **pooled** data matrix directly, since those two are centralised and never see a federated aggregation step. `fedhc`'s original, `hc()` with its default `iterative=False`, returns `None` for B (the no-deflation ablation leaves B estimation to the caller), so that one method's `B` field is recorded as `null` and only its `causal_order` is checked against the port.
 

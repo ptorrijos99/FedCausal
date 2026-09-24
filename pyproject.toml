@@ -63,9 +63,6 @@ flower = ["flwr>=1.23"]
 # version and platform, so it is a separate extra rather than a hard cost of
 # using the transport.
 flower-simulation = ["flwr[simulation]>=1.23"]
-# Experiment-only. The fedcausal.lingam algorithms need none of these; the
-# published comparisons do.
-lingam-experiments = ["lingam>=1.8", "bnlearn>=0.7", "matplotlib>=3.7", "seaborn>=0.13", "tqdm>=4.62"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fedcausal"]

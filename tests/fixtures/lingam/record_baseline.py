@@ -1,6 +1,6 @@
 """Record FedRCD reference outputs from the original FedLiNGAM implementation.
 
-Run this once, against the FedLiNGAM repository the PGM 2026 paper links to,
+Run this once, against the original FedLiNGAM repository,
 *before* any porting work begins. The resulting fixture is what proves the port
 did not change the paper's results, so it must never be regenerated from ported
 code.
@@ -85,7 +85,7 @@ def main() -> None:
         # case. These pin the values that a
         # bias-correction bug in cumulants.py could quietly perturb without
         # ever flipping a causal order -- see
-        # tests/lingam/test_paper_regression.py::test_cumulants_match_the_recording.
+        # tests/lingam/test_reference_implementation.py::test_cumulants_match_the_recording.
         cumulants = {
             key: np.asarray(stats[key], dtype=float).tolist()
             for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22")
