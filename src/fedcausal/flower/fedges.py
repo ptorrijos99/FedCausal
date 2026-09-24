@@ -376,10 +376,11 @@ def _collect_locals(
     required: int,
     known_schema: str | None,
 ) -> tuple[list[BNModel], str]:
-    """Rebuild the clients' local models, ordered by their reported index.
+    """Rebuild the clients' local models in a stable order.
 
-    Ordering is by the index the client reports rather than by node id, so
-    fusion inputs arrive in the order the in-process engine would produce.
+    Ordered by the partition id each client reports, then by node id: in
+    simulation that is the in-process engine's order, and in a deployment,
+    where no partition id is set, it is still the same every round.
 
     Raises
     ------
@@ -394,11 +395,12 @@ def _collect_locals(
     if known_schema is not None and schema != known_schema:
         raise SchemaMismatchError("a client's schema changed between rounds")
 
-    by_index: dict[int, BNModel] = {}
+    keyed = []
     for reply in good:
         dag = record_to_dag(cast(ArrayRecord, reply.content[_LOCAL_KEY]), num_nodes)
-        by_index[ctrl_int(reply, "node_index")] = BNModel(dag, ctrl_float(reply, "score"))
-    return [by_index[i] for i in sorted(by_index)], schema
+        key = (ctrl_int(reply, "node_index"), reply.metadata.src_node_id)
+        keyed.append((key, BNModel(dag, ctrl_float(reply, "score"))))
+    return [model for _, model in sorted(keyed, key=lambda item: item[0])], schema
 
 
 class _Fanout:
