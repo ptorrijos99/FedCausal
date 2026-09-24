@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fedcausal"
 version = "0.1.0"
-description = "Federated causal structure learning for Bayesian networks"
+description = "Federated causal discovery: Bayesian network structure learning and linear non-Gaussian models"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -15,6 +15,7 @@ keywords = [
   "structure learning",
   "bayesian networks",
   "federated learning",
+  "LiNGAM",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",

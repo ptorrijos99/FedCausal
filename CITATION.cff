@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "fedcausal: federated Bayesian network structure learning"
+title: "fedcausal: federated causal discovery"
 message: "If you use this software, please cite the FedGES paper below."
 type: software
 authors:
