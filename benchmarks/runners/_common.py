@@ -8,7 +8,7 @@ cannot corrupt the payload the orchestrator parses.
 The emitted object is deliberately thin -- edge lists plus a stopwatch reading.
 Runners do not compute BDeu, SHD, or SMHD for publication: the orchestrator
 re-derives all three with one scorer, because the implementations disagree on
-score scale and sign (see the design doc, "One metric authority").
+score scale and sign.
 """
 
 from __future__ import annotations
