@@ -1,18 +1,10 @@
-"""Minimal-I-map transform of a DAG into a target order (BetaToAlpha port).
+"""Transform a DAG into a minimal I-map consistent with a target order.
 
-Ported from ``consensusBN/BetaToAlpha.java``. Given a DAG ``G`` and a target
-order ``alpha``, return a new DAG that is (a) consistent with ``alpha`` (every
-arc points forward in the order) and (b) a minimal I-map of ``G`` -- obtained
-by first building an intermediate ``beta`` order by sink-peeling ``G``, then
-bubbling nodes into ``alpha`` order by adjacent swaps, reversing each crossed
-arc and moralizing so that no conditional independence of ``G`` is lost.
-
-Determinism: the sink chosen at each peeling step is the lowest-index ready
-sink, where the original picked an arbitrary element of an unordered set. Documented
-as
-a deliberate substitution; where it can change the intermediate ``beta`` the
-final union (:func:`~fedcausal.fusion.consensus.consensus_union`) is the
-binding reference.
+A ``beta`` order is built first by peeling the DAG's sinks, placing each as
+close to its target position as the DAG allows. Nodes are then bubbled into
+the target order by adjacent swaps; a swap across an arc reverses it and adds
+the moral edges that keep every conditional independence of the input. Ties
+among ready sinks go to the lowest index.
 """
 
 from __future__ import annotations
@@ -67,7 +59,7 @@ def beta_to_alpha(dag: DAG, order: Sequence[int]) -> DAG:
                 nodej = beta[i]
                 if rank[nodej] > rank[sink]:
                     break
-                if sink in dag.parents(nodej):  # the original G, deliberately
+                if sink in dag.parents(nodej):  # the input DAG, not the working copy
                     break
                 if i == len(beta) - 1:
                     break

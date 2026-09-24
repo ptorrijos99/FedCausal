@@ -8,7 +8,6 @@ from fedcausal.graph.undirected import (
     mcs_order,
     moralize,
     treewidth,
-    treewidth_java,
 )
 
 __all__ = [
@@ -19,6 +18,5 @@ __all__ = [
     "mcs_order",
     "fill_in",
     "maximal_cliques",
-    "treewidth_java",
     "treewidth",
 ]

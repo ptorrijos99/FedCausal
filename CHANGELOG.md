@@ -30,7 +30,7 @@ First public release.
 
 ### Graphs, data, and metrics
 
-- `DAG` and `PDAG`, Meek rules, DAG and CPDAG conversion, moralisation, maximum-cardinality triangulation, treewidth.
+- `DAG` and `PDAG`, Meek rules, DAG and CPDAG conversion, moralisation, maximum-cardinality triangulation, a treewidth bound.
 - `DiscreteDataset` over integer-coded categorical data, stored column-major so the score kernel's gathers are contiguous.
 - `ContinuousDataset` over real-valued data, the input format for `fedcausal.lingam`.
 - `contiguous_split` and `dirichlet_split` for simulated sites, generic over `DiscreteDataset` and `ContinuousDataset`.

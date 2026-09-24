@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from fedcausal.graph import DAG
 from fedcausal.graph.undirected import (
@@ -7,7 +8,6 @@ from fedcausal.graph.undirected import (
     mcs_order,
     moralize,
     treewidth,
-    treewidth_java,
 )
 
 
@@ -121,21 +121,9 @@ def test_maximal_cliques_no_subset_cliques() -> None:
     assert frozenset({1, 2, 3}) in node_sets
 
 
-def test_treewidth_java_diamond_is_three() -> None:
-    dag = DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])
-    assert treewidth_java(dag) == 3
-
-
 def test_treewidth_diamond_is_two() -> None:
     dag = DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])
     assert treewidth(dag) == 2
-
-
-def test_treewidth_java_tree_is_two() -> None:
-    # A simple out-tree: no node has more than one parent, so moralization
-    # adds no edges and the largest clique is a single edge (size 2).
-    dag = DAG.from_edges(5, [(0, 1), (0, 2), (1, 3), (1, 4)])
-    assert treewidth_java(dag) == 2
 
 
 def test_treewidth_tree_is_one() -> None:
@@ -143,11 +131,6 @@ def test_treewidth_tree_is_one() -> None:
     assert treewidth(dag) == 1
 
 
-def test_treewidth_java_single_node_is_one() -> None:
-    dag = DAG(1)
-    assert treewidth_java(dag) == 1
-
-
-def test_treewidth_java_empty_graph_is_zero() -> None:
-    dag = DAG(0)
-    assert treewidth_java(dag) == 0
+@pytest.mark.parametrize("n", [0, 1, 3])
+def test_treewidth_without_edges_is_zero(n: int) -> None:
+    assert treewidth(DAG(n)) == 0

@@ -1,10 +1,4 @@
-"""Directed acyclic graph data structure for causal structure learning.
-
-This module provides :class:`DAG`, a lightweight, dependency-free directed
-acyclic graph over integer node indices ``0..num_nodes-1``. It is the
-foundational data structure consumed by CPDAG conversion, structural fusion,
-GES search, and metrics elsewhere in ``fedcausal``.
-"""
+"""Directed acyclic graph over integer nodes."""
 
 from __future__ import annotations
 
@@ -39,11 +33,6 @@ class DAG:
     num_edges : int
         Current number of directed edges in the graph.
 
-    Notes
-    -----
-    Parent and child sets are stored per-node as Python ``set`` objects for
-    cheap incremental mutation. A boolean adjacency matrix is cached lazily
-    and invalidated on any mutation.
     """
 
     def __init__(self, num_nodes: int) -> None:

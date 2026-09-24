@@ -1,16 +1,4 @@
-"""Partially directed acyclic graph (PDAG) for causal structure learning.
-
-This module provides :class:`PDAG`, a graph over integer node indices
-``0..num_nodes-1`` that carries a mixture of *directed* edges ``u -> v`` and
-*undirected* edges ``{u, v}``. It is the working representation for CPDAG
-(completed partially directed acyclic graph / pattern) construction, Meek-rule
-orientation, and GES search elsewhere in ``fedcausal``.
-
-The class mirrors :class:`fedcausal.graph.dag.DAG` conventions: parent/child
-sets are stored per node for cheap incremental mutation, undirected neighbours
-are stored per node as symmetric sets, and a boolean adjacency matrix is cached
-lazily and invalidated on any mutation.
-"""
+"""Partially directed acyclic graph: the working representation for CPDAGs."""
 
 from __future__ import annotations
 
@@ -44,12 +32,8 @@ class PDAG:
 
     Notes
     -----
-    Directed edges are stored via per-node ``_parents`` and ``_children`` sets;
-    undirected edges are stored via a per-node ``_undirected`` list of symmetric
-    neighbour sets. A boolean adjacency matrix is cached lazily and invalidated
-    on any mutation. Unlike :class:`DAG`, ``add_directed`` performs no cycle
-    checking -- inconsistency (a directed cycle) is surfaced only when
-    :meth:`to_dag` is asked for a consistent extension.
+    Unlike :class:`DAG`, ``add_directed`` does not check for cycles. A directed
+    cycle surfaces only when :meth:`to_dag` finds no consistent extension.
     """
 
     def __init__(self, num_nodes: int) -> None:
@@ -58,8 +42,6 @@ class PDAG:
         self._children: list[set[int]] = [set() for _ in range(num_nodes)]
         self._undirected: list[set[int]] = [set() for _ in range(num_nodes)]
         self._amat: np.ndarray | None = None
-        # Lazy CSR of semi-directed successors (children ∪ undirected), built by
-        # `successor_csr` for the optional numba traversal; invalidated on mutation.
         self._succ_csr: tuple[np.ndarray, np.ndarray] | None = None
 
     def parents(self, v: int) -> frozenset[int]:
@@ -78,20 +60,9 @@ class PDAG:
         """Return the nodes adjacent to `v` (parents, children, and undirected)."""
         return frozenset(self._parents[v] | self._children[v] | self._undirected[v])
 
-    # -- Fast read-only accessors (performance-critical inner loops) ---------
-    #
-    # The public ``parents``/``children``/``undirected_neighbors``/``adjacent``
-    # above each allocate a fresh ``frozenset`` on every call. In the GES search
-    # those are invoked hundreds of thousands of times per network (see the
-    # profile in note 2026-07-25), where the copy dominates. The accessors below
-    # hand back the *live* internal set (or, for ``adjacent_set``, a single fresh
-    # plain set) so hot, read-only code can iterate and test membership without
-    # that per-call allocation.
-    #
-    # CONTRACT: the returned set of ``children_set``/``parents_set``/
-    # ``undirected_set`` is the graph's own storage -- callers MUST treat it as
-    # read-only. Mutating it corrupts the graph. Use the frozenset-returning
-    # public methods anywhere the result escapes a local, read-only scope.
+    # Allocation-free accessors for the search's inner loops, where copying into
+    # a frozenset on every call dominates the runtime. The first three return
+    # the graph's own storage: never mutate it, and never let it escape.
 
     def children_set(self, v: int) -> set[int]:
         """Return the live child set of `v` (read-only; do not mutate)."""
@@ -108,9 +79,7 @@ class PDAG:
     def adjacent_set(self, v: int) -> set[int]:
         """Return a fresh plain-set union of `v`'s parents, children and undirected neighbours.
 
-        Unlike :meth:`adjacent` this returns a mutable ``set`` (a fresh copy, so
-        mutating it is harmless) rather than a ``frozenset``, skipping the
-        frozenset construction in membership-test-only hot paths.
+        Cheaper than :meth:`adjacent`, which also builds a frozenset.
         """
         return self._parents[v] | self._children[v] | self._undirected[v]
 
@@ -272,12 +241,10 @@ class PDAG:
     def successor_csr(self) -> tuple[np.ndarray, np.ndarray]:
         """Return CSR arrays of each node's semi-directed successors (children ∪ undirected).
 
-        ``indices[indptr[v]:indptr[v + 1]]`` are node ``v``'s successors along a
-        semi-directed path -- its children (a directed edge followed forward) and
-        its undirected neighbours. Both arrays are ``int32``. The per-node
-        successor order is unspecified (reachability is order-invariant). Cached
-        lazily and invalidated on mutation, exactly like :meth:`adjacency`; it
-        backs the optional numba traversal in :mod:`fedcausal.search`.
+        ``indices[indptr[v]:indptr[v + 1]]`` are the nodes a semi-directed path
+        can step to from ``v``. Both arrays are ``int32``; the order within a
+        node is unspecified. Cached until the next mutation. Used by the
+        optional numba traversal in :mod:`fedcausal.search`.
 
         Returns
         -------
@@ -360,16 +327,13 @@ class PDAG:
         """
         from fedcausal.graph.dag import DAG
 
-        # Work on mutable copies restricted to the "remaining" node set.
         parents = [set(p) for p in self._parents]
         children = [set(c) for c in self._children]
         undirected = [set(u) for u in self._undirected]
         remaining = set(range(self.num_nodes))
 
-        # Directed edges are kept as-is; oriented undirected edges are appended
-        # during elimination. The DAG is materialised only after a full,
-        # successful elimination, so a directed cycle surfaces as the
-        # "no consistent extension" error rather than a premature CycleError.
+        # Built only once elimination succeeds, so a directed cycle surfaces as
+        # "no consistent extension" rather than as a CycleError.
         result_edges: list[tuple[int, int]] = list(self.directed_edges())
 
         while remaining:

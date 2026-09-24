@@ -16,9 +16,8 @@ __all__ = ["FusionOperator"]
 class FusionOperator(Protocol):
     """Combine several DAGs over the same node set into one consensus DAG.
 
-    Every consensus method in :mod:`fedcausal.fusion` -- the full union and
-    each limited variant -- implements this single method, so the federated
-    the server and the clients can use them interchangeably.
+    Every operator in :mod:`fedcausal.fusion` implements it, so the server and
+    the clients can use any of them, or your own, interchangeably.
     """
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
