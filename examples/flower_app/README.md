@@ -57,7 +57,7 @@ The rows differ. That is the whole point.
 
 `ConsensusUnion()` on the client and `default_server_fusion()` on the server decide how FedGES combines structures. Swap in one of the budgeted operators from `fedcausal.fusion` for a sparser consensus. `default_convergence()` decides when to stop: when the mean local score stops improving, or when every site repeats a model it has produced before.
 
-`solver` picks which member of the FedRCD family runs. `result-path` is where the server writes the final causal order and coefficient matrix, since a `ServerApp`'s `main` has no return value of its own.
+`solver` picks which member of the FedRCD family runs. `result-path` is where the server writes the result as JSON: the global DAG's edges for FedGES, the causal order and coefficient matrix for FedRCD.
 
 ## If a site drops out
 

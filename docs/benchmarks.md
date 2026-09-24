@@ -91,7 +91,7 @@ The `accel` extra JITs the semi-directed path check, the dominant cost on large 
 
 ## Cross-checked against the original implementation
 
-The reference tests pin the search against the original Java implementation on networks up to 37 variables. `link`, at 724, has now been run through both on the same data:
+The reference tests pin the search against the original Java implementation on networks up to 37 variables. `link`, at 724, has been run through both on the same data:
 
 | | Edges | SHD | SMHD | BDeu |
 |---|---:|---:|---:|---:|

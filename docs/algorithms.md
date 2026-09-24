@@ -50,7 +50,7 @@ Anything with a `fuse(dags)` method works in their place.
 |---|---|
 | `ScoreImprovement()` | The mean local score stops strictly improving |
 | `ModelEquality()` | Every site re-emits a model it has produced before |
-| `IterationEquality(n)` | The current round repeats one of the last `n` |
+| `IterationEquality(n)` | The current round repeats one of the last `n`, or any earlier one if `n` is negative |
 | `MultipleConvergence([...])` | Any of its members does |
 | `NoneConvergence()` | Never; the full iteration budget runs |
 
