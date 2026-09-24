@@ -1,13 +1,9 @@
-"""Candidate scanning and scoring shared by the full-scan and incremental engines.
+"""Candidate scoring shared by the full-scan and incremental engines.
 
-Both :mod:`fedcausal.search.ges` and :mod:`fedcausal.search.incremental` score a
-candidate pair through the functions here, so the two engines cannot drift in
-their tie-breaking or validity rules. Nothing in this module is public API.
-
-Determinism is a hard requirement: candidate ``(x, y, T)`` / ``(x, y, H)``
-triples are scanned in a fixed order -- `x` ascending, then `y` ascending, then
-subsets in :func:`subsets` order -- and ties are kept first-seen, a later
-candidate replacing the incumbent only when it wins by more than :data:`EPS`.
+Both engines score candidates through these functions, so they cannot drift
+apart. Candidates are scanned with `x` ascending, then `y`, then subsets in
+:func:`subsets` order, and a later candidate replaces the best so far only if
+it wins by more than :data:`EPS`.
 """
 
 from __future__ import annotations
@@ -42,31 +38,26 @@ EPS = 1e-12
 HPool = Literal["nayx", "bayesfl"]
 """Which candidate pool `H` is drawn from during the backward phase.
 
-``"nayx"`` (default) draws `H` from `NaYX(x, y)`, matching Chickering (2002)
-Definition 13. ``"bayesfl"`` draws it from `T0(x, y)` for compatibility with the
-original Java implementation, where the pool is disjoint from `NaYX` and the search
-therefore only ever applies ``Delete(x, y, empty)``. See ``docs/algorithms.md``.
+``"nayx"`` (default) draws `H` from `NaYX(x, y)`, as in Chickering (2002),
+Definition 13. ``"bayesfl"`` draws it from `T0(x, y)`, as the original Java
+implementation does; that pool is disjoint from `NaYX`, so only
+``Delete(x, y, {})`` is ever applied. See ``docs/algorithms.md``.
 """
 
 H_POOLS: tuple[HPool, ...] = get_args(HPool)
 
 
 def invalid_h_pool_error(h_pool: str) -> ValueError:
-    """Return (not raise) the `ValueError` for an unrecognised `h_pool`.
-
-    Returned rather than raised so call sites read ``raise
-    invalid_h_pool_error(...)``, keeping the ``raise`` visible where it happens.
-    """
+    """Return the `ValueError` for an unrecognised `h_pool`, for the caller to raise."""
     expected = " or ".join(f"{p!r}" for p in H_POOLS)
     return ValueError(f"Unknown h_pool: {h_pool!r}; expected {expected}.")
 
 
 def subsets(items: list[int], max_size: int | None = None) -> Iterator[frozenset[int]]:
-    """Yield every subset of `items`, ascending size then lexicographic.
+    """Yield the subsets of `items` by ascending size, up to `max_size`.
 
-    Callers pass `items` pre-sorted so the emitted order is deterministic.
-    Truncating at `max_size` only drops trailing size classes, so a bounded
-    run's order is a prefix of the unbounded one.
+    Within a size, subsets follow the order of `items`, so sorted input gives
+    a deterministic order.
     """
     largest = len(items) if max_size is None else min(max_size, len(items))
     for size in range(largest + 1):
@@ -80,10 +71,8 @@ def rebuild_cpdag(pdag: PDAG) -> PDAG:
     Raises
     ------
     ValueError
-        Propagated from :meth:`~fedcausal.graph.pdag.PDAG.to_dag` if `pdag` has
-        no consistent extension. A valid operator applied to a CPDAG always
-        leaves one, so this firing means a bug upstream; it is deliberately not
-        caught.
+        If `pdag` has no consistent extension, which a valid operator never
+        causes.
     """
     return dag_to_cpdag(pdag.to_dag())
 
@@ -91,8 +80,7 @@ def rebuild_cpdag(pdag: PDAG) -> PDAG:
 def adjacent_ordered_pairs(pdag: PDAG) -> list[tuple[int, int]]:
     """Return every ordered adjacent pair `(x, y)` eligible for Delete, sorted.
 
-    A directed edge `x -> y` contributes only `(x, y)`; an undirected edge
-    contributes both orderings, since either endpoint may play the role of `x`.
+    A directed edge `x -> y` gives `(x, y)`; an undirected edge gives both.
     """
     pairs = set(pdag.directed_edges())
     for u, v in pdag.undirected_edges():
@@ -126,8 +114,7 @@ def best_insert_for_pair(
 ) -> tuple[float, frozenset[int]] | None:
     """Return the best valid improving Insert `(delta, T)` for the pair `(x, y)`.
 
-    `x` and `y` must be non-adjacent -- the caller checks. Returns `None` if no
-    `T` yields an improving valid Insert.
+    `x` and `y` must not be adjacent. Returns `None` if no `T` improves.
     """
     empty: frozenset[int] = frozenset()
     na = ops.na_yx(pdag, x, y)
@@ -137,14 +124,9 @@ def best_insert_for_pair(
     ):
         return None
     best: tuple[float, frozenset[int]] | None = None
-    # Monotonicity shortcut for the dominant cost, `is_semidirected_blocked`:
-    # the check is monotone increasing in the conditioning set (a larger seed
-    # only removes reachable nodes) and `na` is a subset of every `na | t`. So
-    # once the na-only path check is blocked, every `na | t` is blocked too and
-    # the traversal can be skipped for the remaining subsets. This inlines
-    # `valid_insert`'s two checks -- clique first, then blocked, order unchanged
-    # -- to reuse the na-only result, computed lazily on the first `T` passing
-    # the clique test so pairs failing `is_clique` throughout pay nothing extra.
+    # valid_insert inlined, to save path checks: blocking is monotone in the
+    # conditioning set and na is inside every na | t, so once na alone blocks
+    # every path, every na | t does too.
     na_blocked: bool | None = None
     for t in subsets(sorted(ops.t0_neighbors(pdag, x, y)), max_t_size):
         nat = na | t
@@ -169,8 +151,7 @@ def best_delete_for_pair(
 ) -> tuple[float, frozenset[int]] | None:
     """Return the best valid improving Delete `(delta, H)` for the pair `(x, y)`.
 
-    Assumes `h_pool` is already validated. Returns `None` if no `H` yields an
-    improving valid Delete.
+    `h_pool` must already be valid. Returns `None` if no `H` improves.
     """
     na = ops.na_yx(pdag, x, y)
     best: tuple[float, frozenset[int]] | None = None

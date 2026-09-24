@@ -1,15 +1,8 @@
-"""Optional numba-accelerated semi-directed reachability.
+"""Semi-directed reachability compiled with numba, for large graphs.
 
-A nopython DFS over the PDAG's successor CSR (children ∪ undirected), used
-automatically by :func:`fedcausal.search.gesops.is_semidirected_blocked` when
-numba is importable and the graph is large enough for the JIT'd traversal to beat
-the pure-Python set walk (~4x on the traversal at 400-700 variables; see
-``docs/benchmarks.md``). The boolean is
-identical to the set traversal, validated on 400k+ real queries across two nets.
-
-numba is an optional extra (``fedcausal[accel]``); when it is absent :data:`HAVE_NUMBA`
-is ``False`` and the pure-Python traversal is used, so the core stays
-pure-Python-installable.
+Used by :func:`fedcausal.search.gesops.is_semidirected_blocked` when numba is
+installed (the ``accel`` extra); it returns the same answer as the pure-Python
+walk, about 4x faster at a few hundred variables.
 """
 
 from __future__ import annotations
@@ -37,7 +30,7 @@ if HAVE_NUMBA:
 
     @njit(cache=True)
     def _kernel(indptr, indices, n, y, x, cond_arr):  # type: ignore[no-untyped-def]  # noqa: ANN001, ANN202
-        """Nopython iterative DFS over the successor CSR; True iff y->x is blocked by cond."""
+        """Return whether every path from `y` to `x` in the successor CSR hits `cond`."""
         visited = np.zeros(n, dtype=np.bool_)
         for i in range(cond_arr.shape[0]):
             visited[cond_arr[i]] = True
@@ -65,11 +58,7 @@ if HAVE_NUMBA:
         return True
 
     def blocked_numba(pdag: PDAG, y: int, x: int, cond: frozenset[int]) -> bool:
-        """Return whether every semi-directed path ``y -> x`` is blocked by `cond`.
-
-        Byte-identical to :func:`fedcausal.search.gesops.is_semidirected_blocked`;
-        see that function for the ``cond``-seeding semantics.
-        """
+        """Return :func:`fedcausal.search.gesops.is_semidirected_blocked`'s answer."""
         cond_arr = np.fromiter(cond, dtype=np.int32, count=len(cond)) if cond else _EMPTY
         indptr, indices = pdag.successor_csr()
         return bool(_kernel(indptr, indices, pdag.num_nodes, y, x, cond_arr))
@@ -77,5 +66,5 @@ if HAVE_NUMBA:
 else:  # pragma: no cover - only when the accel extra is not installed
 
     def blocked_numba(pdag: PDAG, y: int, x: int, cond: frozenset[int]) -> bool:
-        """Unavailable without numba; callers must guard on :data:`HAVE_NUMBA`."""
+        """Raise: numba is not installed. Check :data:`HAVE_NUMBA` first."""
         raise RuntimeError("blocked_numba requires the optional 'numba' extra (fedcausal[accel])")

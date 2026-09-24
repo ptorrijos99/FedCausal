@@ -1,28 +1,15 @@
-"""Incremental FES/BES engines: cache per-pair operator scores across steps.
+"""Incremental forward and backward phases: re-score only what an operator changed.
 
-The full-scan engines in :mod:`fedcausal.search.ges` re-score *every* candidate
-pair on *every* step. Because the BDeu score is memoized, the repeated
-arithmetic is cheap, but the per-step Python-level rescan (validity tests,
-``na_yx``, subset enumeration, semi-directed-path checks) is not -- it dominates
-GES on larger graphs (see the profile in ``docs/benchmarks.md``). This module
-keeps a persistent cache of the best improving operator per candidate pair and,
-after each applied operator, re-scores only the pairs whose neighbourhood
-changed. The original Java implementation has an equivalent path but does not use it by
-default, so this is an optimisation over the faithful full scan rather than a
-port of it.
+The full scan in :mod:`fedcausal.search.ges` re-scores every candidate pair on
+every step. These engines cache the best operator per pair and, after each
+step, re-score only the pairs touching a node whose neighbourhood changed.
 
-**Exactness vs the full scan.** A candidate's score *delta* depends only on the
-neighbourhoods of its two endpoints, so invalidating pairs incident to any node
-whose CPDAG neighbourhood changed keeps every cached delta correct. Operator
-*validity* is not fully local, though: :func:`~fedcausal.search.gesops.is_clique`
-inspects edges among an endpoint's neighbours, and
-:func:`~fedcausal.search.gesops.is_semidirected_blocked` traverses the whole
-graph. So this incremental invalidation is not *proven* identical to the full
-scan on every conceivable graph. It is therefore validated empirically:
-``tests/search/test_incremental.py`` asserts the incremental and full-scan
-engines produce byte-identical CPDAGs on every benchmark network. The full scan
-(:mod:`fedcausal.search.ges`) stays the guaranteed-exact reference; the GES
-entry point selects this engine via ``incremental=True``.
+A candidate's score delta depends only on its endpoints' neighbourhoods, so the
+cached deltas stay correct. Validity is not fully local (clique and path checks
+look further), so a cached candidate is re-checked before it is applied, and
+``tests/search/test_incremental.py`` checks that both engines give the same
+CPDAG on every shipped network. ``incremental=False`` in :class:`GES` selects
+the full scan.
 """
 
 from __future__ import annotations
@@ -49,16 +36,13 @@ if TYPE_CHECKING:
 
 __all__ = ["run_fes_incremental", "run_bes_incremental"]
 
-# A node's CPDAG-local signature: (parents, children, undirected neighbours).
-# Two signatures are equal iff the node's incident edges and their orientations
-# are unchanged, which is exactly the condition under which every candidate
-# score touching that node is unchanged.
+# (parents, children, undirected neighbours): equal iff no incident edge changed.
 _Sig = tuple[frozenset[int], frozenset[int], frozenset[int]]
 _Cache = dict[tuple[int, int], tuple[float, frozenset[int]]]
 
 
 def _sig(pdag: PDAG, v: int) -> _Sig:
-    """Return node `v`'s immutable neighbourhood signature (parents/children/undirected)."""
+    """Return node `v`'s neighbourhood signature."""
     return (
         frozenset(pdag.parents_set(v)),
         frozenset(pdag.children_set(v)),
@@ -72,11 +56,7 @@ def _changed_nodes(before: list[_Sig], after: list[_Sig], n: int) -> set[int]:
 
 
 def _incident_ordered_pairs(changed: set[int], n: int) -> Iterator[tuple[int, int]]:
-    """Yield every ordered pair with an endpoint in `changed`, each once.
-
-    These are exactly the pairs whose cached score/validity may have gone stale
-    after an edit that changed the signatures of `changed`.
-    """
+    """Yield every ordered pair with an endpoint in `changed`, each once."""
     seen: set[tuple[int, int]] = set()
     for v in changed:
         for u in range(n):
@@ -89,7 +69,7 @@ def _incident_ordered_pairs(changed: set[int], n: int) -> Iterator[tuple[int, in
 
 
 def _all_ordered_pairs(n: int) -> Iterator[tuple[int, int]]:
-    """Yield every ordered pair ``(x, y)`` with ``x != y`` (the initial scan)."""
+    """Yield every ordered pair ``(x, y)`` with ``x != y``."""
     for x in range(n):
         for y in range(n):
             if x != y:
@@ -97,13 +77,9 @@ def _all_ordered_pairs(n: int) -> Iterator[tuple[int, int]]:
 
 
 def _select(cache: _Cache) -> tuple[float, int, int, frozenset[int]] | None:
-    """Return the best cached operator ``(delta, x, y, subset)`` with the full-scan tie rule.
+    """Return the best cached operator ``(delta, x, y, subset)``, or `None`.
 
-    Iterates candidates in ascending ``(x, y)`` order and keeps an incumbent only
-    when a later one beats it by more than :data:`~fedcausal.search._candidates.EPS` --
-    reproducing the full scan's first-seen tie-break exactly, so the incremental
-    engine selects the same operator the full scan would at each step. `None`
-    when no improving candidate remains.
+    Uses the full scan's order and tie rule, so both engines pick the same one.
     """
     best: tuple[float, int, int, frozenset[int]] | None = None
     for x, y in sorted(cache):
@@ -117,18 +93,13 @@ def _pop_best_valid(
     cache: _Cache,
     fresh: Callable[[int, int], tuple[float, frozenset[int]] | None],
 ) -> tuple[float, int, int, frozenset[int]] | None:
-    """Select the best candidate, re-scoring it against the current graph first.
+    """Return the best cached candidate once a fresh re-score confirms it.
 
-    Operator *validity* is not fully local (a semi-directed-path or clique change
-    can invalidate a candidate whose endpoints did not change), so a cached entry
-    can be stale-high: still in the cache, but no longer valid or no longer the
-    best `T`/`H`. Before committing to the current maximum this re-scores it with
-    `fresh`; if the fresh value is gone it drops the entry, if it differs it
-    corrects the entry, and in either case it re-selects. It returns only once the
-    maximum equals its own fresh re-score, so the engine never applies a stale or
-    invalid operator. (This corrects stale-*high* entries; the empirical
-    differential test guards against stale-*low* misses, which do not arise on the
-    benchmark networks -- see the module docstring.)
+    A change elsewhere in the graph can invalidate a cached candidate, so the
+    best one is re-scored with `fresh`; if that disagrees, the cache is
+    corrected and the selection repeats. This never applies a stale operator,
+    but cannot find a candidate that became valid without its endpoints
+    changing; the differential test covers that case.
     """
     while True:
         best = _select(cache)
@@ -152,13 +123,7 @@ def run_fes_incremental(
     max_t_size: int | None = None,
     empty_t_gate: bool = False,
 ) -> tuple[PDAG, bool]:
-    """Incremental FES: same contract as :func:`~fedcausal.search.ges.run_fes`.
-
-    Scores every non-adjacent ordered pair once, then after each applied Insert
-    re-scores only the pairs incident to a node whose signature changed, keeping
-    the cache in step with what a full rescan would hold. Returns the closed
-    CPDAG and whether any Insert was applied. `pdag` is not mutated.
-    """
+    """Run the forward phase incrementally; see :func:`~fedcausal.search.ges.run_fes`."""
     current = pdag.copy()
     n = current.num_nodes
     cache: _Cache = {}
@@ -198,11 +163,7 @@ def run_fes_incremental(
 
 
 def _is_delete_pair(pdag: PDAG, x: int, y: int) -> bool:
-    """Return whether ``(x, y)`` is an eligible Delete pair (``x -> y`` or ``x - y``).
-
-    Matches :func:`~fedcausal.search._candidates.adjacent_ordered_pairs`: a directed
-    edge contributes only its forward ordering, an undirected edge both.
-    """
+    """Return whether ``x -> y`` or ``x - y`` is in `pdag`."""
     return y in pdag.children_set(x) or y in pdag.undirected_set(x)
 
 
@@ -212,13 +173,7 @@ def run_bes_incremental(
     candidate_edges: frozenset[tuple[int, int]] | None = None,
     h_pool: HPool = "nayx",
 ) -> tuple[PDAG, bool]:
-    """Incremental BES: same contract as :func:`~fedcausal.search.ges.run_bes`.
-
-    Scores every eligible Delete pair once, then after each applied Delete
-    re-scores only the pairs incident to a changed node (adding pairs newly made
-    eligible by a reorientation, dropping those whose edge was removed). Returns
-    the closed CPDAG and whether any Delete was applied. `pdag` is not mutated.
-    """
+    """Run the backward phase incrementally; see :func:`~fedcausal.search.ges.run_bes`."""
     if h_pool not in H_POOLS:
         raise invalid_h_pool_error(h_pool)
 
