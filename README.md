@@ -122,7 +122,7 @@ The algorithm packages never import `flwr`. Adding a method means a package besi
 
 ```bash
 pip install -e ".[dev,flower]"
-pytest                    # 4 xfails are expected; see docs/validation.md
+pytest
 ruff check . && ruff format --check .
 mypy src
 ```
