@@ -1,26 +1,14 @@
-"""BDeu (Bayesian Dirichlet equivalent uniform) score with a counting cache.
+"""The BDeu score, with a vectorised counting kernel and a memoised cache.
 
-This module ports Tetrad's ``BdeuScore.localScore`` (tetrad-lib 7.6.5) to a
-vectorized NumPy kernel, wrapped in :class:`BDeuScore`. It is the critical inner
-loop of GES-style search: at ~1000 variables the local score is evaluated
-millions of times, so a fast counting kernel and a memoizing cache matter.
-
-The score is the log marginal likelihood of a node given its parents under a
-BDeu prior, plus Tetrad's structure-prior term. Higher is more dependence;
-negative indicates independence (Tetrad's convention).
-
-Prior term (ported verbatim from ``BdeuScore.getPriorForStructure``)::
+A family's score is its log marginal likelihood under a BDeu prior plus a
+structure prior on the number of parents::
 
     e = structure_prior
-    if e == 0: return 0.0
-    vm = N - 1                       # N = number of complete rows (== n_rows here)
-    return num_parents * log(e / vm) + (vm - num_parents) * log(1 - e / vm)
+    vm = n_rows - 1
+    prior = num_parents * log(e / vm) + (vm - num_parents) * log(1 - e / vm)
 
-Note that Tetrad passes the *row count* ``N`` (not the variable count) as the
-second argument, so ``vm = n_rows - 1``. Because it depends only on
-``num_parents`` and the (constant) sample size, the structure-prior term is
-identical for any two parent sets of the same size and therefore cancels in
-score *differences* between equal-sized parent sets.
+The prior is zero when ``e == 0`` and depends only on the number of parents,
+so it cancels between parent sets of the same size.
 """
 
 from __future__ import annotations
@@ -63,26 +51,14 @@ def _counts(
     Returns
     -------
     np.ndarray
-        Counts of shape ``(q_realized, r)`` -- one row per **realized**
-        parent configuration and one column per child level ``r =
-        cards[node]``. Parent configurations that occur in zero rows are
-        omitted (see Notes).
+        Shape ``(q_seen, r)``: one row per parent configuration that occurs in
+        the data, one column per level of `node`.
 
     Notes
     -----
-    **Only realized configurations are counted, and this is exact.** A
-    parent configuration with zero rows contributes
-    ``lgamma(a_j) - lgamma(a_j) = 0`` to the row term and, per child level,
-    ``lgamma(a_jk) - lgamma(a_jk) = 0`` to the cell term, so absent
-    configurations add nothing to the likelihood. Summing over the realized
-    configurations alone therefore reproduces the full sum over
-    ``q`` configurations exactly. **The caller must still use the full ``q``
-    (product of parent cardinalities), not ``q_realized``, when forming the
-    Dirichlet pseudocounts** ``a_j = ess / q`` and ``a_jk = ess / (q * r)``.
-
-    Parent configurations are encoded as mixed-radix ``int64`` codes. The
-    encoding is injective for ``q <= 2**63``; realistic GES families are far
-    below that bound, so ``int64`` never overflows in practice.
+    Configurations that never occur contribute exactly zero to BDeu, so
+    skipping them is exact. The caller must still form the pseudocounts from
+    the full number of configurations ``q``, not ``q_seen``.
     """
     child = values[:, node].astype(np.int64)
     r = int(cards[node])
@@ -97,12 +73,10 @@ def _counts(
         q *= int(cards[p])
 
     if q * r <= 4 * n_rows:
-        # Dense path: bincount over the full q*r table. Cheap because the
-        # guard bounds q*r by 4*n_rows, so the flattened table is small.
+        # The full table is small enough to count directly.
         return np.bincount(code * r + child, minlength=q * r).reshape(q, r)
 
-    # Sparse path: relabel to realized configurations only via unique(),
-    # which avoids allocating a length-(q*r) table when q is huge.
+    # Too many configurations for a full table: count only the ones present.
     _, inv = np.unique(code, return_inverse=True)
     inv = inv.astype(np.int64).ravel()
     k = int(inv.max()) + 1
@@ -110,45 +84,21 @@ def _counts(
 
 
 class BDeuScore:
-    """BDeu local score with a memoizing, thread-safe cache.
-
-    The score of
-    a family ``(node, parents)`` is the BDeu log marginal likelihood plus
-    Tetrad's structure-prior term (see the module docstring).
+    """BDeu local score with a thread-safe cache.
 
     Parameters
     ----------
     dataset : DiscreteDataset
         The discrete data to score against.
     sample_prior : float, optional
-        The equivalent sample size (ESS). Default
-        ``1.0``.
+        The equivalent sample size. Default ``1.0``.
     structure_prior : float, optional
-        Penalises parent count; ``0.0`` disables the structure-prior term.
-        Default ``0.001``.
+        The per-parent penalty ``e`` in the module docstring; a larger value is
+        a weaker penalty and ``0.0`` disables it. Default ``1.0``, which
+        recovers better structure on large networks; pass ``0.0`` to reproduce
+        published FedGES results. See ``docs/algorithms.md``.
     cache : bool, optional
-        If ``True`` (default), memoize local scores keyed by
-        ``(node, sorted_parents)``.
-
-    Notes
-    -----
-    ``structure_prior`` defaults to ``0.001`` because it recovers better
-    structure as networks grow: over five sampled datasets each, it improves
-    SMHD on six of twelve benchmark networks and costs three, with the gains
-    concentrated where they matter (``win95pts`` 125 to 58, ``pathfinder`` 318
-    to 214, ``link`` 3098 to 980) and the losses small. See
-    ``docs/benchmarks.md``.
-
-    The original Java implementation effectively scores with ``0.0``: it
-    declares ``0.001`` but never propagates it onto the score object, so it
-    uses Tetrad's own default. Pass ``structure_prior=0.0`` to reproduce
-    published FedGES numbers exactly.
-
-    **Full vs. realized configurations.** The counting kernel returns one
-    row per *realized* parent configuration, but the Dirichlet pseudocounts
-    always use the *full* ``q`` (product of parent cardinalities):
-    ``a_j = sample_prior / q`` and ``a_jk = sample_prior / (q * r)``. This is
-    exact because empty configurations contribute zero to the likelihood.
+        Memoise local scores. Default ``True``.
     """
 
     def __init__(
@@ -170,11 +120,7 @@ class BDeuScore:
         self._misses = 0
 
     def _prior_term(self, num_parents: int) -> float:
-        """Return Tetrad's structure-prior term for ``num_parents`` parents.
-
-        Verbatim port of ``BdeuScore.getPriorForStructure`` with ``N`` equal
-        to the (constant) number of complete rows, i.e. ``vm = n_rows - 1``.
-        """
+        """Return the structure prior for a family with `num_parents` parents."""
         e = self.structure_prior
         if e == 0:
             return 0.0
@@ -198,7 +144,6 @@ class BDeuScore:
             (gammaln(a_jk + n_jk) - gammaln(a_jk)).sum() + (gammaln(a_j) - gammaln(a_j + n_j)).sum()
         )
         score = lik + self._prior_term(len(parents))
-        # Final guard: non-finite scores collapse to NaN.
         if not math.isfinite(score):
             return math.nan
         return score
@@ -211,30 +156,21 @@ class BDeuScore:
         node : int
             Index of the child variable.
         parents : Collection[int]
-            Indices of the parent variables, in any order (a ``frozenset``,
-            ``tuple``, or any other collection). The cache key is canonicalized
-            to a ``frozenset``, so ``(2, 1)`` and ``(1, 2)`` hit the same entry;
-            passing a ``frozenset`` directly (as the GES operators do) skips
-            even that rebuild. The score itself is invariant to parent order
-            (parent order only permutes the contingency configurations, which
-            sum identically), so keying on the unordered set is exact.
+            Indices of the parents, in any order. A ``frozenset`` is used as
+            the cache key as is.
 
         Returns
         -------
         float
-            The local score of the family ``(node, parents)``.
+            The local score, or NaN if it is not finite.
         """
         key_parents = parents if isinstance(parents, frozenset) else frozenset(parents)
         if not self._use_cache:
             return self._compute(node, key_parents)
 
-        # Lock-free read on the hot path. ``dict.get`` is atomic under the GIL,
-        # and because the kernel is pure a concurrent writer only ever installs
-        # the *same* value under this key, so a hit never returns a wrong or
-        # torn result. GES hits this ~97% of the time (see the profile in note
-        # 2026-07-25), where taking the lock was pure overhead. The hit/miss
-        # counters are updated without the lock and so are best-effort under
-        # concurrency -- diagnostics only, never correctness.
+        # Reads skip the lock: dict.get is atomic, and a concurrent writer can
+        # only store the same value. The hit and miss counters are approximate
+        # under concurrency.
         key = (node, key_parents)
         cached = self._cache.get(key)
         if cached is not None:

@@ -1,8 +1,4 @@
-"""Property-based invariants for consensus fusion, robust to tie-breaking.
-
-These hold regardless of how ties are resolved, so they validate the port
-independently of the committed reference runs, which pin one specific tie order.
-"""
+"""Properties of consensus fusion that hold however ties are broken."""
 
 from __future__ import annotations
 
@@ -47,17 +43,22 @@ def test_maxfreq1_and_maxparents_p_equal_union(p: int, data: st.DataObject) -> N
     assert set(max_parents(dags, p).edges()) == union
 
 
-def test_fuses_real_ges_output_on_asia() -> None:
-    """End-to-end: three clients learn asia by GES, then fuse to an acyclic DAG.
+@given(st.integers(3, 6), st.integers(0, 3), st.data())
+@settings(max_examples=50)
+def test_max_parents_respects_the_cap(p: int, limit: int, data: st.DataObject) -> None:
+    """No node gets more than `limit` parents, and nothing outside the union appears."""
+    dags = [data.draw(_dag_over(p)) for _ in range(data.draw(st.integers(1, 3)))]
+    out = max_parents(dags, limit)
+    assert all(len(out.parents(v)) <= limit for v in range(p))
+    assert set(out.edges()) <= set(consensus_union(dags).edges())
 
-    Proves the fusion consumes real GES output. The SMHD bound is generous;
-    the binding assertions are acyclicity and a non-degenerate result.
-    """
+
+def test_fuses_real_ges_output_on_asia() -> None:
+    """Fusing GES output from three sites gives an acyclic union of their adjacencies."""
     xbif = NETWORKS / "asia.xbif"
 
     from fedcausal.data.partition import contiguous_split
     from fedcausal.io import forward_sample, load_xbif
-    from fedcausal.metrics import smhd
     from fedcausal.scores import BDeuScore
     from fedcausal.search import GES
 
@@ -69,4 +70,5 @@ def test_fuses_real_ges_output_on_asia() -> None:
     fused = consensus_union(client_dags)
     assert len(fused.topological_order()) == fused.num_nodes  # acyclic
     assert fused.num_edges > 0
-    assert smhd(fused, bn.dag) <= 30  # generous; recorded from first green run
+    fused_skeleton = {frozenset(e) for e in fused.edges()}
+    assert all(frozenset(e) in fused_skeleton for d in client_dags for e in d.edges())

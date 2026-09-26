@@ -1,9 +1,4 @@
-"""Default federation wiring, shared by every transport.
-
-The in-process engine and the Flower app must agree on what "the defaults" are,
-or the two stop being comparable. They both build their defaults here rather
-than each spelling them out.
-"""
+"""The default fusion and convergence, shared by the in-process loop and Flower."""
 
 from __future__ import annotations
 

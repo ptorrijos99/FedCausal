@@ -1,20 +1,10 @@
-r"""Greedy Equivalence Search: the forward and backward phases, and the ``GES`` entry point.
+"""Greedy equivalence search (Chickering, 2002).
 
-* *Forward Equivalence Search* (:func:`run_fes`) repeatedly applies the
-  highest-scoring valid Insert, re-canonicalising to a CPDAG after each step,
-  until no Insert improves the score.
-* *Backward Equivalence Search* (:func:`run_bes`) is the mirror image over
-  Delete.
-
-Both are full scans: they re-score every candidate pair on every step. They are
-the reference, exact by construction. :class:`GES` defaults to
-the incremental engine in :mod:`fedcausal.search.incremental`, which is verified
-byte-identical against these and much faster as graphs grow; pass
-``incremental=False`` to search with these instead.
-
-The operator primitives both phases drive live in :mod:`fedcausal.search.gesops`;
-the candidate scanning and tie-breaking they share with the incremental engine
-live in :mod:`fedcausal.search._candidates`.
+The forward phase (:func:`run_fes`) applies the best valid Insert until none
+improves the score; the backward phase (:func:`run_bes`) does the same with
+Delete. These full scans re-score every candidate on every step. :class:`GES`
+uses the incremental engine in :mod:`fedcausal.search.incremental` by default,
+which gives the same result much faster; ``incremental=False`` selects these.
 """
 
 from __future__ import annotations
@@ -57,8 +47,7 @@ def _best_insert(
     """
     best: tuple[float, int, int, frozenset[int]] | None = None
     n = pdag.num_nodes
-    # Adjacency is fixed for the whole scan (the graph is only edited between
-    # scans), so materialise it once rather than inside the O(n^2) pair loop.
+    # The graph does not change during a scan.
     adj = [pdag.adjacent_set(v) for v in range(n)]
     for x in range(n):
         for y in range(n):
@@ -126,8 +115,7 @@ def _best_delete(
     Raises
     ------
     ValueError
-        If `h_pool` is unrecognised. Checked before the scan, so a typo never
-        silently no-ops on a graph with no eligible pairs.
+        If `h_pool` is unrecognised, even when there is nothing to scan.
     """
     if h_pool not in H_POOLS:
         raise invalid_h_pool_error(h_pool)
@@ -159,10 +147,8 @@ def run_bes(
     pdag : PDAG
         Starting graph, typically the output of :func:`run_fes`.
     candidate_edges : frozenset[tuple[int, int]] or None, optional
-        Restrict every step's scan to these pairs, matched as *ordered* pairs.
-        For an undirected edge both `(x, y)` and `(y, x)` must be present to
-        give Delete its full search over it; supplying only the canonical
-        `(min, max)` pair silently loses the other labelling's candidates.
+        Restrict every step's scan to these ordered pairs. An undirected edge
+        needs both `(x, y)` and `(y, x)` to be fully searched.
     h_pool : HPool, optional
         Which pool `H` is drawn from; see :data:`HPool`.
 
@@ -183,12 +169,9 @@ def run_bes(
         if best is None:
             break
         _, x, y, h = best
-        # Safety-relevant coupling, not incidental: ops.apply_delete raises
-        # KeyError when some w in h has no edge to x, which is exactly what
-        # h_pool="bayesfl" selects for. This call is only safe there because
-        # the empty-set-first subset order plus the strict tie rule guarantee
-        # h is empty under that pool; "nayx" needs no such guarantee, since
-        # na_yx(x, y) only contains nodes already adjacent to x.
+        # Under h_pool="bayesfl" every H ties with the empty set, which is
+        # scanned first and so always kept. A non-empty H from that pool would
+        # make apply_delete raise, since its nodes are not adjacent to x.
         ops.apply_delete(current, x, y, h)
         current = rebuild_cpdag(current)
         changed = True
@@ -201,40 +184,29 @@ class GES:
     Parameters
     ----------
     score : Score
-        Decomposable local score. Every method taking a `data` argument
-        requires the score to have been built from that same dataset -- `data`
-        itself is consulted only for `n_vars`. Passing a mismatched `data`
-        silently produces nonsense; this is a caller contract, not something
-        `GES` can check through the `Score` protocol.
+        Decomposable local score, built from the same data later passed to
+        :meth:`fit`. Only the data's ``n_vars`` is read, so a mismatch is not
+        detected.
     h_pool : HPool, optional
         Which pool the backward phase draws `H` from; see :data:`HPool`.
     max_t_size : int or None, optional
-        Cap on ``|T|`` in the forward phase. **Defaults to 2.** Measured
-        byte-identical to the exhaustive scan on all nine benchmark networks
-        while running up to 20x faster, so it is the default. It is not free in
-        theory -- any finite cap forfeits Chickering's optimality guarantee --
-        so pass `None` for the exhaustive scan, and say which you used in any
-        published result.
+        Cap on ``|T|`` in the forward phase. Default 2, which matched the
+        exhaustive scan on every benchmark network while running up to 20x
+        faster. Any cap gives up Chickering's optimality guarantee in theory;
+        `None` is the exhaustive scan.
     empty_t_gate : bool, optional
-        Abandon a candidate pair unless it already passes validity and scores
-        positively at ``T = {}``. Defaults to `False`: unlike the cap, this
-        does cost the optimum, and it is not reliably faster. Provided for
-        compatibility with the original Java implementation, not as a recommended
-        setting; see ``docs/algorithms.md``.
+        Skip a candidate pair unless it improves the score with ``T = {}``.
+        Default `False`. It costs the optimum and exists only to reproduce the
+        original Java implementation; see ``docs/algorithms.md``.
     incremental : bool, optional
-        **Defaults to `True`.** Use the incremental engine, which re-scores
-        only the pairs whose neighbourhood changed after each operator rather
-        than rescanning everything. Verified byte-identical to the full scan on
-        every benchmark network, and dramatically faster as the graph grows
-        (~2x at 37 nodes, ~13x at 223). Pass `False` for the full scan, the
-        guaranteed-exact reference.
+        Re-score only the pairs each operator can affect. Default `True`; about
+        2x faster at 37 nodes and 13x at 223, with the same result. `False`
+        uses the full scan.
 
     Raises
     ------
     ValueError
-        If `h_pool` is unrecognised or `max_t_size` is negative. Both checked
-        at construction, so a typo fails immediately even on an instance only
-        ever used through :meth:`fes_only`.
+        If `h_pool` is unrecognised or `max_t_size` is negative.
     """
 
     def __init__(
@@ -348,12 +320,7 @@ class GES:
         *,
         candidate_edges: frozenset[tuple[int, int]] | None = None,
     ) -> PDAG:
-        """Run only the backward phase, starting from `initial_graph`'s CPDAG.
-
-        Unlike :meth:`fit` and :meth:`fes_only`, `initial_graph` is required: a
-        backward pass from an empty graph is meaningless, since nothing is ever
-        adjacent and no Delete is ever valid.
-        """
+        """Run only the backward phase, starting from `initial_graph`'s CPDAG."""
         start = self._start_cpdag(data, initial_graph)
         cpdag, _ = self._run_bes(start, candidate_edges)
         return cpdag

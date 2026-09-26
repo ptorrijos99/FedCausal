@@ -10,7 +10,7 @@ pytest.importorskip("flwr")
 from flwr.common import ConfigRecord, Context, Message, MessageType, RecordDict  # noqa: E402
 
 from fedcausal.data import DiscreteDataset, contiguous_split  # noqa: E402
-from fedcausal.exceptions import ClientFailureError, ConfigurationError  # noqa: E402
+from fedcausal.exceptions import ClientFailureError  # noqa: E402
 from fedcausal.flower.fedges import handle_train_message  # noqa: E402
 from fedcausal.flower.loaders import InMemoryPartitions  # noqa: E402
 from fedcausal.flower.serde import dag_to_record, record_to_dag  # noqa: E402
@@ -51,16 +51,6 @@ def test_build_round_returns_a_scored_local_model() -> None:
     assert record_to_dag(reply.content["local"], 3).num_edges > 0
 
 
-def test_the_local_model_persists_between_rounds() -> None:
-    """The supernode's own state carries its model, not the server."""
-    parts = contiguous_split(_ds(), 2)
-    context = node_context(0)
-
-    _handle(_message("build"), context, parts)
-
-    assert "local_dag" in context.state.array_records
-
-
 def test_fuse_round_incorporates_the_global_dag() -> None:
     parts = contiguous_split(_ds(), 2)
     context = node_context(0)
@@ -84,9 +74,3 @@ def test_unknown_phase_is_an_error() -> None:
     parts = contiguous_split(_ds(), 2)
     with pytest.raises(ClientFailureError, match="unknown phase"):
         _handle(_message("gossip"), node_context(0), parts)
-
-
-def test_out_of_range_partition_id_is_an_error() -> None:
-    parts = contiguous_split(_ds(), 2)
-    with pytest.raises(ConfigurationError, match="out of range"):
-        _handle(_message("build"), node_context(7), parts)

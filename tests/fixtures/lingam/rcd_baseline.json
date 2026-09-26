@@ -51,8 +51,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -343,8 +341,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -635,8 +631,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -927,8 +921,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -1219,8 +1211,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -1475,8 +1465,6 @@
         2
       ],
       "B": null,
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -1767,8 +1755,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -2059,8 +2045,6 @@
           0.0
         ]
       ],
-      "b_sha16": "71cc3b54632b2e22",
-      "noise_sha16": "36e618310ba8335d",
       "cumulants": {
         "cov": [
           [
@@ -2399,8 +2383,6 @@
           0.0
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -3015,8 +2997,6 @@
           0.0
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -3631,8 +3611,6 @@
           0.0
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -4247,8 +4225,6 @@
           0.0
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -4863,8 +4839,6 @@
           -4.440892098500626e-16
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -5398,8 +5372,6 @@
         7
       ],
       "B": null,
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -6014,8 +5986,6 @@
           0.0
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -6630,8 +6600,6 @@
           0.0
         ]
       ],
-      "b_sha16": "c58516397a394c81",
-      "noise_sha16": "d4f7e032a99bd60e",
       "cumulants": {
         "cov": [
           [
@@ -7288,8 +7256,6 @@
           0.0
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -8190,8 +8156,6 @@
           0.0
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -9092,8 +9056,6 @@
           0.0
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -9994,8 +9956,6 @@
           0.0
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -10896,8 +10856,6 @@
           -2.220446049250313e-16
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -11677,8 +11635,6 @@
         8
       ],
       "B": null,
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -12579,8 +12535,6 @@
           0.0
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [
@@ -13481,8 +13435,6 @@
           0.0
         ]
       ],
-      "b_sha16": "a01f4839be910366",
-      "noise_sha16": "29d2d0cafb26729a",
       "cumulants": {
         "cov": [
           [

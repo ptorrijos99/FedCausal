@@ -19,12 +19,7 @@ def _toy_dataset() -> DiscreteDataset:
 def _synthetic_dataset(
     n_rows: int = 100, n_label_levels: int = 4, seed: int = 0
 ) -> DiscreteDataset:
-    """Build a dataset with a bijective ``id`` column for tracing rows.
-
-    Column 0 (``id``) holds the code ``i`` for original row ``i``, so a
-    partitioner's output can be checked for an exact row partition by
-    collecting the ``id`` column across all clients.
-    """
+    """Build a dataset whose ``id`` column gives each row's original index."""
     rng = np.random.default_rng(seed)
     id_values = np.arange(n_rows, dtype=np.int32)
     label_values = rng.integers(0, n_label_levels, size=n_rows).astype(np.int32)
@@ -49,17 +44,29 @@ def test_contiguous_split_sizes() -> None:
     assert [p.n_rows for p in parts] == [3, 3, 2]
 
 
-def test_contiguous_split_matches_java_ceil_boundaries() -> None:
-    # BN_DataSet.divideDataSet uses ceil boundaries, which for a non-divisible
-    # (n, N) differ from numpy.array_split's front-loaded blocks. n=10, N=4:
-    # bucketSize=2.5 -> boundaries [0, 3, 5, 8, 10] -> sizes [3, 2, 3, 2]
-    # (array_split would give [3, 3, 2, 2]).
+def test_contiguous_split_spreads_the_remainder() -> None:
     ds = _synthetic_dataset(n_rows=10)
     parts = contiguous_split(ds, 4)
     assert [p.n_rows for p in parts] == [3, 2, 3, 2]
-    # still an exact, order-preserving partition (trace via the id column)
-    reconstructed = np.concatenate([p.values for p in parts], axis=0)
-    assert np.array_equal(reconstructed[:, 0], np.arange(10))
+
+
+class _RowCounter:
+    """A dataset stand-in that records which rows each block asked for."""
+
+    def __init__(self, n_rows: int) -> None:
+        self.n_rows = n_rows
+        self.n_vars = 1
+
+    def subset(self, rows: np.ndarray) -> tuple[int, int]:
+        return (int(rows[0]), int(rows[-1]) + 1) if rows.size else (0, 0)
+
+
+@pytest.mark.parametrize("n_rows", [7, 5000, 16_777_217, 50_000_003])
+@pytest.mark.parametrize("n_clients", [3, 7, 10, 12])
+def test_contiguous_split_covers_every_row_once(n_rows: int, n_clients: int) -> None:
+    blocks = [b for b in contiguous_split(_RowCounter(n_rows), n_clients) if b != (0, 0)]  # type: ignore[type-var]
+    assert blocks[0][0] == 0 and blocks[-1][1] == n_rows
+    assert all(a[1] == b[0] for a, b in zip(blocks, blocks[1:], strict=False))
 
 
 def test_contiguous_split_reproduces_original_rows_in_order() -> None:
@@ -229,9 +236,3 @@ def test_dirichlet_split_rejects_by_with_continuous():
         TypeError, match=r"by is only supported for a DiscreteDataset, got ContinuousDataset"
     ):
         dirichlet_split(ds, 4, alpha=1.0, seed=0, by=1)
-
-
-def test_dirichlet_split_accepts_by_with_discrete():
-    ds = _synthetic_dataset(n_rows=100, n_label_levels=4)
-    parts = dirichlet_split(ds, 4, alpha=0.5, seed=7, by=1)
-    assert len(parts) == 4

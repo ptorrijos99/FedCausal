@@ -38,31 +38,8 @@ def test_meek_r3() -> None:
 
 
 def test_meek_r4_fires() -> None:
-    # Nodes: a=0, b=1, c=2, d=3.
-    #
-    # Target: undirected a-b, with c a parent of b, d a common adjacent of a
-    # and c (d != b), d not adjacent to b, d->c directed, a-d undirected.
-    # R4 should then orient a->b.
-    #
-    #   a(0) - b(1)      undirected edge to be oriented by R4
-    #   c(2) -> b(1)     c is a parent of b
-    #   d(3) -> c(2)     d -> c directed
-    #   a(0) - d(3)      a - d undirected
-    #   a(0) - c(2)      EXTRA edge, added only to block R1 pre-emption (see
-    #                    below); not part of R4's precondition list itself.
-    #
-    # Without the extra a-c edge, R1 fires first and misorients the edge:
-    # parents(b) = {c}, and if c were not adjacent to a, R1(b, a) would see
-    # "c -> b, b - a, c not adjacent to a" and orient b -> a before R4 is
-    # ever reached (R1 has strictly higher precedence in
-    # ``apply_meek_rules``'s rule ordering). Adding the undirected a-c edge
-    # makes c adjacent to a, which is exactly the guard clause
-    # ``if a in pdag.adjacent(c): continue`` in ``_meek_r1`` -- so R1 no
-    # longer fires for this parent, and R4 gets to run. This was verified by
-    # hand and confirmed empirically: disabling ``_meek_r4`` leaves a-b
-    # undirected after ``apply_meek_rules``, while the real R4 orients it
-    # a -> b, so the assertion below genuinely exercises R4 (and not a
-    # lower-precedence rule) through the public entry point.
+    # a=0, b=1, c=2, d=3. R4 orients a - b given c -> b, d -> c, a - d, with d not
+    # adjacent to b. The extra a - c edge keeps R1 from orienting b -> a first.
     p = PDAG(4)
     p.add_undirected(0, 1)  # a - b
     p.add_directed(2, 1)  # c -> b
@@ -74,7 +51,7 @@ def test_meek_r4_fires() -> None:
 
 
 def test_dag_to_cpdag_v_structure() -> None:
-    # collider 0→2←1 is compelled; chain 2→3 gets... (3-node star checked exactly)
+    # Both edges of the collider 0→2←1 are compelled.
     dag = DAG.from_edges(3, [(0, 2), (1, 2)])
     c = dag_to_cpdag(dag)
     assert c.has_directed(0, 2) and c.has_directed(1, 2)

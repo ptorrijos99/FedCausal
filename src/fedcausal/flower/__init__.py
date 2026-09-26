@@ -1,24 +1,12 @@
-"""Flower transports for the federated methods in fedcausal.
+"""Both method families over Flower (``pip install fedcausal[flower]``).
 
-``flwr`` is an optional dependency: importing this subpackage requires it.
-Nothing under :mod:`fedcausal.fedges` or :mod:`fedcausal.lingam` imports it, so
-the algorithms work without it; ``pip install fedcausal[flower]`` adds the
-transport.
+- :mod:`fedcausal.flower.fedges`: FedGES, several rounds of build and fuse.
+- :mod:`fedcausal.flower.lingam`: the FedRCD family, one round of statistics
+  (``p - 1`` for ``fedrcd_exact``).
 
-One module per method family, both built on the same plumbing:
-
-- :mod:`fedcausal.flower.fedges` -- FedGES over discrete data, several rounds of
-  build and fuse.
-- :mod:`fedcausal.flower.lingam` -- the FedRCD family over continuous data, one
-  round of cumulant statistics (``p - 1`` for ``fedrcd_exact``).
-
-Both take their data through a :class:`~fedcausal.flower.loaders.PartitionLoader`
-and pack their messages with :mod:`fedcausal.flower.serde`. Adding a third
-family means writing a module beside these two, not a new transport.
-
-The ``run_flower_*`` helpers below run a whole federation in one process through
-Flower's Ray-based simulation engine (``fedcausal[flower-simulation]``). A real
-deployment needs neither them nor Ray; see ``docs/deployment.md``.
+The ``run_flower_*`` helpers run a whole federation in one process on Flower's
+simulation engine (``fedcausal[flower-simulation]``). A real deployment needs
+neither them nor Ray; see ``docs/deployment.md``.
 """
 
 from __future__ import annotations

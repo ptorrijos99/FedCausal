@@ -1,13 +1,7 @@
-"""Intersection fusion: keep only edges present, consistently, in every DAG.
+"""Intersection fusion: keep only the adjacencies every DAG agrees on.
 
-The strictest fusion operator: keep only what every client agrees on.
-The Java implementation code fixes the topological order of the first DAG, reorients the
-other
-DAGs' edges to agree with that order, then removes from the first DAG every edge
-absent in any reoriented DAG. Because fedcausal DAGs already share the integer
-node set ``0..n-1``, this reduces to: keep edge ``(a, b)`` of ``dags[0]`` iff the
-skeleton pair ``{a, b}`` is present in every other DAG. The orientation is taken
-from ``dags[0]`` (the "randomly first graph", per the original comment).
+An edge of ``dags[0]`` survives if its node pair is adjacent, in either
+direction, in every other DAG. Orientations come from ``dags[0]``.
 """
 
 from __future__ import annotations

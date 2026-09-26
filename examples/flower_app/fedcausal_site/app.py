@@ -95,9 +95,9 @@ def main(grid: Grid, context: Context) -> None:
 
 
 def _run_fedges(grid: Grid, context: Context, n_clients: int, min_clients: int | None) -> None:
-    """Run the FedGES loop and leave the global DAG on the server's state."""
+    """Run the FedGES loop and write the global DAG's edges to `result-path`."""
     n_vars = int(_config(context, "num-variables", 0)) or synthetic_discrete().n_vars
-    fedges.run_server_loop(
+    final = fedges.run_server_loop(
         grid,
         context,
         global_fusion=default_server_fusion(),
@@ -107,23 +107,26 @@ def _run_fedges(grid: Grid, context: Context, n_clients: int, min_clients: int |
         n_iterations=int(_config(context, "num-server-rounds", 5)),
         min_clients=min_clients,
     )
+    if final is None:
+        raise RuntimeError("the run converged before producing a global model")
+    _write_result(context, {"edges": final.dag.edges()})
+    print(f"global model with {final.dag.num_edges} edges")
 
 
 def _run_fedrcd(grid: Grid, context: Context, n_clients: int, min_clients: int | None) -> None:
-    """Run the selected FedRCD solver and write its result to `result-path`.
-
-    A `ServerApp`'s `main` has no return value, so the coefficient matrix has to
-    be persisted here to leave the coordinating machine.
-    """
+    """Run the selected FedRCD solver and write its result to `result-path`."""
     solver = str(_config(context, "solver", "fedrcd"))
     if solver == "fedrcd_exact":
         result = lingam.run_exact_server_loop(grid, n_clients, min_clients=min_clients)
     else:
         result = lingam.run_server_loop(grid, n_clients, solver, min_clients=min_clients)
 
-    out = Path(str(_config(context, "result-path", "rcd_result.json")))
-    out.write_text(
-        json.dumps({"causal_order": list(result.causal_order), "b": result.b.tolist()}),
-        encoding="utf-8",
-    )
-    print(f"causal order {result.causal_order}, written to {out}")
+    _write_result(context, {"causal_order": list(result.causal_order), "b": result.b.tolist()})
+    print(f"causal order {result.causal_order}")
+
+
+def _write_result(context: Context, result: dict[str, Any]) -> None:
+    """Write `result` as JSON to `result-path`; a ``ServerApp`` cannot return it."""
+    out = Path(str(_config(context, "result-path", "result.json")))
+    out.write_text(json.dumps(result), encoding="utf-8")
+    print(f"result written to {out}")

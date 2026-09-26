@@ -1,22 +1,10 @@
-"""Consensus topological order by sink-peeling (Puerta et al. 2021, AlphaOrder).
+"""Consensus topological order by sink peeling (Puerta et al., 2021).
 
-Ported from ``consensusBN/AlphaOrder.java``. The heuristic builds the order
-from sinks upward: at each step it picks the node whose removal costs the
-fewest edge changes (arc inversions plus moralization additions, summed over
-every input DAG, :func:`_compute_next`), prepends it to the order, and peels
-it from every working copy (:func:`_peel`).
-
-Determinism: candidate nodes are scanned in ascending index and ties are kept
-first-seen, so the lowest index wins. This replaces the original's ``nodes``-list
-order, which is the same ascending order. No RNG.
-
-``_peel`` is a verbatim port of ``AlphaOrder.removeNode``: it reverses each
-out-arc of the peeled node (skipping, on the first pass, any child still
-reachable by an alternative directed path, to avoid a cycle on reversal),
-moralizes the node's parents with its children, then strips every remaining
-incident arc. fedcausal keeps a fixed ``num_nodes``, so "remove the node"
-becomes "leave it isolated" -- invisible to every parent/child query, since
-an isolated node is nobody's parent or child.
+The order is built from the sinks up. Each step picks the node whose removal
+costs the fewest edge changes, summed over every input DAG (arc reversals plus
+the moral edges they force), places it before the nodes already ordered, and
+peels it from every working copy. Ties go to the lowest index, so the result
+is deterministic.
 """
 
 from __future__ import annotations
@@ -143,7 +131,7 @@ def _peel(g: DAG, alpha: int) -> None:
                 g.add_edge(p, alpha)
         children.remove(child)
 
-    # "removeNode": strip every remaining incident arc, leaving alpha isolated.
+    # Strip every remaining incident arc, leaving alpha isolated.
     for p in list(g.parents(alpha)):
         g.remove_edge(p, alpha)
     for c in list(g.children(alpha)):

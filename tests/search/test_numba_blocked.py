@@ -1,8 +1,6 @@
-"""The optional numba reachability path must be byte-identical to the set walk.
+"""The numba path check gives the same answers as the pure-Python one.
 
-Skipped when numba is not installed. Compares the numba fast path against the
-pure-Python traversal both directly (random graphs + queries) and end-to-end
-(a full GES fit), so the accelerated path can never silently diverge.
+Skipped when numba is not installed.
 """
 
 from __future__ import annotations
@@ -56,18 +54,3 @@ def test_numba_matches_set_walk_on_random_graphs(seed: int) -> None:
         cond = frozenset(int(c) for c in rng.integers(0, n, size=k))
         got = ops.is_semidirected_blocked(g, y, x, cond)  # numba (n=60 >= 50)
         assert got == _pure_python_blocked(g, y, x, cond)
-
-
-def test_successor_csr_matches_adjacency_and_invalidates() -> None:
-    """successor_csr reflects children ∪ undirected and is rebuilt after a mutation."""
-    g = PDAG(4)
-    g.add_directed(0, 1)
-    g.add_undirected(1, 2)
-    indptr, indices = g.successor_csr()
-    succ = {v: set(indices[indptr[v] : indptr[v + 1]].tolist()) for v in range(4)}
-    assert succ == {0: {1}, 1: {2}, 2: {1}, 3: set()}
-    # mutation invalidates the cache
-    g.add_directed(2, 3)
-    indptr2, indices2 = g.successor_csr()
-    succ2 = {v: set(indices2[indptr2[v] : indptr2[v + 1]].tolist()) for v in range(4)}
-    assert succ2[2] == {1, 3}

@@ -1,10 +1,4 @@
-"""Discrete dataset representation for causal structure learning.
-
-This module provides :class:`DiscreteDataset`, a fully-observed, purely
-categorical dataset over integer-coded variables. It is the input format
-consumed by the BDeu score and by the federated client partitioners
-elsewhere in ``fedcausal``.
-"""
+"""Fully observed categorical data, the input to the BDeu score."""
 
 from __future__ import annotations
 
@@ -67,35 +61,14 @@ class DiscreteDataset:
 
     Notes
     -----
-    **Level encoding convention.** Within each column `j`, levels are
-    always encoded **sorted lexicographically** (Python's default string
-    ordering over ``categories[j]``), independent of the order in which
-    levels first appear in the source data. This is a deliberate,
-    documented convention chosen for reproducibility across Python
-    clients.
+    The loaders code each column's levels in sorted order, whatever order they
+    appear in, so the same data always gets the same codes.
 
-    Other tools assign level codes by first appearance instead, so level
-    *indices* are not expected to agree across implementations. Only
-    quantities computed from them (contingency-table counts, BDeu
-    sufficient statistics) need to match, and those are
-    invariant to which integer label is assigned to which level.
+    `values` is stored column-major, because the BDeu kernel reads one column
+    at a time.
 
-    **Memory layout.** `values` is stored **column-major** (Fortran order)
-    so the BDeu counting kernel's per-column gathers (``values[:, node]``,
-    ``values[:, p]``) are contiguous — measured ~1.6x on the kernel at
-    ~1000-variable shape. The array is logically unchanged ``(n_rows,
-    n_vars)`` int32; do not re-C-order it. `subset` re-imposes the layout,
-    since fancy row-indexing returns a C-contiguous copy.
-
-    **Shared, immutable metadata.** `subset` shares `names`,
-    `cardinalities`, and `categories` by reference with its parent
-    (rather than copying them), so that every subset of the same
-    dataset agrees bit-for-bit on the variable domains. Each of these
-    is immutable: `cardinalities` is a read-only array (attempting to
-    write into it raises `ValueError`), and `names`/`categories` are
-    plain tuples, which have no in-place mutation API. This means an
-    in-place edit on one subset can never silently corrupt its siblings
-    or the parent.
+    `names`, `cardinalities` and `categories` are immutable and shared by every
+    `subset`, so all sites split from one dataset agree on the variables.
     """
 
     values: np.ndarray
@@ -111,11 +84,7 @@ class DiscreteDataset:
         categories: Sequence[Sequence[str]],
     ) -> None:
         values = np.asarray(values, dtype=np.int32)
-        # Always a fresh, independent copy (never aliases the caller's array):
-        # `cardinalities` is small metadata that is shared by reference across
-        # every `subset()` of this dataset, so it is made read-only below to
-        # guard against accidental in-place mutation corrupting sibling
-        # subsets or the parent.
+        # A copy, because it is made read-only below.
         cardinalities = np.array(cardinalities, dtype=np.int32)
 
         if values.ndim != 2:
@@ -146,9 +115,6 @@ class DiscreteDataset:
                 )
 
         cardinalities.setflags(write=False)
-        # Column-major so the BDeu kernel's per-column gathers are contiguous
-        # (see the class Notes). `asfortranarray` copies a C-ordered input and
-        # is a no-op when already Fortran-ordered.
         self.values = np.asfortranarray(values)
         self.cardinalities = cardinalities
         self.names = tuple(names)
@@ -176,20 +142,12 @@ class DiscreteDataset:
         Returns
         -------
         DiscreteDataset
-            A new dataset over the selected rows only. `names`,
-            `cardinalities`, and `categories` are shared by reference
-            with the parent dataset (safe, since all three are
-            immutable) rather than recomputed from the subset's actual
-            values, so a level absent from the subset still counts
-            toward its variable's cardinality. This is essential for
-            federated clients: every client must agree on the same
-            variable domains, even if a particular client's local
-            partition happens not to contain every level.
+            The selected rows over the same variables. A level missing from
+            those rows still counts toward its variable's cardinality, so
+            every site agrees on the domains.
         """
         row_index = np.asarray(rows)
         subset_ds: DiscreteDataset = object.__new__(DiscreteDataset)
-        # Fancy row-indexing returns a C-contiguous copy; re-impose column-major
-        # so subsets keep the kernel's contiguous-gather advantage.
         subset_ds.values = np.asfortranarray(self.values[row_index])
         subset_ds.cardinalities = self.cardinalities
         subset_ds.names = self.names
@@ -233,9 +191,8 @@ class DiscreteDataset:
     def from_pandas(cls, df: pd.DataFrame) -> DiscreteDataset:
         """Build a dataset from a pandas DataFrame of categorical columns.
 
-        Each column is encoded independently: its distinct values (read
-        as strings) become that variable's levels, sorted
-        lexicographically (see the class-level Notes on level encoding).
+        Each column's distinct values, read as strings, become its levels in
+        sorted order.
 
         Parameters
         ----------
@@ -279,20 +236,10 @@ class DiscreteDataset:
     def from_csv(cls, path: str | Path) -> DiscreteDataset:
         """Build a dataset from a CSV file of categorical columns.
 
-        The file must have a header row of variable names followed by
-        comma-separated categorical string values — the same layout as
-        the reference datasets. All values are read as strings (never inferred as
-        numeric), so category labels are never silently reinterpreted.
-
-        **NA policy.** pandas' default NA-token sniffing is disabled
-        (``keep_default_na=False, na_filter=False``), so literal strings
-        such as ``"None"``, ``"NA"``, ``"NULL"``, or ``"NaN"`` are read
-        back as ordinary category labels rather than being coerced to a
-        missing value. This matters because some benchmark networks use
-        ``None`` as a genuine level (``child``'s ``DuctFlow``,
-        ``insurance``'s ``ThisCarDam``). A field that is empty or holds
-        only whitespace is still treated as missing and rejected with a
-        `ValueError`, since fedcausal requires fully-observed data.
+        A header row of variable names, then one row per observation. Every
+        value is read as a string label, including ``"None"`` and ``"NA"``,
+        which some networks use as real levels. Only an empty or blank field
+        counts as missing, and missing data is rejected.
 
         Parameters
         ----------

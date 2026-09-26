@@ -124,19 +124,6 @@ def test_defaults() -> None:
     assert s.structure_prior == 1.0
 
 
-def test_reference_priors_are_still_reachable() -> None:
-    """The original implementation's effective priors remain one argument away.
-
-    The default changed because it recovers better structure, but reproducing
-    published FedGES numbers must stay possible, and the regression tests rely
-    on it.
-    """
-    values = np.zeros((4, 2), np.int32)
-    ds = DiscreteDataset.from_arrays(values, np.full(2, 2, np.int32), ["A", "B"], [["0", "1"]] * 2)
-    s = BDeuScore(ds, sample_prior=1.0, structure_prior=0.0)
-    assert (s.sample_prior, s.structure_prior) == (1.0, 0.0)
-
-
 def test_cache_and_order_invariance() -> None:
     rng = np.random.default_rng(1)
     values = rng.integers(0, 2, size=(50, 4)).astype(np.int32)

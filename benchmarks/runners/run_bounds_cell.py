@@ -29,12 +29,8 @@ from fedcausal.metrics import shd, smhd  # noqa: E402
 from fedcausal.scores import BDeuScore  # noqa: E402
 from fedcausal.search import GES  # noqa: E402
 
-# The configurations compared. "exhaustive" is Chickering (2002) exactly;
-# "cap2" is now fedcausal's default (GES(score, max_t_size=2)); "java" is
-# BayesFL's pair of bounds together, expected to reproduce Java's own result.
-# Every config sets max_t_size explicitly -- since the GES default changed to
-# 2, an empty dict would silently mean cap2, so "exhaustive" and "gate" must
-# pin max_t_size=None to keep meaning "no cap".
+# The configurations compared. Each sets max_t_size explicitly, because an empty
+# dict would mean the default, cap2.
 CONFIGS: dict[str, dict[str, object]] = {
     "exhaustive": {"max_t_size": None},
     "cap1": {"max_t_size": 1},

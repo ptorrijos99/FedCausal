@@ -1,0 +1,105 @@
+"""fedcausal.lingam reproduces the original FedLiNGAM implementation.
+
+The fixtures come from that implementation; see tests/fixtures/lingam/README.md.
+If this fails, fix the code: never re-record the fixtures from it.
+"""
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from fedcausal.lingam import (
+    fedhc,
+    fedishc,
+    fedrcd,
+    fedrcd_exact,
+    fedrcd_noniterative,
+    hc,
+    hc_lingam,
+    ishc_beta,
+)
+from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
+
+FIXTURE = Path(__file__).parent.parent / "fixtures" / "lingam" / "rcd_baseline.json"
+CASES = json.loads(FIXTURE.read_text(encoding="utf-8"))["cases"]
+# The cumulants belong to the problem, not the method, so one record per problem.
+PROBLEMS = list({case["name"]: case for case in CASES}.values())
+
+# Federated solvers: consume aggregated cumulant stats.
+SOLVERS = {
+    "fedrcd": fedrcd,
+    "fedrcd_noniterative": fedrcd_noniterative,
+    "ishc": ishc_beta,
+    "fedishc": fedishc,
+    "fedhc": fedhc,
+}
+
+# Centralised solvers: consume the pooled data matrix directly, not stats.
+CENTRALISED_SOLVERS = {
+    "hc_lingam": hc_lingam,
+    "hc": hc,
+}
+
+
+def make_lingam_data(seed: int, n_samples: int, n_vars: int) -> np.ndarray:
+    """Regenerate a recorded problem, drawing in exactly the recorder's order."""
+    rng = np.random.default_rng(seed)
+    b_true = np.zeros((n_vars, n_vars))
+    for child in range(1, n_vars):
+        for parent in range(child):
+            if rng.random() < 0.5:
+                b_true[child, parent] = rng.uniform(0.5, 1.5) * rng.choice([-1.0, 1.0])
+    noise = rng.laplace(0.0, 1.0, size=(n_samples, n_vars))
+    x = np.zeros((n_samples, n_vars))
+    for j in range(n_vars):
+        x[:, j] = x @ b_true[j] + noise[:, j]
+    return x
+
+
+def _data(case: dict) -> np.ndarray:
+    return make_lingam_data(case["seed"], case["n_samples"], case["n_vars"])
+
+
+def _clients(case: dict) -> list[np.ndarray]:
+    return list(np.array_split(_data(case), case["n_clients"], axis=0))
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
+def test_port_reproduces_the_original(case):
+    method = case["method"]
+    if method == "fedrcd_exact":
+        result = fedrcd_exact(_clients(case))
+    elif method in CENTRALISED_SOLVERS:
+        # hc_lingam/hc work on the pooled data matrix, not aggregated stats.
+        result = CENTRALISED_SOLVERS[method](_data(case))
+    else:
+        stats = aggregate_and_compute_cumulants(
+            [compute_local_raw_stats(c, order=4) for c in _clients(case)]
+        )
+        result = SOLVERS[method](stats)
+
+    assert list(result.causal_order) == case["causal_order"]
+
+    if case["B"] is None:
+        # The original returns no B for fedhc.
+        return
+
+    np.testing.assert_allclose(result.b, np.array(case["B"]), rtol=1e-9, atol=1e-9)
+
+
+@pytest.mark.parametrize("case", PROBLEMS, ids=lambda c: c["name"])
+def test_cumulants_match_the_recording(case):
+    """The aggregated cumulants match, not just the order they lead to.
+
+    B is estimated from the covariance alone, so a small error in the higher
+    cumulants could pass the other test unless it flipped the order.
+    """
+    stats = aggregate_and_compute_cumulants(
+        [compute_local_raw_stats(c, order=4) for c in _clients(case)]
+    )
+    for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22"):
+        np.testing.assert_allclose(
+            stats[key], np.array(case["cumulants"][key]), rtol=1e-12, atol=1e-12
+        )

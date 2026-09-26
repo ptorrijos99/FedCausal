@@ -77,44 +77,6 @@
       "edges": 1446
     }
   },
-  "federated_replay": [
-    {
-      "net": "asia",
-      "n_clients": 5,
-      "recorded": 5,
-      "now": 5
-    },
-    {
-      "net": "asia",
-      "n_clients": 10,
-      "recorded": 2,
-      "now": 2
-    },
-    {
-      "net": "asia",
-      "n_clients": 20,
-      "recorded": 5,
-      "now": 5
-    },
-    {
-      "net": "cancer",
-      "n_clients": 5,
-      "recorded": 1,
-      "now": 1
-    },
-    {
-      "net": "cancer",
-      "n_clients": 10,
-      "recorded": 2,
-      "now": 2
-    },
-    {
-      "net": "cancer",
-      "n_clients": 20,
-      "recorded": 2,
-      "now": 2
-    }
-  ],
   "incremental_andes": {
     "n_vars": 223,
     "incremental_s": 7.98191890004091,
@@ -214,178 +176,6 @@
       "shd": 1589,
       "smhd": 3108,
       "bdeu": -1114307.673980479
-    }
-  ],
-  "proposal_structure_prior": [
-    {
-      "net": "asia",
-      "shd_0": 3,
-      "shd_sp": 2,
-      "smhd_0": 2,
-      "smhd_sp": 1,
-      "better": "yes"
-    },
-    {
-      "net": "cancer",
-      "shd_0": 1,
-      "shd_sp": 2,
-      "smhd_0": 2,
-      "smhd_sp": 3,
-      "better": "WORSE"
-    },
-    {
-      "net": "child",
-      "shd_0": 2,
-      "shd_sp": 2,
-      "smhd_0": 0,
-      "smhd_sp": 0,
-      "better": "same"
-    },
-    {
-      "net": "insurance",
-      "shd_0": 16,
-      "shd_sp": 18,
-      "smhd_0": 18,
-      "smhd_sp": 21,
-      "better": "WORSE"
-    },
-    {
-      "net": "water",
-      "shd_0": 55,
-      "shd_sp": 49,
-      "smhd_0": 81,
-      "smhd_sp": 91,
-      "better": "WORSE"
-    },
-    {
-      "net": "mildew",
-      "shd_0": 22,
-      "shd_sp": 22,
-      "smhd_0": 40,
-      "smhd_sp": 40,
-      "better": "same"
-    },
-    {
-      "net": "alarm",
-      "shd_0": 10,
-      "shd_sp": 10,
-      "smhd_0": 11,
-      "smhd_sp": 10,
-      "better": "yes"
-    },
-    {
-      "net": "hailfinder",
-      "shd_0": 62,
-      "shd_sp": 58,
-      "smhd_0": 73,
-      "smhd_sp": 72,
-      "better": "yes"
-    },
-    {
-      "net": "hepar2",
-      "shd_0": 64,
-      "shd_sp": 66,
-      "smhd_0": 66,
-      "smhd_sp": 80,
-      "better": "WORSE"
-    },
-    {
-      "net": "win95pts",
-      "shd_0": 71,
-      "shd_sp": 41,
-      "smhd_0": 106,
-      "smhd_sp": 55,
-      "better": "yes"
-    },
-    {
-      "net": "pathfinder",
-      "shd_0": 233,
-      "shd_sp": 183,
-      "smhd_0": 288,
-      "smhd_sp": 205,
-      "better": "yes"
-    },
-    {
-      "net": "andes",
-      "shd_0": 101,
-      "shd_sp": 71,
-      "smhd_0": 178,
-      "smhd_sp": 176,
-      "better": "yes"
-    }
-  ],
-  "proposal_greedy_t": [
-    {
-      "net": "asia",
-      "exhaustive_s": 0.006314900005236268,
-      "greedy_s": 0.006027800031006336,
-      "same": true
-    },
-    {
-      "net": "cancer",
-      "exhaustive_s": 0.0017709999810904264,
-      "greedy_s": 0.0016268000472337008,
-      "same": true
-    },
-    {
-      "net": "child",
-      "exhaustive_s": 0.056247200118377805,
-      "greedy_s": 0.05529779987409711,
-      "same": true
-    },
-    {
-      "net": "insurance",
-      "exhaustive_s": 0.13232510001398623,
-      "greedy_s": 0.1521723000332713,
-      "same": true
-    },
-    {
-      "net": "water",
-      "exhaustive_s": 0.13814149983227253,
-      "greedy_s": 0.13890419993549585,
-      "same": true
-    },
-    {
-      "net": "mildew",
-      "exhaustive_s": 0.2208849999587983,
-      "greedy_s": 0.2193748999852687,
-      "same": true
-    },
-    {
-      "net": "alarm",
-      "exhaustive_s": 0.21944390004500747,
-      "greedy_s": 0.22753280005417764,
-      "same": true
-    },
-    {
-      "net": "hailfinder",
-      "exhaustive_s": 0.5253055000212044,
-      "greedy_s": 0.5279902000911534,
-      "same": true
-    },
-    {
-      "net": "hepar2",
-      "exhaustive_s": 0.6384974999818951,
-      "greedy_s": 0.6064402998890728,
-      "same": true
-    },
-    {
-      "net": "win95pts",
-      "exhaustive_s": 1.2010031999088824,
-      "greedy_s": 1.29230109998025,
-      "same": true
-    },
-    {
-      "net": "pathfinder",
-      "exhaustive_s": 2.8606139000039548,
-      "greedy_s": 2.822952400194481,
-      "same": true
-    },
-    {
-      "net": "andes",
-      "exhaustive_s": 8.456291199894622,
-      "greedy_s": 8.420615299837664,
-      "same": true
     }
   ],
   "structure_prior_5samples": [
@@ -704,6 +494,9 @@
     "ours_sp0_bdeu": -1114303.2,
     "ours_sp0_seconds": 186.2,
     "skeleton_overlap": 1666,
-    "note": "same configuration; BDeu computed with structure_prior=0.0 for both"
+    "note": "same configuration; BDeu computed with structure_prior=0.0 for both",
+    "true_edges": 1125,
+    "true_bdeu": -1059715.0,
+    "warm_start_from_truth_bdeu": -1058834.0
   }
 }

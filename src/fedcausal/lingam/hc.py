@@ -1,20 +1,10 @@
-"""HC and HC-LiNGAM: centralised 4th-order-cumulant baselines.
+"""HC and HC-LiNGAM (Chen et al.), centralised fourth-order baselines.
 
-Ports the two causal-ordering algorithms of Chen et al.'s ``HCLiNGAM`` class
-(``method='hc'`` and ``method='hc-lingam'``), plus its OLS adjacency-matrix
-estimator. Both work directly on a centralised data matrix -- there is no
-federated aggregation step here, unlike the rest of this subpackage.
-
-``hc_lingam``
-    Algorithm 2 (regression-free). Computes the 4th-order tau matrix once
-    over all variables and sorts by row sum. Cheaper, but assumes the global
-    ordering induced by a single pass holds.
-
-``hc``
-    Algorithm 1 (iterative regression). Identifies one exogenous variable at
-    a time from the tau matrix of the variables still active, regresses its
-    linear effect out of the rest, and repeats -- similar in spirit to
-    DirectLiNGAM but using the 4th-order tau criterion in place of HSIC.
+Both work on the pooled data matrix. ``hc_lingam`` sorts once by the
+fourth-order tau; ``hc`` removes one source at a time, regressing it out of the
+rest. With the default OLS estimate of B, both match the reference
+implementation numerically; ``tests/lingam/test_reference_implementation.py``
+checks it.
 
 References
 ----------
@@ -35,10 +25,7 @@ __all__ = ["hc", "hc_lingam"]
 
 
 def _fit_hc_lingam(x: npt.NDArray[np.float64]) -> list[int]:
-    """Estimate the causal order via Algorithm 2 (regression-free global ordering).
-
-    Sorts variables by total 4th-order tau score. The variable with the
-    smallest total score is the most exogenous.
+    """Return the order of the variables by their fourth-order tau row sums.
 
     Parameters
     ----------
@@ -61,10 +48,7 @@ def _fit_hc_lingam(x: npt.NDArray[np.float64]) -> list[int]:
 
 
 def _fit_hc(x: npt.NDArray[np.float64]) -> list[int]:
-    """Estimate the causal order via Algorithm 1 (iterative regression).
-
-    Identifies one exogenous variable at a time, regresses its effect out of
-    the remaining variables, and repeats.
+    """Return the causal order found by removing one source at a time.
 
     Parameters
     ----------
@@ -84,19 +68,16 @@ def _fit_hc(x: npt.NDArray[np.float64]) -> list[int]:
     for _ in range(p - 1):
         n_curr = len(active_indices)
 
-        # X_curr is already the reduced dataset (n, n_curr); active_indices
-        # maps its local column index to the original global index.
+        # active_indices maps x_curr's columns to the original ones.
         tau_local = tau_matrix_4th_from_data(x_curr)
 
-        # Find root in the current set (smallest row sum).
         t_tau = np.sum(tau_local, axis=1)
         m_local_idx = int(np.argmin(t_tau))
         m_global_idx = active_indices[m_local_idx]
 
         k.append(m_global_idx)
 
-        # Remove the effect of x_m from the rest by regression:
-        # x_j := x_j - (cov(xj, xm) / var(xm)) * xm
+        # Regress x_m out of the rest, with population (biased) moments.
         xm_data = x_curr[:, m_local_idx]
         var_xm = np.var(xm_data)
 
@@ -118,7 +99,6 @@ def _fit_hc(x: npt.NDArray[np.float64]) -> list[int]:
         x_curr = np.array(new_x).T
         active_indices = new_active_indices
 
-    # Add the last remaining variable.
     k.append(active_indices[0])
 
     return k
@@ -127,9 +107,7 @@ def _fit_hc(x: npt.NDArray[np.float64]) -> list[int]:
 def _estimate_adjacency_matrix(
     x: npt.NDArray[np.float64], order: list[int]
 ) -> npt.NDArray[np.float64]:
-    """Estimate B given the causal order by OLS regression.
-
-    For each variable, regress it on its predecessors in the order.
+    """Estimate B by regressing each variable on the ones before it in `order`.
 
     Parameters
     ----------
@@ -155,7 +133,6 @@ def _estimate_adjacency_matrix(
         y = x[:, target_var]
         a_mat = x[:, predictors_indices]
 
-        # OLS: coef = (A^T A)^-1 A^T y
         coefs, _, _, _ = np.linalg.lstsq(a_mat, y, rcond=None)
 
         for k_idx, split_idx in enumerate(predictors_indices):
@@ -171,7 +148,7 @@ def _estimate_b(
     use_lasso: bool,
     lmbda_type: str,
 ) -> npt.NDArray[np.float64]:
-    """Dispatch to OLS (original) or Adaptive Lasso adjacency-matrix estimation.
+    """Estimate B by per-variable OLS on `x`, or by adaptive Lasso on its covariance.
 
     Parameters
     ----------
@@ -180,8 +157,7 @@ def _estimate_b(
     order : list of int
         Causal order, source first.
     use_lasso : bool
-        If ``True``, estimate B with Adaptive Lasso from the sample
-        covariance instead of the original's per-target OLS regression.
+        Use the adaptive Lasso.
     lmbda_type : str
         Lambda selection for Lasso: ``"fixed"`` or ``"bic"``.
 
@@ -204,23 +180,14 @@ def hc_lingam(
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
 ) -> RCDResult:
-    """Recover the causal order and B via HC-LiNGAM (Algorithm 2).
-
-    Ports ``HCLiNGAM(method='hc-lingam').fit(X)`` from the original
-    implementation. Computes a single global 4th-order tau matrix and sorts
-    by row sum, then estimates B by per-target OLS regression on the
-    centred data -- exactly as the original does when `use_lasso` is
-    ``False``.
+    """Find the causal order with HC-LiNGAM (Algorithm 2), then estimate B.
 
     Parameters
     ----------
     x : numpy.ndarray
         Data, shape ``(n, p)``.
     use_lasso : bool, optional
-        If ``True``, estimate B with Adaptive Lasso from the sample
-        covariance instead of the original's per-target OLS regression. Not
-        part of the original algorithm; added for interface parity with the
-        other solvers in this subpackage.
+        Estimate B by adaptive Lasso on the covariance instead of OLS.
     lmbda_type : str, optional
         Lambda selection for Lasso: ``"fixed"`` or ``"bic"``.
 
@@ -228,19 +195,6 @@ def hc_lingam(
     -------
     RCDResult
         The estimated causal order and coefficient matrix.
-
-    Notes
-    -----
-    **Do not change this function's numerics** when ``use_lasso=False``.
-    HC-LiNGAM is a baseline from Chen et al. (IEEE TNNLS, 2025); the causal
-    order (global argsort of 4th-order tau row sums) and the default OLS
-    coefficient estimate (``numpy.linalg.lstsq`` per target, on the centred
-    data) are transcribed unchanged from the reference implementation.
-
-    References
-    ----------
-    [1] Chen, W., et al. "Higher Order Cumulants-Based Method for Direct
-        and Efficient Causal Discovery." IEEE TNNLS, 2025.
     """
     x_centred = np.asarray(x, dtype=float)
     x_centred = x_centred - np.mean(x_centred, axis=0)
@@ -257,25 +211,14 @@ def hc(
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
 ) -> RCDResult:
-    """Recover the causal order and B via HC (Algorithm 1).
-
-    Ports ``HCLiNGAM(method='hc').fit(X)`` from the original implementation.
-    Iteratively identifies the currently most exogenous variable via the
-    4th-order tau matrix of the active set, regresses its linear effect out
-    of the rest (population covariance / population variance, i.e.
-    ``bias=True``), and repeats. B is then estimated by per-target OLS
-    regression on the centred data -- exactly as the original does when
-    `use_lasso` is ``False``.
+    """Find the causal order with HC (Algorithm 1), then estimate B.
 
     Parameters
     ----------
     x : numpy.ndarray
         Data, shape ``(n, p)``.
     use_lasso : bool, optional
-        If ``True``, estimate B with Adaptive Lasso from the sample
-        covariance instead of the original's per-target OLS regression. Not
-        part of the original algorithm; added for interface parity with the
-        other solvers in this subpackage.
+        Estimate B by adaptive Lasso on the covariance instead of OLS.
     lmbda_type : str, optional
         Lambda selection for Lasso: ``"fixed"`` or ``"bic"``.
 
@@ -283,20 +226,6 @@ def hc(
     -------
     RCDResult
         The estimated causal order and coefficient matrix.
-
-    Notes
-    -----
-    **Do not change this function's numerics** when ``use_lasso=False``. HC
-    is a baseline from Chen et al. (IEEE TNNLS, 2025); its iterative
-    regression step deliberately uses the *biased* (population)
-    covariance/variance estimators of the reference implementation, and its
-    default OLS coefficient estimate (``numpy.linalg.lstsq`` per target, on
-    the centred data) is transcribed unchanged.
-
-    References
-    ----------
-    [1] Chen, W., et al. "Higher Order Cumulants-Based Method for Direct
-        and Efficient Causal Discovery." IEEE TNNLS, 2025.
     """
     x_centred = np.asarray(x, dtype=float)
     x_centred = x_centred - np.mean(x_centred, axis=0)

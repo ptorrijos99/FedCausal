@@ -1,14 +1,9 @@
-"""Federated causal discovery over continuous data via higher-order cumulants.
+"""Federated causal discovery over continuous data, from higher-order cumulants.
 
-This subpackage implements the FedRCD family and its baselines. Where
-:mod:`fedcausal.fedges` learns by fusing *models*, these methods aggregate
-*sufficient statistics*: each client sends raw moment sums, the server turns
-them into unbiased cumulant estimates, and a causal order falls out of the tau
-discriminator. Raw data never leaves a client in either design.
-
-Every solver here is a pure function of the aggregated statistics, so the
-subpackage needs only numpy and scipy. The Flower transport that feeds them over
-a real federation is :mod:`fedcausal.flower.lingam`.
+Each site sends moment sums; the server turns them into cumulants and a tau
+discriminator recovers the causal order. Every solver is a pure function of
+those statistics and needs only numpy and scipy. The Flower transport is
+:mod:`fedcausal.flower.lingam`.
 
 References
 ----------

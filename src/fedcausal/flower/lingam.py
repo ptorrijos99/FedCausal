@@ -1,27 +1,16 @@
-"""The FedRCD family over Flower: one-shot solvers and multi-round deflation.
+"""The FedRCD family over Flower.
 
-The one-shot solvers (``fedrcd``, ``fedrcd_noniterative``, ``ishc_beta``,
-``fedishc``, ``fedhc``) need a single round trip:
+The one-shot solvers need one round trip: every site replies with its moment
+sums, row count and a fingerprint of its variable names, and the server checks
+the fingerprints, aggregates the sums into cumulants and runs the solver.
 
-1. The server broadcasts a ``train`` message to every supernode.
-2. Each client computes its fourth-order raw moment sums locally and replies
-   with those sums, its row count, and a fingerprint of its variable names. Raw
-   data never leaves the client.
-3. The server checks the fingerprints agree, aggregates the sums into unbiased
-   cumulants, and runs the selected solver.
+``fedrcd_exact`` takes ``p - 1`` rounds. Each identifies a source, and every
+site deflates its own data by it and replies with fresh sums; the deflated
+data stays in the site's ``context.state`` between rounds.
 
-``fedrcd_exact`` is the multi-round member: ``p - 1`` rounds, each identifying a
-source, deflating every client's local data by it, and recomputing fresh
-statistics from the residuals. Its clients are stateful, keeping the
-progressively deflated working matrix in ``context.state`` between rounds.
-
-Both protocols split the server side in two layers, the same way
-:mod:`fedcausal.flower.fedges` does. :func:`run_server_loop` and
-:func:`run_exact_server_loop` take a ``Grid`` directly, so anything that can
-send and receive messages can drive them, including an in-process stub grid in
-tests with no Ray anywhere. :func:`run_flower_rcd` and
-:func:`run_flower_rcd_exact` are the convenience entry points that partition a
-dataset and spin up real supernodes through Flower's simulation engine.
+:func:`run_server_loop` and :func:`run_exact_server_loop` take any ``Grid``;
+:func:`run_flower_rcd` and :func:`run_flower_rcd_exact` split a dataset and
+run it on Flower's simulation engine.
 """
 
 from __future__ import annotations
@@ -80,8 +69,6 @@ _STATS_KEY = "stats"
 _BETAS_KEY = "betas"
 _WORKING_STATE_KEY = "rcd_working"
 
-#: The one-shot solvers this transport can drive. ``fedrcd_exact`` is
-#: multi-round and has its own loop below.
 _SOLVERS: dict[str, Callable[..., RCDResult]] = {
     "fedrcd": fedrcd,
     "fedrcd_noniterative": fedrcd_noniterative,
@@ -94,10 +81,7 @@ _SOLVERS: dict[str, Callable[..., RCDResult]] = {
 def handle_stats_message(
     msg: Message, context: Context, loader: PartitionLoader[ContinuousDataset]
 ) -> Message:
-    """Handle one ``train`` message and reply with this client's moment sums.
-
-    The whole client side of the one-shot protocol. Nothing persists between
-    rounds; the server asks each client exactly once for its statistics.
+    """Reply to a ``train`` message with this client's moment sums.
 
     Parameters
     ----------
@@ -150,10 +134,6 @@ def run_server_loop(
 ) -> RCDResult:
     """Run the one-shot FedRCD protocol over `grid` and return the result.
 
-    The whole server side, with no Flower app machinery around it, so an app
-    reading its settings from ``run_config`` can call it directly and a test can
-    drive it over an in-process stub grid with no Ray anywhere.
-
     Parameters
     ----------
     grid : Grid
@@ -163,9 +143,8 @@ def run_server_loop(
     solver : {"fedrcd", "fedrcd_noniterative", "ishc_beta", "fedishc", "fedhc"}, optional
         Which one-shot solver to run on the aggregated statistics.
     min_clients : int or None, optional
-        How many usable replies the round needs. Defaults to `n_clients`, so a
-        failed client aborts the run rather than silently shrinking the
-        statistics. Lower it to tolerate dropouts.
+        How many usable replies the round needs. Default `n_clients`, so a
+        failed client stops the run; lower it to tolerate dropouts.
     **solver_kwargs : Any
         Passed through to the selected solver (``use_lasso``, ``lmbda_type``).
 
@@ -207,9 +186,8 @@ def build_server_app(
 ) -> ServerApp:
     """Register :func:`run_server_loop` as a ``ServerApp``.
 
-    Takes the same arguments; see there. `results`, if given, receives the final
-    `RCDResult`. A ``ServerApp``'s ``main`` has no return value of its own, so
-    that list is how :func:`run_flower_rcd` gets the result back out.
+    Takes the same arguments. `results`, if given, receives the final
+    `RCDResult`, since a ``ServerApp`` cannot return one.
     """
     app = ServerApp()
 
@@ -230,10 +208,8 @@ def run_flower_rcd(
 ) -> RCDResult:
     """Run a one-shot FedRCD solver over a Flower simulation and return the result.
 
-    Splits `data` into `n_clients` contiguous partitions and drives them through
-    real supernodes via Flower's Ray-based simulation engine
-    (``fedcausal[flower-simulation]``). For the same protocol without Ray, which
-    is what the transport-equivalence tests drive, see :func:`run_server_loop`.
+    Splits `data` into `n_clients` contiguous blocks, one per simulated
+    supernode. Needs ``fedcausal[flower-simulation]``.
 
     Parameters
     ----------
@@ -276,15 +252,11 @@ def run_flower_rcd(
 def handle_deflate_message(
     msg: Message, context: Context, loader: PartitionLoader[ContinuousDataset]
 ) -> Message:
-    """Handle one round of the multi-round FedRCD-Exact protocol and reply.
+    """Handle one round of FedRCD-Exact and reply with fresh moment sums.
 
-    On round 0 the working matrix is seeded from `loader` untouched. On every
-    later round the message carries the source identified last round and the OLS
-    coefficients for it; this handler deflates the client's *persisted* working
-    matrix by them (``x_j := x_j - beta_j * x_s`` for every column but the
-    source), drops the source column, and only then computes fresh statistics.
-    No algebraic error accumulates across rounds, because only the residual data
-    itself changes.
+    Round 0 starts from the site's data. Every later round deflates the stored
+    working matrix by the source and coefficients the server sent
+    (``x_j -= beta_j * x_s``) and drops the source column.
 
     Parameters
     ----------
@@ -300,10 +272,8 @@ def handle_deflate_message(
     Returns
     -------
     Message
-        A reply carrying the nine moment-sum arrays computed from the current
-        working matrix, and the local row count. Round 0 also carries a
-        fingerprint of the client's original variable names; later rounds do
-        not, since the working matrix no longer corresponds to named variables.
+        The moment sums of the working matrix and the row count. Round 0 also
+        carries the fingerprint of the variable names.
     """
     control = msg.content[CTRL_KEY]
     round_idx = int(cast(int, control["round"]))
@@ -351,15 +321,7 @@ def run_exact_server_loop(
 ) -> RCDResult:
     """Run the multi-round FedRCD-Exact protocol over `grid` and return the result.
 
-    Follows :func:`fedcausal.lingam.rcd.fedrcd_exact`'s server half step for
-    step. Round 0's aggregate gives the *original* covariance and sample count,
-    kept aside for the final coefficient estimate; each subsequent step builds
-    the fourth-order tau matrix from the current aggregate, takes the ``argmin``
-    of its row sums as the source, computes OLS coefficients from the current
-    covariance, and (for every step but the last) broadcasts them so clients
-    deflate and reply with fresh statistics. ``active_global`` tracks which
-    original variable each surviving local column corresponds to, so the causal
-    order comes back in original variable indices.
+    The server half of :func:`fedcausal.lingam.rcd.fedrcd_exact`, step for step.
 
     Parameters
     ----------
@@ -459,8 +421,7 @@ def build_exact_server_app(
 ) -> ServerApp:
     """Register :func:`run_exact_server_loop` as a ``ServerApp``.
 
-    Takes the same arguments; see there. `results`, if given, receives the final
-    `RCDResult`, which is how :func:`run_flower_rcd_exact` gets it back out.
+    Takes the same arguments. `results`, if given, receives the final `RCDResult`.
     """
     app = ServerApp()
 
@@ -480,8 +441,7 @@ def run_flower_rcd_exact(
 ) -> RCDResult:
     """Run the multi-round FedRCD-Exact solver over a Flower simulation.
 
-    :func:`run_flower_rcd` for the multi-round protocol: same partitioning and
-    the same simulation engine, over ``p - 1`` rounds of communication.
+    As :func:`run_flower_rcd`, over ``p - 1`` rounds.
 
     Parameters
     ----------

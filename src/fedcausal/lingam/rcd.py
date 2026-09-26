@@ -1,28 +1,19 @@
-"""FedRCD: federated regression-directed cumulants.
-
-Four variants of the same algorithm family:
+"""The FedRCD solvers.
 
 ``fedrcd_noniterative``
-    One-shot: computes tau once on the original aggregated stats and sorts
-    globally. Federated counterpart of HCLiNGAM. Requires only one
-    communication round. Fast, but ignores residual structure.
-
+    Computes tau once from the aggregated statistics and sorts by it. One
+    round, the federated counterpart of HC-LiNGAM; ignores what removing a
+    source changes.
 ``fedrcd``
-    Iterative algebraic deflation: updates cumulant statistics in place using
-    beta coefficients (OLS) after each source removal. One-shot -- no further
-    communication after the initial stats exchange. Exact under the true
-    LiNGAM model; accumulates numerical error under finite samples or model
-    misspecification.
-
+    Removes one source at a time, deflating the cumulants algebraically with
+    OLS coefficients. One round. Exact under the model, but finite-sample
+    error carries from each step to the next.
 ``fedrcd_exact``
-    Multi-round exact deflation: ``p - 1`` rounds of communication. Each round
-    the server broadcasts ``(source, beta)`` and clients deflate their local
-    raw data, then recompute fresh sufficient statistics. No algebraic
-    approximation -- exact federated counterpart of HC. Higher communication
-    cost, but no error accumulation.
-
+    Removes one source per round of communication: the sites deflate their own
+    data and send fresh statistics. ``p - 1`` rounds, no error carried over;
+    the federated counterpart of HC.
 ``ishc_beta``
-    Improved ISHC baseline using beta-deflation (kept for comparison).
+    ISHC with OLS instead of cumulant-ratio deflation, third-order only.
 
 References
 ----------
@@ -106,11 +97,10 @@ def fedrcd(
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
 ) -> RCDResult:
-    """Identify the causal order iteratively, then re-estimate B by OLS/Lasso.
+    """Find the causal order by algebraic deflation, then estimate B.
 
-    Server-side solver. Updates cumulant statistics in place via beta (OLS)
-    deflation after each source removal, then re-estimates B from the
-    original (pre-deflation) covariance.
+    Uses the fourth-order discriminator when the statistics include it. B is
+    estimated from the original covariance.
 
     Parameters
     ----------
@@ -133,10 +123,7 @@ def fedrcd(
     c12 = np.array(stats["c12"], dtype=float).copy()
     c21 = np.array(stats["c21"], dtype=float).copy()
 
-    # Bound unconditionally so they are never possibly-undefined below, even
-    # though they are only ever read when `has_4th` (equivalently `use_4th`,
-    # which mirrors it) is True. The `if has_4th:` block overwrites these with
-    # the real values; the shape here is irrelevant since it is never read.
+    # Placeholders, read only when has_4th.
     c4 = np.zeros(0, dtype=np.float64)
     c13 = np.zeros((0, 0), dtype=np.float64)
     c31 = np.zeros((0, 0), dtype=np.float64)
@@ -154,8 +141,6 @@ def fedrcd(
     causal_order: list[int] = []
 
     for _iteration in range(p - 1):
-        # ── 1. Source Identification ──────────────────────────────────
-        # Use 4th-order tau when available (stronger discriminator).
         use_4th = has_4th
 
         if use_4th:
@@ -177,7 +162,6 @@ def fedrcd(
         s = active[src_local]
         causal_order.append(s)
 
-        # ── 2. Compute β (OLS) — used for ALL updates ────────────────
         var_s = cov[s, s]
         if np.abs(var_s) < 1e-15:
             var_s = 1e-15
@@ -188,18 +172,16 @@ def fedrcd(
                 continue
             betas[j] = cov[j, s] / var_s
 
-        # ── 3. Update all statistics using β ─────────────────────────
+        # Deflate every statistic by the source.
         remaining = [j for j in active if j != s]
 
         for i in remaining:
             bi = betas[i]
 
-            # Covariance update
             for j in remaining:
                 bj = betas[j]
                 cov[i, j] -= bi * bj * var_s
 
-            # 3rd-order cumulant updates (using β, not α)
             c3_s = c3[s]
             c3[i] = c3[i] - (bi**3) * c3_s - 3 * bi * c21[i, s] + 3 * (bi**2) * c12[i, s]
 
@@ -210,7 +192,6 @@ def fedrcd(
                 c12[i, j] -= bi * (bj**2) * c3_s
                 c21[i, j] -= (bi**2) * bj * c3_s
 
-            # 4th-order cumulant updates (using β)
             if has_4th:
                 c4_s = c4[s]
                 c4[i] = (
@@ -229,7 +210,6 @@ def fedrcd(
                     c31[i, j] -= (bi**3) * bj * c4_s
                     c22[i, j] -= (bi**2) * (bj**2) * c4_s
 
-        # Update diagonals
         for j in remaining:
             c12[j, j] = c3[j]
             c21[j, j] = c3[j]
@@ -243,7 +223,6 @@ def fedrcd(
     if active:
         causal_order.append(active[0])
 
-    # ── 4. Re-estimate B from ORIGINAL covariance ─────────────────────
     n_samples = _n_samples(stats)
     if use_lasso:
         b = estimate_b_lasso_from_cov(
@@ -261,16 +240,7 @@ def ishc_beta(
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
 ) -> RCDResult:
-    """Identify the causal order via ISHC, deflating with beta (OLS).
-
-    This is the improved variant that uses beta (OLS) for deflation instead
-    of alpha (the cumulant ratio) that the original ISHC baseline uses.
-
-    Naming note: every other solver here that takes aggregated federated
-    statistics is `fed`-prefixed (`fedrcd`, `fedrcd_noniterative`, `fedishc`,
-    `fedhc`); `ishc_beta` takes the same kind of input but keeps the name of
-    the original single-machine implementation it was adapted from, for
-    traceability back to that source.
+    """Find the causal order with ISHC's third-order loop, deflating by OLS, then estimate B.
 
     Parameters
     ----------
@@ -308,7 +278,6 @@ def ishc_beta(
         causal_order.append(s)
         active.pop(src_local)
 
-        # Use β (OLS) instead of α (c21/c3)
         var_s = cov[s, s]
         if np.abs(var_s) < 1e-15:
             var_s = 1e-15
@@ -317,10 +286,8 @@ def ishc_beta(
         for j in active:
             bj = cov[j, s] / var_s
 
-            # C3 update (full formula with β)
             c3[j] = c3[j] - (bj**3) * c3_s - 3 * bj * c21[j, s] + 3 * (bj**2) * c12[j, s]
 
-            # Cross-cumulant updates
             for k in active:
                 if k == j:
                     continue
@@ -328,11 +295,10 @@ def ishc_beta(
                 c12[j, k] -= bj * (bk**2) * c3_s
                 c21[j, k] -= (bj**2) * bk * c3_s
 
-            # Also update covariance for next iteration's β
+            # The covariance too, for the next source's coefficients.
             for k in active:
                 cov[j, k] -= bj * (cov[k, s] / var_s) * var_s
 
-        # Update diagonals
         for j in active:
             c12[j, j] = c3[j]
             c21[j, j] = c3[j]
@@ -340,7 +306,6 @@ def ishc_beta(
     if active:
         causal_order.append(active[0])
 
-    # Re-estimate B from original covariance
     n_samples = _n_samples(stats)
     if use_lasso:
         b = estimate_b_lasso_from_cov(
@@ -358,11 +323,7 @@ def fedrcd_noniterative(
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
 ) -> RCDResult:
-    """Sort by a single global tau pass, then re-estimate B by OLS/Lasso.
-
-    Avoids iterative cumulant deflation entirely. Computes tau once from the
-    aggregated stats and sorts by row sum (like HCLiNGAM), then estimates B
-    from the original covariance.
+    """Sort the variables by their tau row sums, then estimate B.
 
     Parameters
     ----------
@@ -394,11 +355,10 @@ def fedrcd_noniterative(
         c21 = np.array(stats["c21"], dtype=float)
         tau = tau_matrix_3rd(c3, c12, c21)
 
-    # Sort by total τ score (ascending = most exogenous first)
+    # Most exogenous first.
     t_tau = np.sum(tau, axis=1)
     causal_order = np.argsort(t_tau).tolist()
 
-    # B re-estimation
     n_samples = _n_samples(stats)
     if use_lasso:
         b = estimate_b_lasso_from_cov(causal_order, cov, n_samples=n_samples, lmbda_type=lmbda_type)
@@ -414,27 +374,19 @@ def fedrcd_exact(
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
 ) -> RCDResult:
-    """Run multi-round exact federated deflation.
+    """Find the causal order by deflating each site's data, one round per source.
 
-    Runs ``p - 1`` communication rounds. Each round:
-
-    1. Clients compute fresh sufficient statistics from their current
-       (deflated) local data and send them to the server.
-    2. Server aggregates stats, identifies the source variable via tau4,
-       and computes OLS coefficients beta from the current covariance.
-    3. Server broadcasts ``(src_local_idx, beta)`` back to clients.
-    4. Clients deflate: ``x_j := x_j - beta_j * x_s`` for all ``j != s``,
-       then drop column ``s`` from their local data.
-
-    Because statistics are recomputed from actual residuals at every round,
-    no algebraic approximation is involved and numerical errors do not
-    accumulate across steps. This is the exact federated counterpart of HC.
+    Each round the sites send the moment sums of their current data, the
+    server picks the source by the fourth-order tau and the OLS coefficients on
+    it, and every site deflates its data by them (``x_j -= beta_j * x_s``) and
+    drops the source column. Runs the whole protocol in one process;
+    :func:`fedcausal.flower.lingam.run_exact_server_loop` is the same over
+    Flower.
 
     Parameters
     ----------
     clients : Sequence[numpy.ndarray]
-        Local datasets, each shape ``(n_k, p)``. Raw data is used only
-        locally; only sufficient statistics (moment sums) leave each client.
+        Each site's data, shape ``(n_k, p)``.
     use_lasso : bool, optional
         If ``True``, estimate B with Adaptive Lasso; otherwise OLS.
     lmbda_type : str, optional
@@ -447,32 +399,27 @@ def fedrcd_exact(
 
     Notes
     -----
-    Communication cost: ``p - 1`` rounds x O(p^2) statistics per round =
-    O(p^3) total.
+    ``p - 1`` rounds of O(p^2) statistics each.
     """
     p = clients[0].shape[1]
     causal_order: list[int] = []
 
-    # Each client maintains a working copy of its (progressively deflated) data.
-    # Only sufficient statistics cross the network — raw data stays local.
     x_local = [x.copy() for x in clients]
 
-    # Round 0 also gives us the original global covariance for final B estimation.
+    # Round 0 also gives the original covariance B is estimated from.
     init_raw = [compute_local_raw_stats(x, order=4) for x in x_local]
     init_agg = aggregate_and_compute_cumulants(init_raw)
     cov_original = np.array(init_agg["cov"])
     n_total = int(init_agg["n"])
 
-    # active_global[local_idx] → original variable index
+    # Original index of each remaining column.
     active_global: list[int] = list(range(p))
 
-    # Reuse the stats already computed for round 0
     agg = init_agg
 
     for step in range(p - 1):
         n_active = len(active_global)
 
-        # ── 1. Source identification via τ₄ ──────────────────────────
         c4 = np.array(agg["c4"])
         c13 = np.array(agg["c13"])
         c31 = np.array(agg["c31"])
@@ -482,13 +429,10 @@ def fedrcd_exact(
         src_local = int(np.argmin(np.sum(tau, axis=1)))
         causal_order.append(active_global[src_local])
 
-        # ── 2. Compute β from current covariance ─────────────────────
         cov_curr = np.array(agg["cov"])
         var_s = max(float(cov_curr[src_local, src_local]), 1e-15)
-        # betas[j] = OLS coefficient for regressing x_j on x_s
-        betas = cov_curr[:, src_local] / var_s  # shape (n_active,)
+        betas = cov_curr[:, src_local] / var_s
 
-        # ── 3. Clients deflate locally and drop source column ─────────
         remaining_local = [j for j in range(n_active) if j != src_local]
         new_x_local = []
         for x in x_local:
@@ -498,7 +442,6 @@ def fedrcd_exact(
         x_local = new_x_local
         active_global = [active_global[j] for j in remaining_local]
 
-        # ── 4. Clients send fresh stats for the next round ────────────
         if step < p - 2:
             raw = [compute_local_raw_stats(x, order=4) for x in x_local]
             agg = aggregate_and_compute_cumulants(raw)
@@ -506,7 +449,6 @@ def fedrcd_exact(
     if active_global:
         causal_order.append(active_global[0])
 
-    # ── 5. Re-estimate B from ORIGINAL covariance ─────────────────────
     if use_lasso:
         b = estimate_b_lasso_from_cov(
             causal_order, cov_original, n_samples=n_total, lmbda_type=lmbda_type

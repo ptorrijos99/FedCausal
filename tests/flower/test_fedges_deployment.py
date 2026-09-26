@@ -1,9 +1,4 @@
-"""The documented deployment path works: each site reads only its own file.
-
-Exercises what `docs/deployment.md` tells people to do, with real CSVs on
-disk and each supernode given nothing but a path to its own. If this passes, the
-walkthrough in the docs is not lying.
-"""
+"""The deployment in docs/deployment.md works: each site reads only its own file."""
 
 from __future__ import annotations
 
@@ -17,6 +12,7 @@ from flwr.common import Context, Message, RecordDict  # noqa: E402
 from fedcausal.data import DiscreteDataset, contiguous_split  # noqa: E402
 from fedcausal.exceptions import SchemaMismatchError  # noqa: E402
 from fedcausal.fedges.defaults import default_convergence, default_server_fusion  # noqa: E402
+from fedcausal.fedges.observer import ModelCollector  # noqa: E402
 from fedcausal.flower.fedges import handle_train_message, run_server_loop  # noqa: E402
 from fedcausal.flower.loaders import NodeConfigLoader  # noqa: E402
 from fedcausal.fusion import ConsensusUnion  # noqa: E402
@@ -27,10 +23,9 @@ N_SITES = 3
 
 
 def _write_sites(tmp_path, n_rows: int = 1800, seed: int = 11, drop_column: int = -1):  # type: ignore[no-untyped-def]
-    """Write one CSV per site and return their paths.
+    """Write one CSV per site and return the paths.
 
-    `drop_column` removes a column from the last site's file, which is how a
-    schema mismatch gets simulated.
+    `drop_column` removes a column from the last site's file.
     """
     rng = np.random.default_rng(seed)
     x0 = rng.integers(0, 2, n_rows)
@@ -56,14 +51,14 @@ def _write_sites(tmp_path, n_rows: int = 1800, seed: int = 11, drop_column: int 
 
 
 class _DeploymentGrid:
-    """Route messages to supernodes that each know only their own data path."""
+    """Route messages to supernodes configured as the docs say: a data path, nothing else."""
 
     def __init__(self, paths: list) -> None:  # type: ignore[type-arg]
         self._contexts = [
             Context(
                 run_id=1,
                 node_id=i,
-                node_config={"partition-id": i, "data-path": str(p)},
+                node_config={"data-path": str(p)},
                 state=RecordDict(),
                 run_config={},
             )
@@ -81,26 +76,26 @@ class _DeploymentGrid:
         ]
 
 
-def _run(grid: _DeploymentGrid, num_nodes: int = 3):  # type: ignore[no-untyped-def]
+def _run(grid: _DeploymentGrid, observer: ModelCollector | None = None):  # type: ignore[no-untyped-def]
     return run_server_loop(
         grid,  # type: ignore[arg-type]
         server_context(),
         global_fusion=default_server_fusion(),
         convergence=default_convergence(),
         n_clients=N_SITES,
-        num_nodes=num_nodes,
+        num_nodes=3,
         n_iterations=6,
+        observer=observer,
     )
 
 
-def test_sites_learn_a_shared_structure_from_their_own_files(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    paths = _write_sites(tmp_path)
+def test_every_site_contributes_to_every_round(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    collector = ModelCollector()
 
-    final = _run(_DeploymentGrid(paths))
+    final = _run(_DeploymentGrid(_write_sites(tmp_path)), collector)
 
-    assert final is not None
-    assert final.dag.num_nodes == 3
-    assert final.dag.num_edges > 0
+    assert final is not None and final.dag.num_edges > 0
+    assert len(collector.builds) == N_SITES * (len(collector.globals) + 1)
 
 
 def test_a_site_with_different_columns_stops_the_run(tmp_path) -> None:  # type: ignore[no-untyped-def]

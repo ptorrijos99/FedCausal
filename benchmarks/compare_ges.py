@@ -10,7 +10,7 @@ Design points that matter for reading the numbers this produces:
 exhaust memory in at least one implementation, and a per-cell process means
 such a failure costs one cell rather than the run. It also gives a timeout that
 works on Windows -- ``subprocess.run(timeout=...)`` does, whereas
-``bench_ges.py``'s ``signal.SIGALRM`` budget is a documented no-op there.
+``signal.SIGALRM`` is not available there.
 
 **One metric authority.** Runners return edge lists only. Every published
 number (BDeu, SHD, SMHD) is computed *here*, with ``fedcausal``'s
@@ -55,8 +55,7 @@ HERE = Path(__file__).resolve().parent
 RUNNERS = HERE / "runners"
 RESULTS = HERE / "results" / "compare_ges.jsonl"
 
-# The scaling ladder, ordered by node count. Mirrors bench_ges.SCALE_NETS so
-# the two notes' tables line up row for row.
+# The networks, ordered by node count.
 NETS: tuple[str, ...] = (
     "asia",
     "cancer",
@@ -82,9 +81,9 @@ IMPLS: tuple[str, ...] = ("fedcausal", "causal-learn")
 def networks_dir() -> Path:
     """Return the benchmark networks root (``FEDCAUSAL_NETWORKS``).
 
-    Expected layout: ``<root>/BBDD/<net>/<net>.<sample>.csv`` for the sampled
-    datasets and ``<root>/<net>.xbif`` for the ground truths. See
-    ``docs/benchmarks.md``.
+    Expected layout: ``<root>/res/networks/BBDD/<net>/<net>.<sample>.csv`` for
+    the sampled datasets and ``<root>/res/networks/<net>.xbif`` for the ground
+    truths.
 
     Raises
     ------

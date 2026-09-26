@@ -1,4 +1,4 @@
-"""Structure search algorithms (e.g. GES)."""
+"""Greedy equivalence search and its operators."""
 
 from fedcausal.search import gesops
 from fedcausal.search.ges import GES, HPool, run_bes, run_fes

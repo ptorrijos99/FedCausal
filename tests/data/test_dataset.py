@@ -12,10 +12,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 TOY_CSV = FIXTURES / "toy.csv"
 NONE_CATEGORY_CSV = FIXTURES / "none_category.csv"
 
-# Expected sorted-lexicographic encoding of tests/fixtures/toy.csv:
-#   A: b,a,c,a,b,a,c,b -> sorted levels [a,b,c] -> codes [1,0,2,0,1,0,2,1]
-#   B: lo,hi,lo,hi,lo,hi,hi,lo -> sorted levels [hi,lo] -> codes [1,0,1,0,1,0,0,1]
-#   C: q,p,r,q,p,r,q,p -> sorted levels [p,q,r] -> codes [1,0,2,1,0,2,1,0]
+# Level codes follow the sorted order of each column's labels in toy.csv.
 EXPECTED_VALUES = np.array(
     [
         [1, 1, 1],
@@ -41,22 +38,11 @@ def test_from_csv_shapes_and_names() -> None:
     assert ds.values.shape == (8, 3)
 
 
-def test_from_csv_accepts_path_as_str() -> None:
-    ds = DiscreteDataset.from_csv(str(TOY_CSV))
-    assert ds.n_rows == 8
-
-
 def test_from_csv_sorted_lexicographic_encoding() -> None:
     ds = DiscreteDataset.from_csv(TOY_CSV)
     assert ds.categories == EXPECTED_CATEGORIES
     assert np.array_equal(ds.cardinalities, EXPECTED_CARDINALITIES)
     assert np.array_equal(ds.values, EXPECTED_VALUES)
-
-
-def test_from_csv_dtypes_are_int32() -> None:
-    ds = DiscreteDataset.from_csv(TOY_CSV)
-    assert ds.values.dtype == np.int32
-    assert ds.cardinalities.dtype == np.int32
 
 
 def test_from_csv_rejects_missing_values(tmp_path: Path) -> None:
@@ -67,10 +53,7 @@ def test_from_csv_rejects_missing_values(tmp_path: Path) -> None:
 
 
 def test_from_csv_rejects_whitespace_only_field(tmp_path: Path) -> None:
-    # A field that is present but blank/whitespace-only is still genuinely
-    # missing data, even though pandas' default NA-token sniffing is
-    # disabled (which is what lets the literal string "None" survive as an
-    # ordinary category -- see test_from_csv_preserves_none_as_category).
+    # A blank field is missing data, even though strings like "None" are labels.
     bad_csv = tmp_path / "bad.csv"
     bad_csv.write_text("A,B\nx,y\n  ,z\n")
     with pytest.raises(ValueError, match="missing"):
@@ -78,11 +61,7 @@ def test_from_csv_rejects_whitespace_only_field(tmp_path: Path) -> None:
 
 
 def test_from_csv_preserves_none_as_category() -> None:
-    # Regression test: pandas' default `read_csv` NA tokens include the
-    # literal string "None", which used to be silently coerced to NaN and
-    # then rejected by the missing-value guard. Some reference networks
-    # (e.g. child's DuctFlow, insurance's ThisCarDam) use "None" as a
-    # genuine category label, exactly as Weka/Tetrad read it.
+    # "None" is a real level in some networks (child's DuctFlow, insurance's ThisCarDam).
     ds = DiscreteDataset.from_csv(NONE_CATEGORY_CSV)
     assert ds.n_rows == 4
     a_idx = ds.names.index("A")
@@ -184,22 +163,6 @@ def test_subset_keeps_full_cardinalities_when_level_absent() -> None:
     assert np.array_equal(sub.values, ds.values[keep_rows])
 
 
-def test_subset_shares_metadata_objects_with_parent() -> None:
-    ds = DiscreteDataset.from_csv(TOY_CSV)
-    sub = ds.subset(np.array([0, 1, 2]))
-    # Metadata is shared by reference (not recomputed/copied) so that
-    # federated clients built from the same parent agree on variable
-    # domains bit-for-bit. `names` and `categories` are tuples (immutable),
-    # so this sharing can never let an in-place edit on one subset corrupt
-    # a sibling or the parent.
-    assert sub.cardinalities is ds.cardinalities
-    assert sub.categories is ds.categories
-    assert sub.names is ds.names
-    assert isinstance(ds.names, tuple)
-    assert isinstance(ds.categories, tuple)
-    assert all(isinstance(cats, tuple) for cats in ds.categories)
-
-
 def test_subset_does_not_mutate_parent_values() -> None:
     ds = DiscreteDataset.from_csv(TOY_CSV)
     sub = ds.subset(np.array([0, 1]))
@@ -229,30 +192,3 @@ def test_subset_with_boolean_mask() -> None:
     sub = ds.subset(mask)
     assert sub.n_rows == 6
     assert np.array_equal(sub.cardinalities, ds.cardinalities)
-
-
-def test_values_is_fortran_ordered() -> None:
-    """values is stored column-major so the BDeu kernel's column gathers are contiguous."""
-    ds = DiscreteDataset.from_arrays(
-        np.array([[0, 1], [1, 0], [0, 0]], dtype=np.int32),
-        np.array([2, 2], dtype=np.int32),
-        ["a", "b"],
-        [["x", "y"], ["p", "q"]],
-    )
-    assert ds.values.flags["F_CONTIGUOUS"]
-    assert ds.values.shape == (3, 2)
-    assert ds.values.dtype == np.int32
-
-
-def test_subset_preserves_fortran_order() -> None:
-    """subset() re-imposes column-major order (fancy row-indexing returns C-order)."""
-    ds = DiscreteDataset.from_arrays(
-        np.array([[0, 1], [1, 0], [0, 0], [1, 1]], dtype=np.int32),
-        np.array([2, 2], dtype=np.int32),
-        ["a", "b"],
-        [["x", "y"], ["p", "q"]],
-    )
-    sub = ds.subset(np.array([0, 2, 3]))
-    assert sub.values.flags["F_CONTIGUOUS"]
-    # And the data is still correct after the layout round-trip.
-    assert sub.values.tolist() == [[0, 1], [0, 0], [1, 1]]

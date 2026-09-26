@@ -1,10 +1,10 @@
-"""Structural fusion of causal graphs learned across sites.
+"""Structural fusion of causal graphs learned across sites (Puerta et al., 2021).
 
-Implements the structural fusion (Puerta et al., Information Fusion
-2021): a consensus topological order (:func:`~fedcausal.fusion.alpha.alpha_order`),
-a minimal-I-map transform of each DAG into that order
-(:func:`~fedcausal.fusion.beta.beta_to_alpha`), and the union of the transformed
-parent sets (:func:`consensus_union`), plus four limited-budget post-filters.
+Every input is transformed into one consensus order
+(:func:`~fedcausal.fusion.alpha.alpha_order`,
+:func:`~fedcausal.fusion.beta.beta_to_alpha`) and the transformed parent sets
+are unioned (:func:`consensus_union`). The budgeted variants add only the most
+agreed edges; :func:`intersection_fusion` keeps only what every input shares.
 """
 
 from fedcausal.fusion.alpha import alpha_order

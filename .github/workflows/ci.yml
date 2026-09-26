@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Weekly, so a dependency release that breaks the suite shows up without a
+  # push to trigger it.
+  schedule:
+    - cron: "0 6 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,8 +18,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -34,8 +38,8 @@ jobs:
         python: ["3.10", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -46,24 +50,24 @@ jobs:
       - run: pytest -m "not bigdata" --tb=short
 
   accel:
-    name: numba fast path
+    name: search with numba and causal-learn
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      # The JIT path is byte-identical to the pure-Python one by design, and
-      # nothing else in CI would notice if that stopped being true.
-      - run: pip install -e ".[dev,accel]"
+      # The numba path must agree with the pure-Python one, and GES must not
+      # fall behind causal-learn's; nothing else in CI installs either.
+      - run: pip install -e ".[dev,accel,compare]"
       - run: pytest tests/search -m "not bigdata" --tb=short
 
   examples:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -71,7 +75,6 @@ jobs:
       - run: python examples/01_learn_structure.py
       - run: python examples/02_fedges_inprocess.py
       - run: python examples/03_fedrcd.py
-      - run: python benchmarks/pgm26/benchmark.py --mode main --quick --out /tmp/pgm26.jsonl
       # The README points people at this app, so a wiring mistake in it should
       # be a red build rather than something they discover.
       - run: python -c "import fedcausal_site.app"
@@ -80,8 +83,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
       - run: pip install build twine

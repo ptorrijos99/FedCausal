@@ -1,9 +1,4 @@
-"""The public API is importable and matches what the documentation tells people to write.
-
-Cheap guards against the two ways a published API rots: an ``__all__`` that
-names something no longer there, and documentation whose import lines stopped
-working.
-"""
+"""Every name in an ``__all__`` exists, and every import the docs show works."""
 
 from __future__ import annotations
 

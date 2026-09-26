@@ -1,17 +1,13 @@
-"""Regression solvers that turn a causal order into a weighted adjacency matrix.
+"""Coefficient estimates for a known causal order, from the covariance alone.
 
-Given a causal order (source to sink) and a covariance matrix, each variable's
-coefficients are obtained by regressing it on the variables that precede it in
-the order, restricted to the sufficient statistics already available: no raw
-data is needed, only the covariance. Two estimators are provided: plain OLS
-and an adaptive-Lasso variant that also shrinks small coefficients to zero.
+Each variable is regressed on the ones before it in the order, using only the
+aggregated covariance, so no data is needed. OLS, or an adaptive Lasso that
+also shrinks small coefficients to zero.
 
 References
 ----------
 [1] Zou, H. "The Adaptive Lasso and Its Oracle Properties." Journal of the
     American Statistical Association, 101(476), 2006.
-[2] Torrijos, P., et al. "Federated Causal Discovery via Regression-Directed
-    Cumulants." Probabilistic Graphical Models (PGM), 2026.
 """
 
 from __future__ import annotations
@@ -32,26 +28,21 @@ def estimate_b_from_cov(
     cov: npt.NDArray[np.float64],
     prune_thres: float = 0.0,
 ) -> npt.NDArray[np.float64]:
-    """Re-estimate adjacency matrix B by OLS from the original covariance.
+    """Estimate the coefficient matrix B by OLS.
 
     Parameters
     ----------
     causal_order : Sequence[int]
         Variable indices from source to sink.
     cov : numpy.ndarray
-        Global covariance matrix, shape ``(p, p)``.
+        Covariance matrix, shape ``(p, p)``.
     prune_thres : float
-        Smallest absolute value to keep in B.
+        Coefficients smaller than this in absolute value become zero.
 
     Returns
     -------
     numpy.ndarray
-        Estimated DAG adjacency matrix, shape ``(p, p)``.
-
-    References
-    ----------
-    [1] Zou, H. "The Adaptive Lasso and Its Oracle Properties." Journal of
-        the American Statistical Association, 101(476), 2006.
+        ``B[child, parent]``, shape ``(p, p)``.
     """
     p = cov.shape[0]
     b_est = np.zeros((p, p))
@@ -63,7 +54,7 @@ def estimate_b_from_cov(
         try:
             beta = np.linalg.solve(sigma_pp, sigma_pc)
         except np.linalg.LinAlgError:
-            # Handle near-singular covariance
+            # Singular covariance: fall back to least squares.
             beta = np.linalg.lstsq(sigma_pp, sigma_pc, rcond=None)[0]
         b_est[child, parents] = beta
 
@@ -80,37 +71,33 @@ def estimate_b_lasso_from_cov(
     prune_thres: float = 0.05,
     gamma: float = 1.0,
 ) -> npt.NDArray[np.float64]:
-    """Re-estimate B by Adaptive Lasso from the global covariance.
+    """Estimate the coefficient matrix B by adaptive Lasso.
 
     Parameters
     ----------
     causal_order : Sequence[int]
-        Topological order.
+        Variable indices from source to sink.
     cov : numpy.ndarray
-        Global covariance matrix, shape ``(p, p)``.
+        Covariance matrix, shape ``(p, p)``.
     n_samples : int
-        Total number of samples (used for BIC).
+        Total number of samples. Only ``"bic"`` uses it.
     lmbda_type : {"fixed", "bic"}
-        ``"fixed"`` for the 0.01 heuristic, ``"bic"`` for analytical selection.
+        ``"fixed"`` sets the penalty to 0.01 times the mean variance of the
+        parents; ``"bic"`` picks it from a grid of 20 by BIC.
     prune_thres : float
-        Final hard-threshold for zeros.
+        Coefficients smaller than this in absolute value become zero.
     gamma : float
-        Power parameter for adaptive weights.
+        Exponent of the adaptive weights.
 
     Returns
     -------
     numpy.ndarray
-        Estimated DAG adjacency matrix, shape ``(p, p)``.
+        ``B[child, parent]``, shape ``(p, p)``.
 
     Raises
     ------
     ValueError
         If `lmbda_type` is not ``"fixed"`` or ``"bic"``.
-
-    References
-    ----------
-    [1] Zou, H. "The Adaptive Lasso and Its Oracle Properties." Journal of
-        the American Statistical Association, 101(476), 2006.
     """
     p = cov.shape[0]
     b_est = np.zeros((p, p))
@@ -121,7 +108,7 @@ def estimate_b_lasso_from_cov(
         sigma_pc = cov[parents, child]
         sigma_cc = cov[child, child]
 
-        # 1. Compute OLS for adaptive weights
+        # OLS gives the adaptive weights.
         try:
             beta_ols = np.linalg.solve(sigma_pp, sigma_pc)
         except np.linalg.LinAlgError:
@@ -130,16 +117,13 @@ def estimate_b_lasso_from_cov(
         weights = 1.0 / (np.abs(beta_ols) ** gamma + 1e-10)
 
         if lmbda_type == "fixed":
-            # 2a. Fixed heuristic: proportional to average parent variance
             lmbda = float(0.01 * np.mean(np.diag(sigma_pp)))
             beta = _solve_lasso_cd(sigma_pp, sigma_pc, lmbda, weights)
         elif lmbda_type == "bic":
-            # 2b. BIC selection: search over a grid
             lmbda_max = np.max(np.abs(sigma_pc)) if len(sigma_pc) > 0 else 0
             if lmbda_max < 1e-12:
                 beta = np.zeros(len(parents))
             else:
-                # 20 points from 0.1% of max to max
                 lambdas = np.logspace(np.log10(lmbda_max * 1e-3), np.log10(lmbda_max), 20)
                 best_bic = np.inf
                 beta = np.zeros(len(parents))
@@ -147,7 +131,7 @@ def estimate_b_lasso_from_cov(
 
                 for lam in lambdas:
                     curr_beta = _solve_lasso_cd(sigma_pp, sigma_pc, float(lam), weights)
-                    # RSS/n = Var(y) - 2*beta*Sxy + beta*Sxx*beta
+                    # RSS / n from the covariance alone.
                     rss_n = (
                         sigma_cc
                         - 2 * curr_beta.dot(sigma_pc)
@@ -176,9 +160,9 @@ def _solve_lasso_cd(
     max_iter: int = 100,
     tol: float = 1e-5,
 ) -> npt.NDArray[np.float64]:
-    """Coordinate descent Lasso optimizer using only covariance statistics.
+    """Solve the weighted Lasso by coordinate descent, from covariances alone.
 
-    Solves ``min_beta 1/2 beta' Cxx beta - Cxy' beta + lambda |w * beta|``.
+    Minimises ``min_beta 1/2 beta' Cxx beta - Cxy' beta + lambda |w * beta|``.
 
     Parameters
     ----------
@@ -205,10 +189,8 @@ def _solve_lasso_cd(
     for _ in range(max_iter):
         beta_old = beta.copy()
         for j in range(q):
-            # Partial residual: r_j = y'x_j - sum_{k!=j} x_k'x_j * beta_k
             r_j = cxy[j] - (cxx[j, :].dot(beta) - cxx[j, j] * beta[j])
 
-            # Soft thresholding
             threshold = lmbda * weights[j]
             if r_j > threshold:
                 beta[j] = (r_j - threshold) / cxx[j, j]

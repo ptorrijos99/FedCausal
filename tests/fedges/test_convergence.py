@@ -55,3 +55,19 @@ def test_multiple_is_or_and_calls_all():
     assert c.check_convergence(a) is False  # neither converged (first round)
     # ScoreImprovement: no improvement (same mean) -> converged
     assert c.check_convergence(a) is True
+
+
+def test_iteration_equality_with_a_negative_window_remembers_every_round():
+    c = IterationEquality(-1)
+    first, second = [_m([(0, 1)])], [_m([(1, 2)])]
+    assert c.check_convergence(first) is False
+    assert c.check_convergence(second) is False
+    assert c.check_convergence(first) is True  # two rounds back
+
+
+def test_iteration_equality_forgets_rounds_outside_its_window():
+    c = IterationEquality(1)
+    first, second = [_m([(0, 1)])], [_m([(1, 2)])]
+    c.check_convergence(first)
+    c.check_convergence(second)
+    assert c.check_convergence(first) is False

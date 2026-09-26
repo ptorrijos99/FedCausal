@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "fedcausal: federated Bayesian network structure learning"
+title: "fedcausal: federated causal discovery"
 message: "If you use this software, please cite the FedGES paper below."
 type: software
 authors:
@@ -47,10 +47,8 @@ preferred-citation:
   url: "https://doi.org/10.1007/s10994-025-06939-2"
 
 references:
-  # The FedRCD paper. Author list beyond Torrijos, page numbers, volume, DOI,
-  # and URL are not yet known -- see the field-by-field note in the task-14
-  # report -- and are left out rather than guessed. Fill in once the PGM 2026
-  # camera-ready is out.
+  # The FedRCD paper. Pages, volume, DOI and URL are left out until the
+  # proceedings are published.
   - type: conference-paper
     title: "Federated Causal Discovery via Regression-Directed Cumulants"
     authors:

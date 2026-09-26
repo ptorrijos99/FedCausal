@@ -1,14 +1,8 @@
-"""Pin structural fusion against committed reference runs, by edge-set equality.
+"""Structural fusion matches the reference implementation's recorded runs.
 
-The reference (`fusion_runs.json`) is committed, so this test is
-self-contained.
-
-Every tie-robust output -- the consensus order, each minimal-I-map transform,
-the full union, and the frequency/percentage/parent-capped variants -- is
-asserted exactly. ``max_edges`` is a top-k cut through frequencies that tie,
-so Java (HashMap order) and fedcausal (lexicographic) legitimately pick
-different edges among equal-frequency ties; it is checked by cardinality and
-union-subset only. See the ``DumpFusion`` docstring.
+Everything is compared exactly except ``max_edges``, which cuts through
+frequency ties that the two implementations break differently; there only the
+edge count and membership of the union are checked.
 """
 
 from __future__ import annotations
@@ -19,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from fedcausal.fusion import consensus_pct, consensus_union, max_edges, max_frequency, max_parents
+from fedcausal.fusion import consensus_pct, consensus_union, max_edges, max_frequency
 from fedcausal.fusion.alpha import alpha_order
 from fedcausal.fusion.beta import beta_to_alpha
 from fedcausal.graph import DAG
@@ -46,13 +40,12 @@ def test_fusion_matches_java(sc: dict[str, Any]) -> None:
     for d, beta_edges in zip(dags, sc["betas"], strict=True):
         assert set(beta_to_alpha(d, alpha).edges()) == _edges(beta_edges, index)
 
-    # Full union and the threshold/cap variants: exact.
+    # Full union and the frequency and percentage variants: exact.
     union = _edges(sc["union"], index)
     assert set(consensus_union(dags).edges()) == union
     v = sc["variants"]
     assert set(max_frequency(dags, 2).edges()) == _edges(v["max_frequency_2"], index)
     assert set(consensus_pct(dags, 50).edges()) == _edges(v["consensus_50"], index)
-    assert set(max_parents(dags, 2).edges()) == _edges(v["max_parents_2"], index)
 
     # max_edges: same budget and a subset of the union; the specific edges among
     # frequency ties are not cross-language stable (Java uses HashMap order).

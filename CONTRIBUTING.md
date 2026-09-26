@@ -9,7 +9,7 @@ pip install -e ".[dev,flower]"
 pytest
 ```
 
-The suite is self-contained. No downloads, no environment variables, no JVM. Four xfails are expected and [Validation](docs/validation.md) explains why.
+The suite is self-contained. No downloads, no environment variables, no JVM.
 
 ## Before you open a pull request
 
@@ -23,11 +23,18 @@ CI runs the same three on Linux and Windows, on Python 3.10 and 3.13.
 
 ## What the tests are for
 
+A test states something a user could observe: a result, an error, a guarantee in the docs. It should fail only when that stops being true. So:
+
+- Assert behaviour through the public API, not private helpers, cache contents, memory layout or the order a loop happens to visit things.
+- Compare floating-point results to a tolerance, never bit for bit. The last few bits move between platforms, BLAS builds and libm versions.
+- Do not pin tie-breaks or values recorded from one run. If two answers are equally correct, the test must accept both.
+- Do not add a strict xfail to record a known difference. Assert the property that makes the difference acceptable, as `tests/regression/test_ges_reference.py` does.
+
 `tests/regression/` pins behaviour against committed reference outputs. If a change moves one of those numbers, that is the change telling you something. Do not update the golden file to match new output without understanding why it moved, and say so in the pull request when you do.
 
 Markers:
 
-- `slow` for anything over a few seconds. CI runs these on one matrix entry.
+- `slow` for anything over a few seconds. CI runs them; `-m "not slow"` skips them locally.
 - `regression` for the reference comparisons.
 - `bigdata` for tests needing networks too large to ship. They skip unless `FEDCAUSAL_NETWORKS` points at a directory holding them.
 

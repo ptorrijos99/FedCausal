@@ -1,16 +1,10 @@
 """Consensus-union fusion and its budgeted variants.
 
-The canonical fusion computes a consensus order
-(:func:`~fedcausal.fusion.alpha.alpha_order`), transforms every input into it
-(:func:`~fedcausal.fusion.beta.beta_to_alpha`), and unions the transformed
-parent sets. The result is acyclic by construction, since every transformed
-input shares the one order. The budgeted variants rank the transformed edges by
-cross-client frequency and add them under a cap.
-
-The genetic, MinCut, and treewidth-bounded fusion modes are not implemented.
-
-Ties in the frequency ranking break lexicographically by ``(child, parent)``,
-so the result does not depend on dictionary iteration order.
+The union transforms every input into one consensus order and unions the
+parent sets, so the result is acyclic by construction. The budgeted variants
+rank the transformed edges by how many inputs contain them and add them under
+a cap. Ties in that ranking break by ``(child, parent)``, so the result never
+depends on dictionary order.
 """
 
 from __future__ import annotations
@@ -67,9 +61,7 @@ def _transform_all(dags: Sequence[DAG]) -> tuple[list[int], list[DAG]]:
 def consensus_union(dags: Sequence[DAG]) -> DAG:
     """Return the full consensus union of `dags` (Puerta et al. 2021).
 
-    Every input is transformed to one shared consensus order, then all parent
-    sets are unioned; the result is acyclic because all transformed inputs
-    share that order.
+    The result is acyclic, since every transformed input shares one order.
 
     Parameters
     ----------
@@ -91,7 +83,7 @@ def consensus_union(dags: Sequence[DAG]) -> DAG:
     for child in range(out.num_nodes):
         for d in transformed:
             for parent in sorted(d.parents(child)):
-                out.add_edge(parent, child)  # no-op if already present
+                out.add_edge(parent, child)
     return out
 
 
@@ -133,9 +125,8 @@ def max_edges(dags: Sequence[DAG], limit: int | str = "Max") -> DAG:
     dags : Sequence[DAG]
         Input DAGs over the same node set.
     limit : int | str, optional
-        The budget: an int, or ``"Mean"``/``"Max"``/``"Min"`` of the
-        transformed inputs' edge counts (as in the original implementation). Default
-        ``"Max"``.
+        The budget: an int, or the ``"Mean"``, ``"Max"`` or ``"Min"`` of the
+        transformed inputs' edge counts. Default ``"Max"``.
 
     Returns
     -------
@@ -165,8 +156,7 @@ def max_frequency(dags: Sequence[DAG], limit: int) -> DAG:
 def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
     """Union every edge appearing in at least `percent`% of inputs.
 
-    The threshold is ``lim = percent * len(dags) // 100`` (truncating, exactly
-    as the original ``Consensus`` mode), then a frequency filter at ``lim``.
+    The threshold is ``percent * len(dags) // 100``, truncated.
 
     Parameters
     ----------
@@ -185,23 +175,11 @@ def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
 
 
 def max_parents(dags: Sequence[DAG], limit: int) -> DAG:
-    """Union edges in frequency order under the original (buggy) parent cap.
-
-    The operator intends to cap each node's in-degree at
-    `limit`,
-    but reads ``edge.getNode1()`` as the "child" whenever ``endpoint1`` is
-    ``TAIL`` -- which, for a ``TAIL -> ARROW`` arc ``a -> b``, is the *source*
-    ``a``. It therefore caps the **source's** parent count, not the target's.
-    This is a real bug in the Java implementation; it is replicated verbatim (not fixed) so this
-    fusion matches published results, and documented
-    so
-    the divergence from the intended semantics is on record.
-    """
+    """Union edges in frequency order, giving no node more than `limit` parents."""
     _alpha, transformed = _transform_all(dags)
     out = DAG(dags[0].num_nodes)
     for (parent, child), _count in edge_frequency(transformed):
-        # Caps the source's in-degree, not the target's, reproducing the original.
-        if len(out.parents(parent)) < limit:
+        if len(out.parents(child)) < limit:
             out.add_edge(parent, child)
     return out
 

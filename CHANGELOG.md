@@ -30,7 +30,7 @@ First public release.
 
 ### Graphs, data, and metrics
 
-- `DAG` and `PDAG`, Meek rules, DAG and CPDAG conversion, moralisation, maximum-cardinality triangulation, treewidth.
+- `DAG` and `PDAG`, Meek rules, DAG and CPDAG conversion, moralisation, maximum-cardinality triangulation, a treewidth bound.
 - `DiscreteDataset` over integer-coded categorical data, stored column-major so the score kernel's gathers are contiguous.
 - `ContinuousDataset` over real-valued data, the input format for `fedcausal.lingam`.
 - `contiguous_split` and `dirichlet_split` for simulated sites, generic over `DiscreteDataset` and `ContinuousDataset`.
@@ -41,6 +41,6 @@ First public release.
 
 - The FedRCD family, for continuous data under a linear non-Gaussian (LiNGAM) model: `fedrcd`, `fedrcd_noniterative`, and `fedrcd_exact` recover a causal order and coefficient matrix from cumulant statistics rather than raw rows. `fedrcd` and `fedrcd_noniterative` need one communication round; `fedrcd_exact` runs `p - 1` rounds of exact deflation to avoid the algebraic error the one-shot solvers can accumulate under finite samples. `ishc_beta` is a related third-order-only variant.
 - `compute_local_raw_stats` and `aggregate_and_compute_cumulants`: the client-side and server-side halves of the statistics exchange. Nine additive moment-sum arrays per client cross the network, never a row of data.
-- `fedishc`, `fedhc` (Chen et al.'s FedISHC baselines) and `hc_lingam`, `hc` (Chen et al.'s centralised HC-LiNGAM baselines), ported for comparison in the PGM 2026 benchmark.
+- `fedishc`, `fedhc` (Chen et al.'s FedISHC) and `hc_lingam`, `hc` (Chen et al.'s centralised HC-LiNGAM), for comparison against the FedRCD family.
 - Every solver is a pure function of the aggregated statistics, so `fedcausal.lingam` itself needs only numpy and scipy. Its Flower transport is `fedcausal.flower.lingam`, under the `flower` extra.
-- See [FedRCD](docs/fedrcd.md) and [`benchmarks/pgm26/`](benchmarks/pgm26/README.md).
+- See [FedRCD](docs/fedrcd.md).

@@ -1,46 +1,15 @@
-"""Sweep the BDeu structure prior to test whether it improves recovered structure.
+"""Sweep the BDeu structure prior and measure the structure it recovers.
 
-Motivation: in the cross-implementation benchmark, causal-learn recovers
-markedly better structures than ``fedcausal`` on the large dense networks
-(``win95pts`` SHD 38 vs 71, ``pathfinder`` 203 vs 233) while reaching a *worse*
-BDeu. causal-learn is the only one of the three whose search carries a
-structure-prior term; ``fedcausal`` and BayesFL both run with Tetrad's
-effective ``structure_prior=0.0``, i.e. no complexity penalty at all.
+One search (``fedcausal``'s), one dataset per cell, one variable:
+``structure_prior``. The prior is a flat per-parent penalty of about
+``log(e / vm)`` nats. ``--vm-mode`` picks ``vm``: the row count, as
+``BDeuScore`` uses, or the variable count, as causal-learn does.
 
-But causal-learn also differs in its search, so that comparison cannot
-attribute the gap to the prior. This script removes the confound: one search
-(``fedcausal``'s), one dataset, one variable -- ``structure_prior``.
-
-**The prior is already implemented.** ``BDeuScore._prior_term`` is a verbatim
-port of Tetrad's ``getPriorForStructure``::
-
-    num_parents*log(e/vm) + (vm - num_parents)*log(1 - e/vm)
-
-which is the same Bernoulli-over-parents form causal-learn uses. The two differ
-only in ``vm``: Tetrad passes the **row** count (``n_rows - 1``), causal-learn
-the **variable** count (``n_features - 1``). Since the term depends only on
-``num_parents``, it acts as a flat per-parent penalty of roughly
-``log(e/vm)`` nats, so Tetrad's much larger ``vm`` makes the same ``e`` a
-*stronger* penalty. ``--vm-mode`` selects between the two conventions so the
-question "does a structure prior help?" is not silently entangled with the
-question "which ``vm``?".
-
-**Scoring.** The search uses the swept prior, but the reported BDeu is always
-re-computed with ``structure_prior=0.0``. Scores from different priors are on
-different scales and cannot be ranked against each other; the fixed scorer
-makes the ``bdeu`` column comparable across rows, and SHD/SMHD are unaffected
-by the prior anyway.
-
-**Seeds.** Each ``(net, prior)`` cell is run over several of BayesFL's sampled
-datasets (``<net>.0.csv`` .. ``<net>.<k-1>.csv``) and reported as mean +/-
-standard deviation. GES is deterministic, so this is not repeat-measurement
-noise: it is the spread over datasets drawn from the same network, which is the
-only thing that can distinguish a prior that genuinely helps from one that
-happened to suit a single sample. A difference smaller than the spread is not
-a difference.
-
-Raw per-run records go to ``results/structure_prior_sweep.jsonl`` so the
-aggregation can be redone without re-running the searches.
+The reported BDeu is always recomputed with ``structure_prior=0.0``, since
+scores under different priors are on different scales; SHD and SMHD do not
+depend on the prior. Each cell runs over several sampled datasets and reports
+mean and standard deviation, since GES is deterministic and the spread comes
+from the data. Raw records go to ``results/structure_prior_sweep.jsonl``.
 
 Usage::
 
@@ -87,14 +56,7 @@ RUNNER = Path(__file__).resolve().parent / "runners" / "run_sweep_cell.py"
 
 
 class VarCountPrior(BDeuScore):
-    """``BDeuScore`` with causal-learn's ``vm``: the variable count, not rows.
-
-    Tetrad passes the row count as ``getPriorForStructure``'s ``N``, making
-    ``vm = n_rows - 1``. causal-learn uses ``vm = n_features - 1``. Both are the
-    same functional form; only the implied per-edge probability ``e/vm``
-    differs, and with it the penalty's strength. Subclassing keeps the ported
-    Tetrad path in :class:`BDeuScore` untouched and verbatim.
-    """
+    """``BDeuScore`` with ``vm`` set from the variable count, as causal-learn does."""
 
     def __init__(self, dataset, sample_prior=1.0, structure_prior=0.0, cache=True):  # noqa: ANN001, ANN204
         super().__init__(dataset, sample_prior, structure_prior, cache)

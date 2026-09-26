@@ -99,7 +99,7 @@ print(result.causal_order)  # a topological order over the recovered structure
 print(result.to_dag().edges())
 ```
 
-`fedrcd` and its one-shot siblings (`fedrcd_noniterative`, `ishc_beta`) need exactly one round of communication. `fedrcd_exact` trades `p - 1` rounds for exact deflation instead of an algebraic approximation, which matters when finite-sample noise would otherwise let error accumulate across deflation steps. See [FedRCD](docs/fedrcd.md) for the full family, what crosses the network, and the baselines it is compared against, and [`benchmarks/pgm26/`](benchmarks/pgm26/README.md) to reproduce the PGM 2026 results.
+`fedrcd` and its one-shot siblings (`fedrcd_noniterative`, `ishc_beta`) need exactly one round of communication. `fedrcd_exact` trades `p - 1` rounds for exact deflation instead of an algebraic approximation, which matters when finite-sample noise would otherwise let error accumulate across deflation steps. See [FedRCD](docs/fedrcd.md) for the full family, what crosses the network, and the other methods in the package.
 
 ## Documentation
 
@@ -122,7 +122,7 @@ The algorithm packages never import `flwr`. Adding a method means a package besi
 
 ```bash
 pip install -e ".[dev,flower]"
-pytest                    # 4 xfails are expected; see docs/validation.md
+pytest
 ruff check . && ruff format --check .
 mypy src
 ```
@@ -150,7 +150,7 @@ If you use fedcausal, cite the FedGES paper:
 
 `CITATION.cff` carries the same, so GitHub's "Cite this repository" button works.
 
-If you use FedRCD specifically, also cite the PGM paper it comes from:
+If you use FedRCD specifically, also cite the paper it comes from:
 
 > Torrijos, P., Stella, F., Gámez, J.A. & Puerta, J.M. Federated Causal Discovery via Regression-Directed Cumulants. Probabilistic Graphical Models (PGM), 2026.
 

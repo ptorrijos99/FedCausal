@@ -1,8 +1,4 @@
-"""Pin ``BDeuScore`` against committed reference local scores.
-
-Each golden file records the priors its scores were computed under, so the
-score object is configured from the file rather than from hardcoded values.
-"""
+"""BDeu local scores match committed reference values, under the priors each file records."""
 
 from __future__ import annotations
 

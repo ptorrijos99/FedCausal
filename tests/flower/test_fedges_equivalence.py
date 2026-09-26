@@ -1,12 +1,7 @@
-"""The Flower transport must reproduce the in-process engine round by round.
+"""FedGES over Flower gives the same models as the in-process loop, round by round.
 
-This is the project's strongest correctness claim, so it runs everywhere rather
-than only where Flower's Ray-based simulation engine installs: the loop is
-driven over a stub grid that routes messages to the real client handler
-in-process.
-
-When Ray *is* available, the same equivalence is checked once more through a
-genuine simulation, which additionally exercises Flower's own serialization.
+The main check runs over `StubGrid`, so everywhere; with Ray installed it runs
+once more through a real simulation.
 """
 
 from __future__ import annotations

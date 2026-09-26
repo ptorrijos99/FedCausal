@@ -1,14 +1,7 @@
-"""Undirected graph utilities: moralization, triangulation, cliques, treewidth.
+"""Moralization, triangulation, maximal cliques and treewidth.
 
-The junction-tree helpers follow Tetrad
-(``org.albacete.simd.utils.Utils``): moralizing a DAG into an undirected moral
-graph, triangulating it via maximum cardinality search (MCS) and the Tarjan
-and Yannakakis (1984) fill-in algorithm, extracting its maximal cliques, and
-computing treewidth from those cliques.
-
-All undirected graphs here are represented as symmetric, hollow (zero
-diagonal) boolean adjacency matrices (``np.ndarray``), consistent with
-:class:`fedcausal.graph.dag.DAG`'s ``adjacency()`` convention.
+Undirected graphs are symmetric boolean adjacency matrices with an empty
+diagonal.
 """
 
 from __future__ import annotations
@@ -25,7 +18,6 @@ __all__ = [
     "mcs_order",
     "fill_in",
     "maximal_cliques",
-    "treewidth_java",
     "treewidth",
 ]
 
@@ -33,10 +25,8 @@ __all__ = [
 def moralize(dag: DAG) -> np.ndarray:
     """Moralize a DAG into an undirected moral graph.
 
-    The moral graph consists of the DAG's skeleton (every directed edge
-    becomes undirected) plus an edge between every pair of nodes that share
-    a common child (i.e. every pair of co-parents), mirroring Tetrad
-    reference's ``Utils.moralize``.
+    The moral graph is the skeleton plus an edge between every two parents of
+    a common child.
 
     Parameters
     ----------
@@ -64,11 +54,8 @@ def moralize(dag: DAG) -> np.ndarray:
 def mcs_order(adj: np.ndarray) -> list[int]:
     """Compute a maximum cardinality search (MCS) ordering.
 
-    Repeatedly selects the unnumbered node adjacent to the most already
-    numbered nodes, breaking ties by choosing the lowest node index. This
-    mirrors Tetrad's ``Utils.getMaximumCardinalityOrdering``,
-    made deterministic per the task's tie-breaking convention (Tetrad
-    priority-queue implementation does not guarantee a specific tie order).
+    Repeatedly picks the unnumbered node adjacent to the most numbered ones,
+    breaking ties by lowest index.
 
     Parameters
     ----------
@@ -102,10 +89,8 @@ def mcs_order(adj: np.ndarray) -> list[int]:
 def fill_in(adj: np.ndarray, order: list[int]) -> np.ndarray:
     """Triangulate a graph using the Tarjan and Yannakakis (1984) fill-in.
 
-    Processes nodes in reverse of `order`. For each node `v`, the set of its
-    neighbours that appear earlier in `order` is computed, and every
-    non-adjacent pair within that set is connected ("filled in"). This
-    mirrors Tetrad's ``Utils.fillIn``.
+    Visits nodes in reverse `order` and connects every two neighbours of the
+    current node that come earlier in `order`.
 
     Parameters
     ----------
@@ -140,13 +125,8 @@ def fill_in(adj: np.ndarray, order: list[int]) -> np.ndarray:
 def maximal_cliques(adj: np.ndarray, order: list[int]) -> list[frozenset[int]]:
     """Extract the maximal cliques of a chordal graph.
 
-    For each node `v` (processed in reverse of `order`), a candidate clique
-    is formed from `v` plus every neighbour of `v` that appears earlier in
-    `order`. On a chordal graph (e.g. the output of :func:`fill_in` with a
-    matching ordering), these candidates are exactly the graph's cliques;
-    candidates that are subsets of another candidate are discarded, leaving
-    only the maximal cliques. This mirrors Tetrad's
-    ``Utils.getCliques``.
+    Each node together with its neighbours earlier in `order` is a clique of a
+    chordal graph; the ones contained in another are dropped.
 
     Parameters
     ----------
@@ -174,8 +154,6 @@ def maximal_cliques(adj: np.ndarray, order: list[int]) -> list[frozenset[int]]:
                 clique.add(w)
         candidates.append(frozenset(clique))
 
-    # Sort by size descending; Python's sort is stable, so ties keep their
-    # original (reverse-MCS) relative order.
     candidates.sort(key=len, reverse=True)
 
     kept: list[frozenset[int] | None] = list(candidates)
@@ -191,52 +169,24 @@ def maximal_cliques(adj: np.ndarray, order: list[int]) -> list[frozenset[int]]:
     return [c for c in kept if c is not None]
 
 
-def treewidth_java(dag: DAG) -> int:
-    """Compute the treewidth of a DAG's moral graph, reference-style.
+def treewidth(dag: DAG) -> int:
+    """Return an upper bound on the treewidth of `dag`'s moral graph.
 
-    Moralizes `dag`, triangulates the moral graph (MCS ordering followed by
-    fill-in), recomputes an MCS ordering on the triangulated graph, and
-    returns the size of its largest maximal clique. This mirrors Tetrad
-    reference's ``Utils.getTreeWidth`` **exactly**, including its
-    off-by-one convention: it returns the maximum clique **size**, not
-    ``size - 1``. Use :func:`treewidth` for the standard graph-theoretic
-    definition.
+    The moral graph is triangulated by maximum cardinality search and fill-in,
+    and the bound is the size of its largest clique minus one. It is exact
+    whenever the moral graph is already chordal.
 
     Parameters
     ----------
     dag : DAG
-        The directed acyclic graph whose moral graph's treewidth is sought.
+        The graph whose moral graph is measured.
 
     Returns
     -------
     int
-        The size (node count) of the largest maximal clique in the
-        triangulated moral graph, or ``0`` if `dag` has no nodes.
+        The bound; ``0`` for a graph with no edges.
     """
     moral = moralize(dag)
-    order = mcs_order(moral)
-    triangulated = fill_in(moral, order)
-    order2 = mcs_order(triangulated)
-    cliques = maximal_cliques(triangulated, order2)
-    return max((len(c) for c in cliques), default=0)
-
-
-def treewidth(dag: DAG) -> int:
-    """Compute the treewidth of a DAG's moral graph.
-
-    Standard graph-theoretic treewidth: the size of the largest maximal
-    clique in a triangulation of the moral graph, minus one. This is
-    :func:`treewidth_java` minus one; see that function's docstring for the
-    fidelity rationale behind the two variants.
-
-    Parameters
-    ----------
-    dag : DAG
-        The directed acyclic graph whose moral graph's treewidth is sought.
-
-    Returns
-    -------
-    int
-        The standard treewidth (``treewidth_java(dag) - 1``).
-    """
-    return treewidth_java(dag) - 1
+    triangulated = fill_in(moral, mcs_order(moral))
+    cliques = maximal_cliques(triangulated, mcs_order(triangulated))
+    return max((len(c) for c in cliques), default=1) - 1

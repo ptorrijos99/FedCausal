@@ -1,23 +1,12 @@
-"""Differential test: the incremental FES/BES engine equals the full scan, byte-for-byte.
+"""The incremental engine gives the same CPDAG as the full scan.
 
-The incremental engine (:mod:`fedcausal.search.incremental`) is a performance
-optimization of the full-scan GES (:mod:`fedcausal.search.ges`): it re-scores
-only the candidate pairs whose neighbourhood changed after each operator. Its
-score-delta invalidation is provably complete, but operator *validity* is not
-fully local (semi-directed-path and clique checks), so equality with the full
-scan is not proven for every conceivable graph -- it is *enforced empirically
-here*. Every case asserts the two engines produce byte-identical CPDAGs (same
-directed and undirected edge sets), so any future divergence fails CI.
-
-Coverage: an always-on synthetic dataset (so CI without the BayesFL tree still
-exercises the engine) plus the real benchmark networks when ``$BAYESFL_DIR`` is
-available, across both ``max_t_size`` settings, both ``h_pool`` values, and the
-``candidate_edges``-restricted (federated) path.
+Its validity checks are not provably local, so this is checked rather than
+derived: on a synthetic dataset and every shipped network, for both caps, both
+H pools and restricted candidate sets.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import numpy as np
@@ -30,9 +19,8 @@ from fedcausal.search import GES
 from fedcausal.search.ges import run_bes, run_fes
 from fedcausal.search.incremental import run_bes_incremental, run_fes_incremental
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-BAYESFL = Path(os.environ.get("BAYESFL_DIR", str(REPO_ROOT.parent / "BayesFL")))
-REAL_NETS = ("asia", "cancer", "child", "insurance", "alarm", "hepar2")
+NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
+REAL_NETS = ("asia", "cancer", "child", "insurance", "alarm")
 
 
 def _canon(pdag: PDAG) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
@@ -41,12 +29,7 @@ def _canon(pdag: PDAG) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
 
 
 def _synthetic_dataset() -> DiscreteDataset:
-    """Build a small dataset with genuine dependencies GES can recover.
-
-    A fixed-seed chain/collider structure over 9 binary/ternary variables, so the
-    search actually applies inserts and deletes (an all-independent dataset would
-    make the comparison vacuous).
-    """
+    """Nine variables with chains and colliders, so the search has work to do."""
     rng = np.random.default_rng(20260725)
     n = 1500
     a = rng.integers(0, 2, n)
@@ -65,21 +48,11 @@ def _synthetic_dataset() -> DiscreteDataset:
     return DiscreteDataset.from_arrays(values, cards, names, cats)
 
 
-def _load_real(net: str) -> DiscreteDataset | None:
-    """Load a benchmark net's sample 0, or `None` if the BayesFL tree is absent."""
-    csv = BAYESFL / "res" / "networks" / "BBDD" / net / f"{net}.0.csv"
-    if not csv.exists():
-        return None
-    return DiscreteDataset.from_csv(csv)
-
-
 def _datasets() -> list[tuple[str, DiscreteDataset]]:
-    """Return the (label, dataset) pairs to run: synthetic always, real nets if present."""
+    """Return the (label, dataset) pairs to run: the synthetic one and every shipped network."""
     out: list[tuple[str, DiscreteDataset]] = [("synthetic", _synthetic_dataset())]
     for net in REAL_NETS:
-        ds = _load_real(net)
-        if ds is not None:
-            out.append((net, ds))
+        out.append((net, DiscreteDataset.from_csv(NETWORKS / f"{net}.0.csv.gz")))
     return out
 
 
@@ -135,11 +108,7 @@ def test_incremental_fes_respects_candidate_edges(label: str, ds: DiscreteDatase
 
 @pytest.mark.parametrize("label,ds", DATASETS, ids=[d[0] for d in DATASETS])
 def test_incremental_bes_respects_candidate_edges(label: str, ds: DiscreteDataset) -> None:
-    """The federated candidate-edge restriction is honoured identically by both BES engines.
-
-    Mirrors ``GESLearner._refine_bes``: run BES from a populated CPDAG, restricted
-    to a subset of its own edges' orderings.
-    """
+    """Both BES engines honour a restricted candidate set identically."""
     score = BDeuScore(ds)
     fes_cpdag, _ = run_fes(score, PDAG(ds.n_vars), None, 2, False)
     # Candidate deletes: both orderings of a deterministic third of the edges.

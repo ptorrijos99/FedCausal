@@ -1,33 +1,22 @@
-"""Measure what BayesFL's two FES bounds buy in time and cost in quality.
+"""Measure what the two optional FES bounds save in time and cost in quality.
 
-The cross-implementation benchmark left one question open. BayesFL's GES is
-consistently faster than ``fedcausal``'s -- 39x on hailfinder (0.63s vs 24.8s),
-6x on diabetes -- and the phase-2 profile attributed the whole gap to FES's
-exhaustive ``T`` enumeration, which is exponential in neighbourhood width.
-BayesFL bounds that loop two ways. Do those bounds buy their speed for free,
-or do they pay for it in recovered structure?
-
-The two bounds are measured **separately**, because they are separate
-mechanisms with different costs (see ``fedcausal.search.ges``):
+The exhaustive forward phase enumerates every subset ``T``, which is
+exponential in neighbourhood width. The configurations, in ``run_bounds_cell``:
 
 ===============  =========================================================
-``cap1/2/3``     ``|T| <= k``. On the five golden networks this changed no
-                 result at all, so it is the candidate speed lever.
-``gate``         The ``T = {}`` pre-gate. On ``child`` this alone
-                 reproduces Java's worse optimum exactly, so it is the
-                 candidate quality cost.
-``java``         Both together, i.e. BayesFL's actual configuration.
+``exhaustive``   No bound: Chickering (2002).
+``cap1/2/3``     ``|T| <= k``. ``cap2`` is the library's default.
+``gate``         The ``T = {}`` pre-gate alone.
+``java``         Both, as the original Java implementation runs.
 ===============  =========================================================
 
-Every configuration is scored by the same ``BDeuScore`` on the same data, so
-the ``bdeu`` column is directly comparable across rows. A bound can only
-remove candidates from the scan, so no bounded row should ever beat
-``exhaustive``; a row that does indicates a bug, not a better search.
+Every configuration is scored with the same ``BDeuScore`` on the same data, so
+the ``bdeu`` column compares across rows. A bound only removes candidates, so a
+bounded row that beats ``exhaustive`` means a bug.
 
-Seeds are BayesFL's sampled datasets. They matter here more than anywhere
-else in this repo: ``pathfinder`` sample 0 finishes in 22s and sample 3 has
-not finished in over two hours, so a single-sample timing claim about the
-unbounded search would be meaningless.
+Each network is run over several sampled datasets, because runtimes vary a
+lot between them: one ``pathfinder`` sample finishes in 22s, another did not
+finish in two hours.
 
 Usage::
 
@@ -52,10 +41,8 @@ from compare_ges import networks_dir  # noqa: E402
 from run_bounds_cell import CONFIGS  # noqa: E402
 from sweep_structure_prior import spread  # noqa: E402
 
-# hailfinder and pathfinder are the point of this benchmark: the first is
-# where BayesFL's 39x lead was measured, the second is where the unbounded
-# search failed to terminate. The rest give a quality baseline on networks
-# where all three implementations agreed.
+# hailfinder and pathfinder are where the exhaustive search is slowest; the rest
+# give a quality baseline.
 NETS: tuple[str, ...] = (
     "child",
     "insurance",

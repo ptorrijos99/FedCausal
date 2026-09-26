@@ -1,16 +1,8 @@
-"""In-process test doubles shared by every transport suite.
+"""In-process doubles for the transport tests, so they run without Ray.
 
-Flower's simulation engine needs Ray, which is not installable everywhere, so
-the transport tests drive the server loops against `StubGrid`, a fake ``Grid``
-that routes each message straight to a client handler in-process. It keeps one
-`Context` per node and reuses it across `send_and_receive` calls, so client-side
-state persists between rounds exactly as it would over a real transport. That
-also makes the failure cases easy to set up, which they are not through a real
-simulation.
-
-Not a test module itself (no `test_` prefix), so pytest does not collect it.
-Importing it needs `flwr`; every suite that imports it calls
-`pytest.importorskip("flwr")` first.
+`StubGrid` stands in for a Flower ``Grid``: it hands each message straight to
+the real client handler and keeps one `Context` per node across rounds, as a
+real transport would.
 """
 
 from __future__ import annotations
@@ -32,20 +24,16 @@ class StubGrid:
     Parameters
     ----------
     handler : Callable
-        The per-message handler to route to, already bound to whatever
-        algorithm-specific arguments it needs beyond ``(msg, context, loader)``.
+        The client handler, called as ``handler(msg, context, loader)``.
     loaders : Sequence
         One partition loader per supernode.
     fail_nodes : set[int], optional
-        Node indices whose replies come back carrying an error.
+        Nodes whose replies carry an error.
 
     Attributes
     ----------
     call_count : int
-        How many `send_and_receive` calls have happened, which is the number of
-        round trips the protocol under test actually performed. A loop running
-        one round too many changes this even when it does not change the final
-        answer, so tests can assert on it directly.
+        How many round trips the protocol made.
     """
 
     def __init__(
@@ -114,14 +102,10 @@ def continuous_chain(seed: int, n: int = 6000, n_vars: int = 4) -> ContinuousDat
 
 
 def permuted_continuous_chain(seed: int, perm: Sequence[int], n: int = 6000) -> ContinuousDataset:
-    """The same chain as `continuous_chain`, with its columns permuted.
+    """The chain of `continuous_chain`, with its columns permuted.
 
-    `continuous_chain` numbers its variables in causal order, which is a
-    dangerous coincidence for FedRCD-Exact: `remaining_local` and
-    `active_global` both preserve ascending order on every column drop, so the
-    identified source is always 0 at every round. A client that drops a
-    hard-coded column instead of the one the server named would be
-    indistinguishable from a correct one. Permuting breaks the coincidence.
+    In causal order the source is always column 0, so a client that drops the
+    wrong column would go unnoticed; permuting makes it matter.
     """
     n_vars = len(perm)
     base = continuous_chain(seed, n=n, n_vars=n_vars)

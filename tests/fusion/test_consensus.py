@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from fedcausal.fusion import ConsensusUnion, consensus_union
+from fedcausal.fusion import consensus_union
 from fedcausal.graph import DAG
 
 
@@ -42,13 +42,6 @@ def test_union_is_acyclic_on_conflicting_orientations() -> None:
     out = consensus_union([d1, d2])
     assert _is_acyclic(out)
     assert 1 in out.adjacent(0)
-
-
-def test_operator_matches_function() -> None:
-    """The ``ConsensusUnion`` operator equals the free function."""
-    d1 = DAG.from_edges(3, [(0, 1), (1, 2)])
-    d2 = DAG.from_edges(3, [(0, 2)])
-    assert set(ConsensusUnion().fuse([d1, d2]).edges()) == set(consensus_union([d1, d2]).edges())
 
 
 def test_empty_input_raises() -> None:

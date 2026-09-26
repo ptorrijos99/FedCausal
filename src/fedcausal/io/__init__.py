@@ -1,4 +1,4 @@
-"""Input/output utilities for graphs and datasets."""
+"""Reading Bayesian networks and sampling data from them."""
 
 from __future__ import annotations
 
