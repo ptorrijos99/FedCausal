@@ -1,11 +1,10 @@
 """Unbiased third- and fourth-order cumulants, computable across sites.
 
-Each site reduces its rows to additive moment sums
-(:func:`compute_local_raw_stats`); the server adds them up, centres them on the
-pooled mean and applies the k-statistic bias corrections
+Each site reduces its rows to moment sums about its own mean
+(:func:`compute_local_raw_stats`); the server merges them exactly into sums
+about the pooled mean and applies the k-statistic bias corrections
 (:func:`aggregate_and_compute_cumulants`). The result equals what the pooled
-data would give. The ``unbiased_*`` and ``cross_cumulants*`` functions compute
-the same estimators directly from vectors.
+data would give.
 
 References
 ----------
@@ -22,7 +21,6 @@ References
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -36,13 +34,9 @@ __all__ = [
     "RawStats",
     "aggregate_and_compute_cumulants",
     "compute_local_raw_stats",
-    "cross_cumulants3",
-    "cross_cumulants4",
-    "unbiased_cumulant3",
-    "unbiased_cumulant4",
 ]
 
-#: Raw, additive moment sums produced by :func:`compute_local_raw_stats`.
+#: A site's centred moment sums, produced by :func:`compute_local_raw_stats`.
 RawStats = dict[str, Any]
 
 #: Unbiased cumulant estimates produced by :func:`aggregate_and_compute_cumulants`.
@@ -63,9 +57,17 @@ def _n_samples(stats: Cumulants) -> int:
 # Moment sums, computed by each site
 # ═══════════════════════════════════════════════════════════════════════════
 
+_KEYS_3RD = ("n", "mean", "m11", "m21")
+_KEYS_4TH = (*_KEYS_3RD, "m31", "m22")
+
 
 def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawStats:
-    """Return the moment sums of `x`, which add up across disjoint sets of rows.
+    """Return the moment sums of `x`, centred on its own mean.
+
+    The server merges sums centred on each site's mean exactly, and they stay
+    accurate wherever the data are located; raw power sums lose every
+    significant digit once the mean is a few thousand standard deviations away
+    from zero.
 
     Parameters
     ----------
@@ -77,84 +79,31 @@ def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawSt
     Returns
     -------
     dict
-        Always present:
+        With ``c = x - mean``:
 
         - ``n`` : int -- sample count.
-        - ``sum_x`` : ``(p,)`` -- Σ xᵢ.
-        - ``sum_xx`` : ``(p, p)`` -- Σ xᵢ xⱼ (includes diagonal).
-        - ``sum_x3`` : ``(p,)`` -- Σ xᵢ³.
-        - ``sum_x1y2`` : ``(p, p)`` -- Σ xᵢ xⱼ² (``i != j``; diagonal is zero).
-        - ``sum_x2y1`` : ``(p, p)`` -- Σ xᵢ² xⱼ (``i != j``; diagonal is zero).
+        - ``mean`` : ``(p,)`` -- column means.
+        - ``m11`` : ``(p, p)`` -- Σ cᵢ cⱼ.
+        - ``m21`` : ``(p, p)`` -- Σ cᵢ² cⱼ; its diagonal is Σ cᵢ³.
 
-        When ``order >= 4``, also:
+        When ``order`` is 4, also:
 
-        - ``sum_x4`` : ``(p,)`` -- Σ xᵢ⁴.
-        - ``sum_x1y3`` : ``(p, p)`` -- Σ xᵢ xⱼ³.
-        - ``sum_x3y1`` : ``(p, p)`` -- Σ xᵢ³ xⱼ.
-        - ``sum_x2y2`` : ``(p, p)`` -- Σ xᵢ² xⱼ².
+        - ``m31`` : ``(p, p)`` -- Σ cᵢ³ cⱼ; its diagonal is Σ cᵢ⁴.
+        - ``m22`` : ``(p, p)`` -- Σ cᵢ² cⱼ².
     """
-    x = np.asarray(x, dtype=float)
-    n, p = x.shape
-
-    # --- 1st / 2nd order ---
-    sum_x = np.sum(x, axis=0)  # (p,)
-    sum_xx = x.T @ x  # (p, p)
-
-    # --- Pre-compute element-wise powers ---
-    x2 = x**2
-
-    # --- 3rd order ---
-    sum_x3 = np.sum(x2 * x, axis=0)  # (p,)  — xᵢ³ = xᵢ² · xᵢ
-    sum_x1y2 = np.zeros((p, p))
-    sum_x2y1 = np.zeros((p, p))
-
-    for i in range(p):
-        xi, xi2 = x[:, i], x2[:, i]
-        for j in range(p):
-            if i == j:
-                continue
-            xj2 = x2[:, j]
-            sum_x1y2[i, j] = xi @ xj2  # Σ xᵢ xⱼ²
-            sum_x2y1[i, j] = xi2 @ x[:, j]  # Σ xᵢ² xⱼ
-
-    stats: RawStats = {
-        "n": n,
-        "sum_x": sum_x,
-        "sum_xx": sum_xx,
-        "sum_x3": sum_x3,
-        "sum_x1y2": sum_x1y2,
-        "sum_x2y1": sum_x2y1,
-    }
-
-    if order < 4:
-        return stats
-
-    # --- 4th order ---
-    x3 = x2 * x
-    sum_x4 = np.sum(x2**2, axis=0)  # (p,)
-    sum_x1y3 = np.zeros((p, p))
-    sum_x3y1 = np.zeros((p, p))
-    sum_x2y2 = np.zeros((p, p))
-
-    for i in range(p):
-        xi, xi2, xi3 = x[:, i], x2[:, i], x3[:, i]
-        for j in range(p):
-            if i == j:
-                continue
-            xj, xj2, xj3 = x[:, j], x2[:, j], x3[:, j]
-            sum_x1y3[i, j] = xi @ xj3  # Σ xᵢ xⱼ³
-            sum_x3y1[i, j] = xi3 @ xj  # Σ xᵢ³ xⱼ
-            sum_x2y2[i, j] = xi2 @ xj2  # Σ xᵢ² xⱼ²
-
-    stats.update(
-        {
-            "sum_x4": sum_x4,
-            "sum_x1y3": sum_x1y3,
-            "sum_x3y1": sum_x3y1,
-            "sum_x2y2": sum_x2y2,
-        }
-    )
-
+    if order not in (3, 4):
+        raise ValueError(f"order must be 3 or 4, got {order!r}")
+    x = np.asarray(x, dtype=np.float64)
+    if x.ndim != 2:
+        raise ValueError(f"x must be a 2-D array, got shape {x.shape}")
+    n = x.shape[0]
+    mean = x.mean(axis=0) if n else np.zeros(x.shape[1])
+    c = x - mean
+    c2 = c * c
+    stats: RawStats = {"n": n, "mean": mean, "m11": c.T @ c, "m21": c2.T @ c}
+    if order == 4:
+        stats["m31"] = (c2 * c).T @ c
+        stats["m22"] = c2.T @ c2
     return stats
 
 
@@ -163,14 +112,70 @@ def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawSt
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+def _merge(client_stats: Sequence[RawStats]) -> RawStats:
+    """Merge the sites' centred moment sums into sums about the pooled mean.
+
+    A site's sums move from its own mean to the pooled one by the binomial
+    expansion of ``(cᵢ + dᵢ)^a (cⱼ + dⱼ)^b``, with ``d`` the shift.
+    """
+    keys = set(client_stats[0])
+    if keys not in (set(_KEYS_3RD), set(_KEYS_4TH)):
+        raise ValueError(f"unrecognised moment sums with keys {sorted(keys)}")
+    if any(set(s) != keys for s in client_stats):
+        raise ValueError("every site must send moment sums of the same order")
+    p = len(client_stats[0]["mean"])
+    if any(len(s["mean"]) != p for s in client_stats):
+        raise ValueError("every site must send moment sums over the same variables")
+    fourth = "m31" in keys
+
+    n = sum(int(s["n"]) for s in client_stats)
+    mean = np.zeros(p)
+    for s in client_stats:
+        mean += int(s["n"]) * np.asarray(s["mean"], dtype=np.float64)
+    mean /= max(n, 1)
+    m11 = np.zeros((p, p))
+    m21 = np.zeros((p, p))
+    m31 = np.zeros((p, p))
+    m22 = np.zeros((p, p))
+    for s in client_stats:
+        k = int(s["n"])
+        if k == 0:
+            continue
+        d = np.asarray(s["mean"]) - mean
+        di, dj = d[:, None], d[None, :]
+        a11 = np.asarray(s["m11"])
+        a21 = np.asarray(s["m21"])
+        s2i, s2j = np.diag(a11)[:, None], np.diag(a11)[None, :]
+        m11 += a11 + k * di * dj
+        m21 += a21 + 2 * di * a11 + dj * s2i + k * di**2 * dj
+        if not fourth:
+            continue
+        a31 = np.asarray(s["m31"])
+        s3i = np.diag(a21)[:, None]
+        m31 += a31 + 3 * di * a21 + dj * s3i + 3 * di**2 * a11 + 3 * di * dj * s2i + k * di**3 * dj
+        m22 += (
+            np.asarray(s["m22"])
+            + 2 * dj * a21
+            + 2 * di * a21.T
+            + dj**2 * s2i
+            + di**2 * s2j
+            + 4 * di * dj * a11
+            + k * di**2 * dj**2
+        )
+    merged: RawStats = {"n": n, "mean": mean, "m11": m11, "m21": m21}
+    if fourth:
+        merged.update({"m31": m31, "m22": m22})
+    return merged
+
+
 def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulants:
-    """Aggregate raw moment sums from multiple clients into global cumulants.
+    """Merge the sites' moment sums and return the pooled covariance and cumulants.
 
     Parameters
     ----------
     client_stats : Sequence[dict]
-        :func:`compute_local_raw_stats` of each site, all over the same
-        variables.
+        :func:`compute_local_raw_stats` of each site, all of the same order and
+        over the same variables.
 
     Returns
     -------
@@ -181,7 +186,7 @@ def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulan
         - ``c12`` : ``(p, p)`` -- C₁,₂(xᵢ, xⱼ) = Cum(xᵢ, xⱼ, xⱼ).
         - ``c21`` : ``(p, p)`` -- C₂,₁(xᵢ, xⱼ) = Cum(xᵢ, xᵢ, xⱼ).
 
-        When 4th-order stats are available, also:
+        When the sums are of order 4, also:
 
         - ``c4`` : ``(p,)`` -- C₄(xᵢ).
         - ``c13`` : ``(p, p)`` -- C₁,₃(xᵢ, xⱼ) = Cum(xᵢ, xⱼ, xⱼ, xⱼ).
@@ -190,418 +195,47 @@ def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulan
 
         An empty dict when `client_stats` is empty.
 
+    Raises
+    ------
+    ValueError
+        If the sites sent sums of different orders or over different numbers
+        of variables, or hold fewer rows in total than the order needs.
+
     Notes
     -----
-    Bias correction follows the k-statistic formulas [2]_:
+    The bias corrections are the k-statistics of Schefczik and Hägele, with
+    Mₖ the sum of k-th powers about the pooled mean:
 
     - 3rd order: k₃ = N / ((N-1)(N-2)) · M₃.
     - 4th order: k₄ = [N(N+1) M₄ - 3(N-1) M₂²] / [(N-1)(N-2)(N-3)].
-
-    where Mₖ denotes the sum of k-th centered powers.
     """
     if not client_stats:
         return {}
+    merged = _merge(client_stats)
+    n = merged["n"]
+    fourth = "m31" in merged
+    needed = _MIN_SAMPLES_4TH if fourth else _MIN_SAMPLES_3RD
+    if n < needed:
+        raise ValueError(
+            f"the sites hold {n} rows in total; cumulants of this order need at least {needed}"
+        )
 
-    p = len(client_stats[0]["sum_x"])
-    has_4th = "sum_x4" in client_stats[0]
-
-    # ── Step 1: Sum all raw statistics across clients ──────────────────
-    totals = _aggregate_raw_stats(client_stats, p, has_4th)
-
-    n = totals["n"]
-    mu = totals["sum_x"] / n
-
-    # ── Step 2: Sample covariance ──────────────────────────────────────
-    cov = (totals["sum_xx"] - n * np.outer(mu, mu)) / max(n - 1, 1)
-
-    # ── Step 3: 3rd-order cumulants ───────────────────────────────────
-    c3, c12, c21 = _compute_3rd_order(totals, mu, n, p)
-
+    m11, m21 = merged["m11"], merged["m21"]
+    c21 = n / ((n - 1) * (n - 2)) * m21
     result: Cumulants = {
         "n": n,
-        "cov": cov,
-        "c3": c3,
-        "c12": c12,
+        "cov": m11 / (n - 1),
+        "c3": np.diag(c21).copy(),
+        "c12": c21.T.copy(),
         "c21": c21,
     }
-
-    if not has_4th:
+    if not fourth:
         return result
 
-    # ── Step 4: 4th-order cumulants ───────────────────────────────────
-    c4, c13, c31, c22 = _compute_4th_order(totals, mu, n, p)
-
-    result.update({"c4": c4, "c13": c13, "c31": c31, "c22": c22})
-    return result
-
-
-def _aggregate_raw_stats(stats_list: Sequence[RawStats], p: int, has_4th: bool) -> RawStats:
-    """Sum raw moment arrays across all clients."""
-    totals: RawStats = {
-        "n": 0,
-        "sum_x": np.zeros(p),
-        "sum_xx": np.zeros((p, p)),
-        "sum_x3": np.zeros(p),
-        "sum_x1y2": np.zeros((p, p)),
-        "sum_x2y1": np.zeros((p, p)),
-    }
-
-    if has_4th:
-        totals.update(
-            {
-                "sum_x4": np.zeros(p),
-                "sum_x1y3": np.zeros((p, p)),
-                "sum_x3y1": np.zeros((p, p)),
-                "sum_x2y2": np.zeros((p, p)),
-            }
-        )
-
-    for s in stats_list:
-        totals["n"] += s["n"]
-        for key in totals:
-            if key == "n":
-                continue
-            if key in s:
-                totals[key] = totals[key] + s[key]
-
-    return totals
-
-
-def _compute_3rd_order(
-    totals: RawStats, mu: npt.NDArray[np.float64], n: int, p: int
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """Compute unbiased 3rd-order marginal and cross-cumulants.
-
-    Centering identity used: Σ(x - μ)³ = S₃ - 3μ S₂ + 2N μ³.
-    """
-    if n < _MIN_SAMPLES_3RD:
-        warnings.warn(
-            f"Total sample size N={n} < {_MIN_SAMPLES_3RD}; 3rd-order cumulants are unreliable.",
-            stacklevel=2,
-        )
-        return np.zeros(p), np.zeros((p, p)), np.zeros((p, p))
-
-    factor3 = n / ((n - 1) * (n - 2))
-
-    s_xx = totals["sum_xx"]
-    s_x3 = totals["sum_x3"]
-    s_x1y2 = totals["sum_x1y2"]
-    s_x2y1 = totals["sum_x2y1"]
-
-    # ── Marginal C₃(xᵢ) ──
-    #   Σ(xᵢ − μᵢ)³ = S₃[i] − 3μᵢ·S₂[i] + 2N·μᵢ³
-    sum_cen_x3 = s_x3 - 3 * mu * np.diag(s_xx) + 2 * n * (mu**3)
-    c3 = factor3 * sum_cen_x3
-
-    # ── Cross-cumulants C₁,₂ and C₂,₁ ──
-    c12 = np.zeros((p, p))
-    c21 = np.zeros((p, p))
-
-    for i in range(p):
-        c12[i, i] = c3[i]
-        c21[i, i] = c3[i]
-        for j in range(p):
-            if i == j:
-                continue
-
-            mi, mj = mu[i], mu[j]
-
-            # Σ(xᵢ−μᵢ)(xⱼ−μⱼ)²
-            #   = S_x1y2[i,j] − 2μⱼ·S_xx[i,j] − μᵢ·S_xx[j,j] + 2N·μᵢ·μⱼ²
-            m_12 = s_x1y2[i, j] - 2 * mj * s_xx[i, j] - mi * s_xx[j, j] + 2 * n * mi * mj**2
-            c12[i, j] = factor3 * m_12
-
-            # Σ(xᵢ−μᵢ)²(xⱼ−μⱼ)  — symmetric swap of roles
-            #   = S_x2y1[i,j] − 2μᵢ·S_xx[i,j] − μⱼ·S_xx[i,i] + 2N·μⱼ·μᵢ²
-            m_21 = s_x2y1[i, j] - 2 * mi * s_xx[i, j] - mj * s_xx[i, i] + 2 * n * mj * mi**2
-            c21[i, j] = factor3 * m_21
-
-    return c3, c12, c21
-
-
-def _compute_4th_order(
-    totals: RawStats, mu: npt.NDArray[np.float64], n: int, p: int
-) -> tuple[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-]:
-    """Compute unbiased 4th-order marginal and cross-cumulants.
-
-    k-statistic formula: k₄ = [N(N+1) M₄ - 3(N-1) M₂²] / [(N-1)(N-2)(N-3)].
-
-    Centering identities used::
-
-        Σ(x−μ)⁴ = S₄ − 4μ S₃ + 6μ² S₂ − 3Nμ⁴
-        Σ(x−μₓ)(y−μᵧ)³ = S_{x¹y³} − μₓ S_{y³} − 3μᵧ S_{x¹y²}
-                          + 3μₓμᵧ S_{y²} + 3μᵧ² S_{xy} − 3Nμₓμᵧ³
-    """
-    if n < _MIN_SAMPLES_4TH:
-        warnings.warn(
-            f"Total sample size N={n} < {_MIN_SAMPLES_4TH}; 4th-order cumulants are unreliable.",
-            stacklevel=2,
-        )
-        z = np.zeros(p)
-        zz = np.zeros((p, p))
-        return z, zz.copy(), zz.copy(), zz.copy()
-
     d4 = (n - 1) * (n - 2) * (n - 3)
-    alpha4 = n * (n + 1)
-    beta4 = n - 1
-
-    s_xx = totals["sum_xx"]
-    s_x3 = totals["sum_x3"]
-    s_x4 = totals["sum_x4"]
-    s_x1y2 = totals["sum_x1y2"]
-    s_x2y1 = totals["sum_x2y1"]
-    s_x1y3 = totals["sum_x1y3"]
-    s_x3y1 = totals["sum_x3y1"]
-    s_x2y2 = totals["sum_x2y2"]
-
-    # ── Centered 2nd-moment sums (reused in bias correction) ──
-    #   M₂[i] = Σ(xᵢ − μᵢ)² = S_xx[i,i] − N μᵢ²
-    m2_diag = np.diag(s_xx) - n * mu**2
-
-    # ── Marginal C₄(xᵢ) ──
-    #   M₄ = S₄ − 4μ S₃ + 6μ² S₂ − 3Nμ⁴
-    m4_vec = s_x4 - 4 * mu * s_x3 + 6 * mu**2 * np.diag(s_xx) - 3 * n * mu**4
-    c4 = (alpha4 * m4_vec - 3 * beta4 * m2_diag**2) / d4
-
-    # ── Cross-cumulants C₁,₃ / C₃,₁ / C₂,₂ ──
-    c13 = np.zeros((p, p))
-    c31 = np.zeros((p, p))
-    c22 = np.zeros((p, p))
-
-    for i in range(p):
-        # Diagonal: all cross-cumulants collapse to the marginal
-        c13[i, i] = c4[i]
-        c31[i, i] = c4[i]
-        c22[i, i] = c4[i]
-
-        for j in range(p):
-            if i == j:
-                continue
-
-            mi, mj = mu[i], mu[j]
-
-            # --- M₁₃ = Σ(xᵢ − μᵢ)(xⱼ − μⱼ)³ ---
-            #   = S_{x¹y³} − μᵢ·S_{y³} − 3μⱼ·S_{x¹y²}
-            #     + 3μᵢμⱼ·S_{y²} + 3μⱼ²·S_{xy} − 3N·μᵢ·μⱼ³
-            m13 = (
-                s_x1y3[i, j]
-                - mi * s_x3[j]
-                - 3 * mj * s_x1y2[i, j]
-                + 3 * mi * mj * s_xx[j, j]
-                + 3 * mj**2 * s_xx[i, j]
-                - 3 * n * mi * mj**3
-            )
-
-            # --- M₃₁ = Σ(xᵢ − μᵢ)³(xⱼ − μⱼ)  [swap i ↔ j roles in M₁₃] ---
-            #   = S_{x³y¹} − μⱼ·S_{x³} − 3μᵢ·S_{x²y¹}
-            #     + 3μⱼμᵢ·S_{x²} + 3μᵢ²·S_{xy} − 3N·μⱼ·μᵢ³
-            m31 = (
-                s_x3y1[i, j]
-                - mj * s_x3[i]
-                - 3 * mi * s_x2y1[i, j]
-                + 3 * mj * mi * s_xx[i, i]
-                + 3 * mi**2 * s_xx[i, j]
-                - 3 * n * mj * mi**3
-            )
-
-            # --- M₂₂ = Σ(xᵢ − μᵢ)²(xⱼ − μⱼ)² ---
-            #   = S_{x²y²} − 2μⱼ·S_{x²y¹} − 2μᵢ·S_{x¹y²}
-            #     + μⱼ²·S_{x²} + μᵢ²·S_{y²} + 4μᵢμⱼ·S_{xy} − 3N·μᵢ²μⱼ²
-            m22 = (
-                s_x2y2[i, j]
-                - 2 * mj * s_x2y1[i, j]
-                - 2 * mi * s_x1y2[i, j]
-                + mj**2 * s_xx[i, i]
-                + mi**2 * s_xx[j, j]
-                + 4 * mi * mj * s_xx[i, j]
-                - 3 * n * mi**2 * mj**2
-            )
-
-            # --- Centered 2nd-moment cross-sum ---
-            #   M₁₁ = Σ(xᵢ − μᵢ)(xⱼ − μⱼ) = S_xx[i,j] − N·μᵢμⱼ
-            m11 = s_xx[i, j] - n * mi * mj
-            m20 = m2_diag[i]
-            m02 = m2_diag[j]
-
-            # --- Unbiased k-statistics ---
-            c13[i, j] = (alpha4 * m13 - 3 * beta4 * m11 * m02) / d4
-            c31[i, j] = (alpha4 * m31 - 3 * beta4 * m11 * m20) / d4
-            c22[i, j] = (alpha4 * m22 - beta4 * (m20 * m02 + 2 * m11**2)) / d4
-
-    return c4, c13, c31, c22
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# The same estimators on vectors
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def unbiased_cumulant3(
-    x: npt.NDArray[np.float64],
-    y: npt.NDArray[np.float64] | None = None,
-    z: npt.NDArray[np.float64] | None = None,
-) -> float:
-    """Return the unbiased 3rd-order cumulant estimator.
-
-    - ``unbiased_cumulant3(x)`` returns C₃(x) = Cum(x, x, x).
-    - ``unbiased_cumulant3(x, y, z)`` returns Cum(x, y, z).
-
-    Parameters
-    ----------
-    x : numpy.ndarray
-        First vector, shape ``(n,)``.
-    y : numpy.ndarray, optional
-        Second vector, shape ``(n,)``. Defaults to `x`.
-    z : numpy.ndarray, optional
-        Third vector, shape ``(n,)``. Defaults to `y`.
-
-    Returns
-    -------
-    float
-        The k-statistic k₃ = N / ((N-1)(N-2)) · Σ(xᵢ - μₓ)(yᵢ - μᵧ)(zᵢ - μ_z).
-
-    Raises
-    ------
-    ValueError
-        If fewer than 3 samples are given.
-    """
-    x = np.asarray(x, dtype=float)
-    if y is None:
-        y = z = x
-    else:
-        y = np.asarray(y, dtype=float)
-        z = np.asarray(z, dtype=float) if z is not None else y
-
-    n = len(x)
-    if n < _MIN_SAMPLES_3RD:
-        raise ValueError(f"Need at least {_MIN_SAMPLES_3RD} samples; got {n}.")
-
-    xc = x - x.mean()
-    yc = y - y.mean()
-    zc = z - z.mean()
-
-    factor = n / ((n - 1) * (n - 2))
-    return float(factor * np.sum(xc * yc * zc))
-
-
-def unbiased_cumulant4(x: npt.NDArray[np.float64]) -> float:
-    """Return the unbiased 4th-order marginal cumulant.
-
-    Parameters
-    ----------
-    x : numpy.ndarray
-        Vector, shape ``(n,)``.
-
-    Returns
-    -------
-    float
-        k₄ = [N(N+1) M₄ - 3(N-1) M₂²] / [(N-1)(N-2)(N-3)], where M₄ = Σ(xᵢ -
-        x̄)⁴ and M₂ = Σ(xᵢ - x̄)².
-
-    Raises
-    ------
-    ValueError
-        If fewer than 4 samples are given.
-    """
-    x = np.asarray(x, dtype=float)
-    n = len(x)
-    if n < _MIN_SAMPLES_4TH:
-        raise ValueError(f"Need at least {_MIN_SAMPLES_4TH} samples; got {n}.")
-
-    xc = x - x.mean()
-    m2 = np.sum(xc**2)
-    m4 = np.sum(xc**4)
-
-    d = (n - 1) * (n - 2) * (n - 3)
-    return float((n * (n + 1) * m4 - 3 * (n - 1) * m2**2) / d)
-
-
-def cross_cumulants3(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> tuple[float, float]:
-    """Return the unbiased 3rd-order cross-cumulants between `x` and `y`.
-
-    Parameters
-    ----------
-    x : numpy.ndarray
-        First vector, shape ``(n,)``.
-    y : numpy.ndarray
-        Second vector, shape ``(n,)``.
-
-    Returns
-    -------
-    tuple of float
-        ``(c12, c21)`` where c12 = Cum(x, y, y) and c21 = Cum(x, x, y).
-
-    Raises
-    ------
-    ValueError
-        If fewer than 3 samples are given.
-    """
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-    n = len(x)
-    if n < _MIN_SAMPLES_3RD:
-        raise ValueError(f"Need at least {_MIN_SAMPLES_3RD} samples; got {n}.")
-
-    xc = x - x.mean()
-    yc = y - y.mean()
-    factor = n / ((n - 1) * (n - 2))
-
-    c12 = float(factor * np.sum(xc * yc**2))
-    c21 = float(factor * np.sum(xc**2 * yc))
-    return c12, c21
-
-
-def cross_cumulants4(
-    x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
-) -> tuple[float, float, float]:
-    """Return the unbiased 4th-order cross-cumulants between `x` and `y`.
-
-    Parameters
-    ----------
-    x : numpy.ndarray
-        First vector, shape ``(n,)``.
-    y : numpy.ndarray
-        Second vector, shape ``(n,)``.
-
-    Returns
-    -------
-    tuple of float
-        ``(c13, c31, c22)`` where c13 = Cum(x, y, y, y), c31 = Cum(x, x, x, y),
-        and c22 = Cum(x, x, y, y).
-
-    Raises
-    ------
-    ValueError
-        If fewer than 4 samples are given.
-    """
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-    n = len(x)
-    if n < _MIN_SAMPLES_4TH:
-        raise ValueError(f"Need at least {_MIN_SAMPLES_4TH} samples; got {n}.")
-
-    xc = x - x.mean()
-    yc = y - y.mean()
-
-    s20 = np.sum(xc**2)
-    s02 = np.sum(yc**2)
-    s11 = np.sum(xc * yc)
-
-    s13 = np.sum(xc * yc**3)
-    s31 = np.sum(xc**3 * yc)
-    s22 = np.sum(xc**2 * yc**2)
-
-    d = (n - 1) * (n - 2) * (n - 3)
-    alpha = n * (n + 1)
-    beta = n - 1
-
-    k13 = (alpha * s13 - 3 * beta * s11 * s02) / d
-    k31 = (alpha * s31 - 3 * beta * s11 * s20) / d
-    k22 = (alpha * s22 - beta * (s20 * s02 + 2 * s11**2)) / d
-
-    return float(k13), float(k31), float(k22)
+    alpha, beta = n * (n + 1), n - 1
+    m2 = np.diag(m11)
+    c31 = (alpha * merged["m31"] - 3 * beta * m11 * m2[:, None]) / d4
+    c22 = (alpha * merged["m22"] - beta * (np.outer(m2, m2) + 2 * m11**2)) / d4
+    result.update({"c4": np.diag(c31).copy(), "c13": c31.T.copy(), "c31": c31, "c22": c22})
+    return result

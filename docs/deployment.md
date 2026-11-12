@@ -1,12 +1,12 @@
 # Deployment
 
-Running fedcausal across real machines, where each site holds its own data and nothing but graphs or statistics crosses the network. A complete, runnable app is in [`examples/flower_app/`](../examples/flower_app/); this page explains what it does and why.
+Running fedcausal across real machines, where each site holds its own data and nothing but graphs or statistics crosses the network. A complete, runnable app is in [`flower_app/`](https://github.com/ptorrijos99/fedcausal/tree/main/flower_app); this page explains what it does and why.
 
 ## Simulation or deployment
 
 Two different things, and it is worth being clear about which you want.
 
-Simulation runs every site inside one process. It is what you want for experiments, and `run_flower_fedges`, `run_flower_rcd`, or `flwr run examples/flower_app` gets you there in a line. It needs Flower's Ray-based engine, so install `fedcausal[flower-simulation]`. Ray has no wheel for every Python version and platform, which is why it is a separate extra.
+Simulation runs every site inside one process. It is what you want for experiments, and `run_flower_fedges`, `run_flower_rcd`, or `flwr run flower_app` gets you there in a line. It needs Flower's Ray-based engine, so install `fedcausal[flower-simulation]`. Ray has no wheel for every Python version and platform, which is why it is a separate extra.
 
 Deployment runs each site as its own process, usually on its own machine. It needs `fedcausal[flower]` only, no Ray. This page is about that.
 
@@ -26,25 +26,22 @@ from flwr.client import ClientApp
 from fedcausal.data import DiscreteDataset
 from fedcausal.flower.fedges import handle_train_message
 from fedcausal.flower.loaders import NodeConfigLoader
-from fedcausal.fusion import ConsensusUnion
 
 app_client = ClientApp()
 
 
 @app_client.train()
 def train(msg, context):
-    loader = NodeConfigLoader(DiscreteDataset)
-    return handle_train_message(msg, context, loader, ConsensusUnion())
+    return handle_train_message(msg, context, NodeConfigLoader(DiscreteDataset))
 ```
 
-For the continuous family, swap `handle_train_message` for `fedcausal.flower.lingam.handle_stats_message` and `DiscreteDataset` for `ContinuousDataset`. Nothing else changes.
+A site's options go through `make_site`, for instance `handle_train_message(msg, context, loader, functools.partial(Site, refinement="both"))`. For the continuous family, swap `handle_train_message` for `fedcausal.flower.lingam.handle_stats_message` and `DiscreteDataset` for `ContinuousDataset`. Nothing else changes.
 
-The server side is one loop:
+The server side is one call, which runs the same round loop as `FedGES` does in one process:
 
 ```python
 from flwr.server import ServerApp
 
-from fedcausal.fedges.defaults import default_convergence, default_server_fusion
 from fedcausal.flower.fedges import run_server_loop
 
 app_server = ServerApp()
@@ -56,11 +53,9 @@ def main(grid, context):
     run_server_loop(
         grid,
         context,
-        global_fusion=default_server_fusion(),
-        convergence=default_convergence(),
         n_clients=int(config["num-clients"]),
-        num_nodes=int(config["num-variables"]),
-        n_iterations=int(config["num-server-rounds"]),
+        n_vars=int(config["num-variables"]),
+        n_rounds=int(config["num-server-rounds"]),
     )
 ```
 
@@ -99,9 +94,9 @@ flwr run . remote --run-config "num-variables=12 num-server-rounds=30"
 
 ## What happens each round
 
-FedGES needs two message round trips per iteration. In the build phase every client rebuilds its local model with GES, warm-started from the model in its own `context.state`, and replies with its DAG and the score that DAG achieves on its own data. The server never sees the data behind that number. In the fuse phase the server combines the local DAGs into a global one and broadcasts it; each client fuses that into its own model, optionally refines, and updates its state. Convergence is checked between the two, on the local models the server just received.
+FedGES needs two message round trips per round. In the build phase every client rebuilds its local model with GES, warm-started from the model in its own `context.state`, and replies with its DAG and the score that DAG achieves on its own data. The server never sees the data behind that number. In the fuse phase the server combines the local DAGs into a global one and broadcasts it; each client fuses that into its own model, optionally refines, and updates its state. Convergence is checked between the two, on the local models the server just received.
 
-The FedRCD family is cheaper. Every solver but `fedrcd_exact` needs exactly one round trip: each client sends nine moment-sum arrays, and the server aggregates them into cumulants and solves. `fedrcd_exact` repeats that `p - 1` times, deflating each client's own rows between rounds. See [FedRCD](fedrcd.md).
+The FedRCD family is cheaper. Every solver but `fedrcd_exact` needs exactly one round trip: each client sends its mean and four matrices of moment sums, and the server aggregates them into cumulants and solves. `fedrcd_exact` repeats that `p - 1` times, deflating each client's own rows between rounds. See [FedRCD](fedrcd.md).
 
 ## When a site drops out
 
@@ -114,14 +109,14 @@ The server writes the final structure to `context.state`, which is process-local
 ```python
 final = run_server_loop(grid, context, ...)
 if final is not None:
-    Path("global_dag.json").write_text(json.dumps(final.dag.edges()))
+    Path("global_dag.json").write_text(json.dumps(final.edges()))
 ```
 
 Both server loops return their result as well as storing it, so there is no need to dig it back out of the state record.
 
 ## Things worth knowing
 
-The server holds no data and computes no scores. That is a design constraint, not an accident, and it is what lets the loops run unchanged over any transport. Metrics against a ground-truth network are computed by an observer outside the loop, so a real federation with no ground truth simply attaches no observer. And neither `fedcausal.fedges` nor `fedcausal.lingam` imports `flwr`, so the algorithms work without the extra installed.
+The server holds no data and computes no scores, which is what lets the loop run unchanged over any transport. To follow a run, pass `on_model`, which receives every local and global model as it arrives; metrics against a known network belong there. Neither `fedcausal.fedges` nor `fedcausal.lingam` imports `flwr`, so the algorithms work without the extra installed.
 
 ## Environment snags
 

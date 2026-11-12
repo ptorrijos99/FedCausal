@@ -28,29 +28,22 @@ A test states something a user could observe: a result, an error, a guarantee in
 - Assert behaviour through the public API, not private helpers, cache contents, memory layout or the order a loop happens to visit things.
 - Compare floating-point results to a tolerance, never bit for bit. The last few bits move between platforms, BLAS builds and libm versions.
 - Do not pin tie-breaks or values recorded from one run. If two answers are equally correct, the test must accept both.
-- Do not add a strict xfail to record a known difference. Assert the property that makes the difference acceptable, as `tests/regression/test_ges_reference.py` does.
+- Do not add a strict xfail to record a known difference. Assert the property that makes the difference acceptable.
+- Prefer checking against an independent definition (a brute-force score, Verma and Pearl's characterisation of equivalence) over checking against recorded output.
 
-`tests/regression/` pins behaviour against committed reference outputs. If a change moves one of those numbers, that is the change telling you something. Do not update the golden file to match new output without understanding why it moved, and say so in the pull request when you do.
-
-Markers:
-
-- `slow` for anything over a few seconds. CI runs them; `-m "not slow"` skips them locally.
-- `regression` for the reference comparisons.
-- `bigdata` for tests needing networks too large to ship. They skip unless `FEDCAUSAL_NETWORKS` points at a directory holding them.
+The whole suite runs in about half a minute. The three tests that drive Flower's Ray simulation engine carry the `slow` marker and are skipped by default: each takes a minute, and Ray now and then hangs when one process starts it twice. Run them with `pytest -m slow` after changing the transport; they need the `flower-simulation` extra.
 
 ## Performance changes
 
 Two things make a performance claim believable here, and wall-clock is neither of them on its own.
 
-Prefer a deterministic counter: calls avoided, pairs re-scored, cache hits. It is immune to machine noise and it says what actually changed.
+Compare timings within one process, back to back, after a warm-up fit so that numba's compilation is not counted, and take the minimum of several runs. A synced folder or a busy machine moves wall-clock by tens of percent, which swamps most optimisations worth making. `benchmarks/scale_ges.py` runs the network ladder in [Benchmarks](docs/benchmarks.md).
 
-If you do report timings, take them within one process, back to back, minimum of several runs. The development machine varied 40% between invocations of the same run because the repository sat in a synced folder, and that swamps most optimisations worth making. [Benchmarks](docs/benchmarks.md) has the details.
-
-Any change to the search must keep the incremental engine byte-identical to the full scan. `tests/search/test_incremental.py` checks that; do not weaken it.
+A change to the search must keep it at a local optimum of the full neighbourhood; `tests/search/test_ges.py` checks that.
 
 ## Adding a method
 
-`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`; `tests/flower/test_lingam_oneshot.py` has the check that keeps it that way.
+`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`; `tests/test_import.py` checks that.
 
 ## Style
 

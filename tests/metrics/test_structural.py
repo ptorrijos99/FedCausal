@@ -46,6 +46,20 @@ def test_shd_reversed_reversible_edge_counts_one() -> None:
     assert shd(g1, g2) == 1
 
 
+def test_shd_compares_cpdags_mark_by_mark() -> None:
+    from fedcausal.graph import PDAG
+
+    chain = PDAG(3)
+    chain.add_undirected(0, 1)
+    chain.add_undirected(1, 2)
+    collider = PDAG(3)
+    collider.add_directed(0, 1)
+    collider.add_directed(2, 1)
+    assert shd(chain, chain) == 0
+    assert shd(chain, collider) == 2
+    assert shd(chain, DAG.from_edges(3, [(0, 1)])) == 2
+
+
 # --- Skeleton SHD ------------------------------------------------------------
 
 

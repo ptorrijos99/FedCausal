@@ -1,238 +1,195 @@
+"""Greedy Equivalence Search: what it recovers, and that it stops at a true local optimum."""
+
+from __future__ import annotations
+
 import numpy as np
+import pandas as pd
 import pytest
 
-from fedcausal.data import DiscreteDataset
+from fedcausal import GES
+from fedcausal.data import as_discrete
+from fedcausal.datasets import load_alarm, load_asia, load_child
 from fedcausal.graph import DAG, PDAG
-from fedcausal.graph.meek import dag_to_cpdag
+from fedcausal.graph.cpdag import dag_to_cpdag
+from fedcausal.metrics import shd
 from fedcausal.scores import BDeuScore
-from fedcausal.search import GES
-from fedcausal.search.ges import run_bes, run_fes
+from fedcausal.search import _operators as ops
+from fedcausal.search import ges
 
 
-def _dep_dataset(n: int = 4000, seed: int = 0) -> DiscreteDataset:
-    # A -> B deterministic-ish: B copies A with 10% noise; C, D independent.
+@pytest.mark.parametrize(("loader", "max_shd"), [(load_asia, 3), (load_child, 3), (load_alarm, 12)])
+def test_recovers_the_bundled_networks(loader, max_shd: int) -> None:  # type: ignore[no-untyped-def]
+    bundle = loader()
+    assert shd(bundle.truth, GES().fit(bundle.data).dag_) <= max_shd
+
+
+def test_stops_where_no_single_operator_improves_the_score() -> None:
+    data = load_child().data
+    score = BDeuScore(data)
+    cpdag = ges(score, data.n_vars)
+    for y in range(data.n_vars):
+        assert ops.inserts_into(score, cpdag, y, max_t_size=2) == {}
+        assert ops.deletes_into(score, cpdag, y) == {}
+
+
+def test_never_ends_below_where_it_starts() -> None:
+    bundle = load_alarm()
+    score = BDeuScore(bundle.data)
+    learned = ges(score, bundle.data.n_vars, bundle.truth).to_dag()
+    assert score.score_dag(learned) >= score.score_dag(bundle.truth)
+
+
+def test_capping_the_conditioning_subsets_finds_the_same_optimum_here() -> None:
+    data = load_child().data
+    score = BDeuScore(data)
+    assert ges(score, data.n_vars, max_t_size=2) == ges(score, data.n_vars, max_t_size=None)
+
+
+def test_only_candidate_pairs_gain_edges() -> None:
+    data = load_asia().data
+    allowed = frozenset({(0, 1), (1, 0), (2, 3), (3, 2)})
+    cpdag = ges(BDeuScore(data), data.n_vars, candidates=allowed)
+    edges = cpdag.directed_edges() + cpdag.undirected_edges()
+    assert {frozenset(e) for e in edges} <= {frozenset(p) for p in allowed}
+
+
+def test_the_estimator_takes_frames_and_arrays_and_names_its_result() -> None:
+    frame = load_asia().data.to_pandas()
+    by_frame = GES().fit(frame)
+    by_array = GES().fit(frame.to_numpy())
+
+    assert by_frame.cpdag_ == by_array.cpdag_
+    assert list(by_frame.feature_names_in_) == list(frame.columns)
+    assert list(by_array.feature_names_in_) == [f"x{j}" for j in range(frame.shape[1])]
+    adjacency = by_frame.adjacency_
+    assert isinstance(adjacency, pd.DataFrame)
+    assert adjacency.to_numpy().sum() == 2 * len(by_frame.cpdag_.undirected_edges()) + len(
+        by_frame.cpdag_.directed_edges()
+    )
+    assert by_frame.score_ == pytest.approx(BDeuScore(load_asia().data).score_dag(by_frame.dag_))
+
+
+def test_a_stronger_structure_prior_learns_fewer_edges() -> None:
+    data = load_alarm().data
+    plain = GES(expected_parents=None).fit(data).dag_.num_edges
+    sparse = GES(expected_parents=0.01).fit(data).dag_.num_edges
+    assert sparse < plain
+
+
+def test_an_insert_that_would_close_a_directed_cycle_is_never_offered() -> None:
+    """x and y are strongly dependent, but y -> z -> x already exists."""
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 2, 2000)
+    z = np.where(rng.random(2000) < 0.9, y, 1 - y)
+    x = np.where(rng.random(2000) < 0.9, z, 1 - z)
+    dataset = as_discrete(np.column_stack([x, y, z]))
+    graph = PDAG(3)
+    graph.add_directed(1, 2)
+    graph.add_directed(2, 0)
+    assert 0 not in ops.inserts_into(BDeuScore(dataset), graph, 1, max_t_size=2)
+
+
+def test_a_delete_orients_the_kept_neighbours_into_a_collider() -> None:
+    graph = PDAG(3)
+    for u, v in [(0, 1), (0, 2), (1, 2)]:
+        graph.add_undirected(u, v)
+    ops.apply_delete(graph, 0, 1, frozenset({2}))
+    assert sorted(graph.directed_edges()) == [(0, 2), (1, 2)]
+    assert graph.undirected_edges() == []
+
+
+def test_the_search_starts_from_a_given_dag() -> None:
+    bundle = load_asia()
+    model = GES().fit(bundle.data, initial_graph=bundle.truth)
+    assert model.cpdag_ == dag_to_cpdag(model.dag_)
+    with pytest.raises(ValueError, match="nodes"):
+        GES().fit(bundle.data, initial_graph=DAG(3))
+
+
+def test_required_and_forbidden_adjacencies_hold_whatever_the_data_say() -> None:
+    bundle = load_asia()
+    names = bundle.data.names
+    learned = {frozenset(e) for e in GES().fit(bundle.data).dag_.edges()}
+    present = next(iter(learned))
+    absent = next(
+        frozenset((a, b))
+        for a in range(len(names))
+        for b in range(a + 1, len(names))
+        if frozenset((a, b)) not in learned
+    )
+    model = GES(
+        required=[tuple(names[i] for i in absent)],
+        forbidden=[tuple(sorted(present))],
+    ).fit(bundle.data)
+    skeleton = {frozenset(e) for e in model.dag_.edges()}
+    assert absent in skeleton
+    assert present not in skeleton
+
+
+def test_knowledge_rejects_contradictions_and_unknown_names() -> None:
+    from fedcausal.search import Knowledge
+
+    with pytest.raises(ValueError, match="both required and forbidden"):
+        Knowledge.from_pairs([("a", "b")], [("b", "a")], names=["a", "b"])
+    with pytest.raises(ValueError, match="unknown variable"):
+        Knowledge.from_pairs([("a", "z")], names=["a", "b"])
+    with pytest.raises(ValueError, match="no variable at index"):
+        Knowledge.from_pairs(forbidden=[(0, 2)], names=["a", "b"])
+    with pytest.raises(ValueError, match="neither"):
+        Knowledge.from_pairs([(0, 1.7)], names=["a", "b"])
+
+
+def test_max_parents_caps_every_family() -> None:
+    bundle = load_alarm()
+    model = GES(max_parents=1).fit(bundle.data)
+    assert max(len(model.dag_.parents(v)) for v in range(bundle.data.n_vars)) <= 1
+    assert model.dag_.num_edges > 0
+
+
+def _linear_gaussian(n: int, seed: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
-    a = rng.integers(0, 2, n)
-    b = np.where(rng.random(n) < 0.9, a, 1 - a)
-    c = rng.integers(0, 2, n)
-    d = rng.integers(0, 2, n)
-    values = np.column_stack([a, b, c, d]).astype(np.int32)
-    return DiscreteDataset.from_arrays(
-        values, np.full(4, 2, np.int32), list("ABCD"), [["0", "1"]] * 4
-    )
+    a = rng.normal(size=n)
+    b = 0.9 * a + rng.normal(size=n)
+    c = rng.normal(size=n)
+    d = 0.7 * b - 0.8 * c + rng.normal(size=n)
+    return pd.DataFrame({"a": a, "b": b, "c": c, "d": d})
 
 
-def _dummy_dataset(n_vars: int) -> DiscreteDataset:
-    # Only n_vars is read when the score is a fake.
-    values = np.zeros((1, n_vars), dtype=np.int32)
-    cardinalities = np.full(n_vars, 2, np.int32)
-    names = [chr(ord("A") + i) for i in range(n_vars)]
-    categories = [["0", "1"]] * n_vars
-    return DiscreteDataset.from_arrays(values, cardinalities, names, categories)
+def test_gaussian_bic_finds_the_collider_of_continuous_data() -> None:
+    model = GES(criterion="gaussian_bic").fit(_linear_gaussian(5000, 0))
+    adjacency = model.adjacency_
+    assert adjacency.loc["b", "d"] == 1 and adjacency.loc["d", "b"] == 0
+    assert adjacency.loc["c", "d"] == 1 and adjacency.loc["d", "c"] == 0
+    assert adjacency.loc["a", "b"] == 1 and adjacency.loc["b", "a"] == 1
+    assert adjacency.loc["a", "c"] == 0
 
 
-def test_fit_returns_pdag_with_expected_adjacency() -> None:
-    ds = _dep_dataset()
-    cpdag = GES(BDeuScore(ds)).fit(ds)
-    assert isinstance(cpdag, PDAG)
-    assert 1 in cpdag.adjacent(0)
-    assert 3 not in cpdag.adjacent(2)
+@pytest.mark.parametrize("criterion", ["bdeu", "bic"])
+def test_discrete_criteria_recover_asia_closely(criterion: str) -> None:
+    bundle = load_asia()
+    assert shd(bundle.truth, GES(criterion=criterion).fit(bundle.data).dag_) <= 3
 
 
-def test_fit_score_at_least_empty_graph() -> None:
-    ds = _dep_dataset()
-    score = BDeuScore(ds)
-    cpdag = GES(score).fit(ds)
-    assert score.score_dag(cpdag.to_dag()) >= score.score_dag(DAG(ds.n_vars))
+def test_score_is_the_held_out_likelihood_per_row_and_ranks_structures() -> None:
+    frame = load_asia().data.to_pandas()
+    train, test = frame.iloc[:3000], frame.iloc[3000:]
+    learned = GES().fit(train)
+    empty = GES(forbidden=[(a, b) for a in frame for b in frame if a < b]).fit(train)
+    assert learned.dag_.num_edges > 0
+    assert empty.dag_.num_edges == 0
+    assert learned.score(test) > empty.score(test)
+    assert -10 < learned.score(test) < 0
+    with pytest.raises(ValueError, match="outside its levels"):
+        learned.score(test.assign(asia="maybe"))
 
 
-def test_fit_equals_fes_then_bes() -> None:
-    ds = _dep_dataset()
-    g = GES(BDeuScore(ds))
-    combined = g.fit(ds)
-    fes = g.fes_only(ds)
-    both = g.bes_only(ds, initial_graph=fes.to_dag())
-    assert combined == both
+def test_a_parameter_search_selects_hyperparameters_on_held_out_rows() -> None:
+    model_selection = pytest.importorskip("sklearn.model_selection")
+    search = model_selection.GridSearchCV(GES(), {"max_parents": [0, 2]}, cv=2)
+    search.fit(load_asia().data.to_pandas())
+    assert search.best_params_ == {"max_parents": 2}
 
 
-class _OvershootScore:
-    """A score on which the forward phase adds an edge the backward phase then removes.
-
-    The forward phase ends on the triangle 0-1, 0-2, 1-2; deleting 1-2 is then
-    worth 10, more than any insert was.
-    """
-
-    _TABLE = {
-        (1, (0,)): 10.0,
-        (2, (1,)): 8.0,
-        (2, (0, 1)): 9.0,
-    }
-
-    def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-        parents = tuple(sorted(parents))  # accept frozenset/tuple per Score contract
-        return self._TABLE.get((node, parents), 0.0)
-
-
-def test_fit_composes_fes_then_bes_not_fes_only_or_reversed() -> None:
-    # Forward only, or backward before forward, would both keep the triangle.
-    ds = _dummy_dataset(3)
-    score = _OvershootScore()
-    g = GES(score)
-
-    combined = g.fit(ds)
-    fes_only_result = g.fes_only(ds)
-    bes_then_fes, _ = run_fes(score, run_bes(score, PDAG(3))[0])
-
-    assert fes_only_result.undirected_edges() == [(0, 1), (0, 2), (1, 2)]
-    assert bes_then_fes.undirected_edges() == [(0, 1), (0, 2), (1, 2)]
-    assert combined.undirected_edges() == [(0, 1), (0, 2)]
-    assert combined.directed_edges() == []
-    assert combined != fes_only_result
-    assert combined != bes_then_fes
-
-
-def test_candidate_edges_restrict_fes() -> None:
-    ds = _dep_dataset()
-    cpdag = GES(BDeuScore(ds)).fes_only(ds, candidate_edges=frozenset({(0, 1)}))
-    assert set(cpdag.adjacent(0)) <= {1}
-
-
-class _DirectedInsertScore:
-    """A fake score where only Insert(x=0, y=2, T=empty) improves."""
-
-    def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-        parents = tuple(sorted(parents))  # accept frozenset/tuple per Score contract
-        if node == 2 and parents == (0,):
-            return 10.0
-        return 0.0
-
-
-def test_fes_only_candidate_edges_pair_order_is_directional() -> None:
-    # Candidates are ordered pairs: only (0, 2) allows the insert this score rewards.
-    ds = _dummy_dataset(3)
-    score = _DirectedInsertScore()
-    g = GES(score)
-
-    allowed = g.fes_only(ds, candidate_edges=frozenset({(0, 2)}))
-    assert 2 in allowed.adjacent(0)
-
-    blocked = g.fes_only(ds, candidate_edges=frozenset({(2, 0)}))
-    assert blocked.directed_edges() == []
-    assert blocked.undirected_edges() == []
-
-
-class _DirectedDeleteScore:
-    """A fake score where only Delete(x=0, y=1, H=empty) improves."""
-
-    def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-        parents = tuple(sorted(parents))  # accept frozenset/tuple per Score contract
-        table = {
-            (1, ()): 5.0,
-            (1, (0,)): 0.0,
-        }
-        return table.get((node, parents), 0.0)
-
-
-def test_bes_only_candidate_edges_pair_order_is_directional() -> None:
-    ds = _dummy_dataset(2)
-    score = _DirectedDeleteScore()
-    g = GES(score)
-    start_pdag = PDAG(2)
-    start_pdag.add_undirected(0, 1)
-    start = start_pdag.to_dag()
-
-    allowed = g.bes_only(ds, initial_graph=start, candidate_edges=frozenset({(0, 1)}))
-    assert allowed.directed_edges() == []
-    assert allowed.undirected_edges() == []
-
-    blocked = g.bes_only(ds, initial_graph=start, candidate_edges=frozenset({(1, 0)}))
-    assert blocked.undirected_edges() == [(0, 1)]
-
-
-def test_fit_threads_candidate_edges_to_bes_phase() -> None:
-    # From the complete graph, BES may not remove C - D if it is not a candidate.
-    ds = _dep_dataset()
-    full = DAG.from_edges(4, [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
-    n = 4
-    restricted = frozenset(
-        (x, y) for x in range(n) for y in range(n) if x != y and (x, y) not in {(2, 3), (3, 2)}
-    )
-    cpdag = GES(BDeuScore(ds)).fit(ds, initial_graph=full, candidate_edges=restricted)
-    assert 3 in cpdag.adjacent(2)
-
-
-def test_fit_threads_candidate_edges_to_fes_phase() -> None:
-    # BES only deletes, so A - B can appear only if FES was allowed to add it.
-    ds = _dep_dataset()
-    n = 4
-    restricted = frozenset(
-        (x, y) for x in range(n) for y in range(n) if x != y and (x, y) not in {(0, 1), (1, 0)}
-    )
-    cpdag = GES(BDeuScore(ds)).fit(ds, candidate_edges=restricted)
-    assert 1 not in cpdag.adjacent(0)
-
-
-@pytest.mark.parametrize("method", ["fit", "fes_only", "bes_only"])
-def test_initial_graph_must_match_the_data(method: str) -> None:
-    ds = _dummy_dataset(3)
-    with pytest.raises(ValueError):
-        getattr(GES(BDeuScore(ds)), method)(ds, initial_graph=DAG(4))
-
-
-def test_ges_init_rejects_invalid_h_pool() -> None:
-    ds = _dummy_dataset(3)
-    with pytest.raises(ValueError):
-        GES(BDeuScore(ds), h_pool="bogus")  # type: ignore[arg-type]
-
-
-class _CommonNeighbourScore:
-    """A fake score built for `_common_neighbour_dag`, matching test_bes.py's fixture."""
-
-    def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-        parents = tuple(sorted(parents))  # accept frozenset/tuple per Score contract
-        table = {
-            (1, ()): 5.0,
-            (1, (0,)): 0.0,
-            (1, (2,)): 3.0,
-            (1, (0, 2)): 1.0,
-            (1, (3,)): 5.0,
-        }
-        return table.get((node, parents), 0.0)
-
-
-def _common_neighbour_dag() -> DAG:
-    # The same graph as test_bes.py's _common_neighbour_fixture, as a DAG.
-    return DAG.from_edges(4, [(0, 2), (0, 1), (2, 1), (1, 3)])
-
-
-def test_ges_h_pool_threads_to_bes_and_changes_result() -> None:
-    ds = _dummy_dataset(4)
-    score = _CommonNeighbourScore()
-    start = _common_neighbour_dag()
-
-    nayx_result = GES(score, h_pool="nayx").bes_only(ds, initial_graph=start)
-    bayesfl_result = GES(score, h_pool="bayesfl").bes_only(ds, initial_graph=start)
-
-    assert nayx_result.directed_edges() == [(0, 2), (1, 2)]
-    assert nayx_result.undirected_edges() == [(1, 3)]
-    assert bayesfl_result.directed_edges() == []
-    assert bayesfl_result.undirected_edges() == [(0, 2), (1, 3)]
-    assert nayx_result != bayesfl_result
-
-
-def test_fit_uses_initial_graph_as_fes_start_not_empty() -> None:
-    # No insert pays under this score, so the edge must come from initial_graph.
-    ds = _dummy_dataset(2)
-
-    class _FlatScore:
-        def local_score(self, node: int, parents: tuple[int, ...]) -> float:
-            return 0.0
-
-    score = _FlatScore()
-    from_empty = GES(score).fit(ds)
-    assert from_empty.directed_edges() == []
-    assert from_empty.undirected_edges() == []
-
-    start = DAG.from_edges(2, [(0, 1)])
-    from_nonempty = GES(score).fit(ds, initial_graph=start)
-    assert dag_to_cpdag(start) == from_nonempty
+def test_an_unknown_criterion_is_an_error() -> None:
+    with pytest.raises(ValueError, match="criterion must be one of"):
+        GES(criterion="aic").fit(load_asia().data)  # type: ignore[arg-type]

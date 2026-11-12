@@ -1,7 +1,7 @@
 """Consensus-union fusion and its budgeted variants.
 
 The union transforms every input into one consensus order and unions the
-parent sets, so the result is acyclic by construction. The budgeted variants
+parent sets, so the result, and any subset of it, is acyclic by construction. The budgeted variants
 rank the transformed edges by how many inputs contain them and add them under
 a cap. Ties in that ranking break by ``(child, parent)``, so the result never
 depends on dictionary order.
@@ -9,6 +9,7 @@ depends on dictionary order.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fedcausal.fusion.alpha import alpha_order
@@ -79,14 +80,11 @@ def consensus_union(dags: Sequence[DAG]) -> DAG:
         If `dags` is empty.
     """
     _alpha, transformed = _transform_all(dags)
-    out = DAG(dags[0].num_nodes)
-    for child in range(out.num_nodes):
-        for d in transformed:
-            for parent in sorted(d.parents(child)):
-                out.add_edge(parent, child)
-    return out
+    edges = {e for d in transformed for e in d.edges()}
+    return DAG.from_edges(dags[0].num_nodes, sorted(edges))
 
 
+@dataclass(frozen=True)
 class ConsensusUnion:
     """`FusionOperator` for the full consensus union (no edge budget)."""
 
@@ -135,28 +133,22 @@ def max_edges(dags: Sequence[DAG], limit: int | str = "Max") -> DAG:
     """
     _alpha, transformed = _transform_all(dags)
     lim = _int_limit(limit, [d.num_edges for d in transformed])
-    out = DAG(dags[0].num_nodes)
-    for (parent, child), _count in edge_frequency(transformed):
-        if out.num_edges >= lim:
-            break
-        out.add_edge(parent, child)
-    return out
+    ranked = [edge for edge, _count in edge_frequency(transformed)]
+    return DAG.from_edges(dags[0].num_nodes, ranked[: max(lim, 0)])
 
 
 def max_frequency(dags: Sequence[DAG], limit: int) -> DAG:
     """Union every edge appearing in at least `limit` of the inputs."""
     _alpha, transformed = _transform_all(dags)
-    out = DAG(dags[0].num_nodes)
-    for (parent, child), count in edge_frequency(transformed):
-        if count >= limit:
-            out.add_edge(parent, child)
-    return out
+    kept = [edge for edge, count in edge_frequency(transformed) if count >= limit]
+    return DAG.from_edges(dags[0].num_nodes, kept)
 
 
 def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
-    """Union every edge appearing in at least `percent`% of inputs.
+    """Union every edge appearing in at least `percent` percent of the inputs.
 
-    The threshold is ``percent * len(dags) // 100``, truncated.
+    An edge needs ``ceil(percent * len(dags) / 100)`` votes, and at least one:
+    ``50`` over three inputs keeps the edges two of them share.
 
     Parameters
     ----------
@@ -170,58 +162,59 @@ def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
     DAG
         The consensus DAG.
     """
-    lim = percent * len(dags) // 100
-    return max_frequency(dags, lim)
+    return max_frequency(dags, max(1, -(-percent * len(dags) // 100)))
 
 
 def max_parents(dags: Sequence[DAG], limit: int) -> DAG:
     """Union edges in frequency order, giving no node more than `limit` parents."""
     _alpha, transformed = _transform_all(dags)
-    out = DAG(dags[0].num_nodes)
+    n_parents = [0] * dags[0].num_nodes
+    kept = []
     for (parent, child), _count in edge_frequency(transformed):
-        if len(out.parents(child)) < limit:
-            out.add_edge(parent, child)
-    return out
+        if n_parents[child] < limit:
+            n_parents[child] += 1
+            kept.append((parent, child))
+    return DAG.from_edges(dags[0].num_nodes, kept)
 
 
+@dataclass(frozen=True)
 class MaxEdges:
     """`FusionOperator` for :func:`max_edges` with a stored budget."""
 
-    def __init__(self, limit: int | str = "Max") -> None:
-        self.limit = limit
+    limit: int | str = "Max"
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
         """Return :func:`max_edges` of `dags` at the stored budget."""
         return max_edges(dags, self.limit)
 
 
+@dataclass(frozen=True)
 class MaxFrequency:
     """`FusionOperator` for :func:`max_frequency` with a stored threshold."""
 
-    def __init__(self, limit: int) -> None:
-        self.limit = limit
+    limit: int
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
         """Return :func:`max_frequency` of `dags` at the stored threshold."""
         return max_frequency(dags, self.limit)
 
 
+@dataclass(frozen=True)
 class Consensus:
     """`FusionOperator` for :func:`consensus_pct` with a stored percentage."""
 
-    def __init__(self, percent: int) -> None:
-        self.percent = percent
+    percent: int
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
         """Return :func:`consensus_pct` of `dags` at the stored percentage."""
         return consensus_pct(dags, self.percent)
 
 
+@dataclass(frozen=True)
 class MaxParents:
     """`FusionOperator` for :func:`max_parents` with a stored cap."""
 
-    def __init__(self, limit: int) -> None:
-        self.limit = limit
+    limit: int
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
         """Return :func:`max_parents` of `dags` at the stored cap."""

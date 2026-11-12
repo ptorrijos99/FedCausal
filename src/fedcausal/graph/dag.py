@@ -10,6 +10,8 @@ import numpy as np
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    import numpy.typing as npt
+
 __all__ = ["DAG", "CycleError"]
 
 
@@ -40,7 +42,7 @@ class DAG:
         self.num_edges = 0
         self._parents: list[set[int]] = [set() for _ in range(num_nodes)]
         self._children: list[set[int]] = [set() for _ in range(num_nodes)]
-        self._amat: np.ndarray | None = None
+        self._amat: npt.NDArray[np.bool_] | None = None
 
     def parents(self, v: int) -> frozenset[int]:
         """Return the parents of node `v`."""
@@ -117,7 +119,7 @@ class DAG:
         """Return all edges of the graph, sorted."""
         return sorted((u, v) for u in range(self.num_nodes) for v in self._children[u])
 
-    def adjacency(self) -> np.ndarray:
+    def adjacency(self) -> npt.NDArray[np.bool_]:
         """Return the boolean adjacency matrix of the graph."""
         if self._amat is None:
             amat = np.zeros((self.num_nodes, self.num_nodes), dtype=bool)
@@ -253,11 +255,18 @@ class DAG:
         """
         dag = cls(num_nodes)
         for u, v in edges:
-            dag.add_edge(u, v)
+            if u == v:
+                raise CycleError(f"self-loop rejected: {u} -> {v}")
+            if v not in dag._children[u]:
+                dag._children[u].add(v)
+                dag._parents[v].add(u)
+                dag.num_edges += 1
+        if len(dag.topological_order()) < num_nodes:
+            raise CycleError("the edges contain a directed cycle")
         return dag
 
     @classmethod
-    def from_amat(cls, A: np.ndarray) -> DAG:
+    def from_amat(cls, A: npt.ArrayLike) -> DAG:
         """Build a `DAG` from a square boolean (or 0/1) adjacency matrix.
 
         Parameters
@@ -276,6 +285,7 @@ class DAG:
         CycleError
             If `A` encodes a self-loop or a cycle.
         """
-        n = A.shape[0]
-        edges = [(int(u), int(v)) for u, v in zip(*np.nonzero(A), strict=True)]
+        matrix = np.asarray(A)
+        n = matrix.shape[0]
+        edges = [(int(u), int(v)) for u, v in zip(*np.nonzero(matrix), strict=True)]
         return cls.from_edges(n, edges)

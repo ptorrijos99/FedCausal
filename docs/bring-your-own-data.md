@@ -1,8 +1,23 @@
 # Bring your own data
 
-fedcausal works on fully observed categorical data. No continuous variables, no missing values.
+`GES` and `FedGES` take fully observed categorical data; `FedRCD` takes numeric data. Neither handles missing values.
 
-## From a CSV
+## Tables the estimators accept
+
+A pandas DataFrame, a 2-D array or a `DiscreteDataset` all work:
+
+```python
+import pandas as pd
+
+from fedcausal import GES
+
+GES().fit(pd.read_csv("cohort.csv", dtype=str))
+GES().fit(array)                     # columns are named x0, x1, ...
+```
+
+Every distinct value of a column is one level, so `1, 2, 3` are three categories, not a quantity. A DataFrame with missing values is rejected, naming the column; impute or drop those rows first.
+
+## From a CSV, without guessing
 
 ```python
 from fedcausal.data import DiscreteDataset
@@ -10,35 +25,19 @@ from fedcausal.data import DiscreteDataset
 data = DiscreteDataset.from_csv("cohort.csv")  # .csv.gz works too
 ```
 
-The file needs a header row of variable names, then comma-separated category labels. Every value is read as a string, so `0` and `1` become the labels `"0"` and `"1"` rather than numbers. That is deliberate: a column coded `1, 2, 3` is a set of three categories, not a quantity, and silently treating it as one would change the score.
+`from_csv` reads every value as a label, including `None`, `NA` and `NaN`, which several standard benchmark networks use as real levels. Only an empty or blank field counts as missing, and that raises. Pandas' own reader, by contrast, turns those strings into missing values unless told otherwise (`keep_default_na=False`).
 
-Two things the loader will not do quietly.
+## Encoding several sites at once
 
-It does not sniff for missing-value tokens. `None`, `NA`, `NULL`, and `NaN` are read as ordinary category labels, because several standard benchmark networks use `None` as a real level. If your file uses one of those strings to mean "missing", replace it before loading.
-
-It rejects genuinely empty fields. A blank or whitespace-only cell raises `ValueError` naming the column, rather than guessing. Impute or drop those rows first; fedcausal has no opinion on which.
-
-## From a DataFrame or an array
+`FedGES.fit` pools levels across sites before encoding, so a value seen at only one site is a level everywhere and every site scores over the same domains. To do the same yourself:
 
 ```python
-import pandas as pd
+from fedcausal.data import as_discrete_sites
 
-data = DiscreteDataset.from_pandas(pd.read_csv("cohort.csv", dtype=str))
+sites = as_discrete_sites([frame_a, frame_b, frame_c])
 ```
 
-Or build one directly, which is what you want when the encoding is already done:
-
-```python
-import numpy as np
-from fedcausal.data import DiscreteDataset
-
-data = DiscreteDataset(
-    values=np.array([[0, 1], [1, 1], [0, 0]], dtype=np.int32),
-    cardinalities=np.array([2, 2], dtype=np.int32),
-    names=["smoking", "cancer"],
-    categories=[["no", "yes"], ["no", "yes"]],
-)
-```
+The tables must share their columns, in the same order.
 
 ## How levels are encoded
 

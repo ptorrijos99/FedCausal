@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from fedcausal.graph import DAG
-from fedcausal.lingam import RCDResult, fedrcd, fedrcd_exact, fedrcd_noniterative, ishc_beta
+from fedcausal.lingam import RCDResult, fedrcd, fedrcd_exact
 from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
 
 
@@ -21,15 +21,44 @@ def _stats(clients):
     return aggregate_and_compute_cumulants([compute_local_raw_stats(c, order=4) for c in clients])
 
 
-@pytest.mark.parametrize("solver", [fedrcd, fedrcd_noniterative, ishc_beta])
-def test_solvers_recover_the_chain_order(solver):
-    result = solver(_stats(_chain_clients(0)))
-    assert result.causal_order == (0, 1, 2, 3)
+@pytest.mark.parametrize("method", ["deflation", "ratio", "sort"])
+def test_every_method_recovers_the_chain_order(method):
+    assert fedrcd(_stats(_chain_clients(0)), method=method).causal_order == (0, 1, 2, 3)
 
 
 def test_exact_solver_recovers_the_chain_order():
-    result = fedrcd_exact(_chain_clients(1))
-    assert result.causal_order == (0, 1, 2, 3)
+    assert fedrcd_exact(_chain_clients(1)).causal_order == (0, 1, 2, 3)
+    assert fedrcd_exact([np.vstack(_chain_clients(1))]).causal_order == (0, 1, 2, 3)
+
+
+def test_ratio_deflation_removes_the_source_with_its_coefficient():
+    """Cum(s, s, j) / Cum(s, s, s) is the coefficient of s in j; Cum(j, j, s) gives its square."""
+    from fedcausal.lingam.rcd import _deflated_order
+
+    rng = np.random.default_rng(7)
+    e = rng.exponential(1.0, size=(200_000, 2)) - 1.0
+    x = np.column_stack([e[:, 0], 1.5 * e[:, 0] + e[:, 1]])
+    stats = aggregate_and_compute_cumulants([compute_local_raw_stats(x, 3)])
+    cur = {k: np.array(stats[k]) for k in ("cov", "c3", "c12", "c21")}
+    assert _deflated_order(cur, 3, "ratio") == [0, 1]
+    assert cur["cov"][1, 1] == pytest.approx(1.0, abs=0.05)
+
+
+@pytest.mark.parametrize("method", ["deflation", "ratio", "sort"])
+def test_third_order_methods_need_only_third_order_sums(method):
+    clients = _skewed_chain_clients(8)
+    stats = aggregate_and_compute_cumulants([compute_local_raw_stats(c, order=3) for c in clients])
+    assert fedrcd(stats, method=method).causal_order == (0, 1, 2, 3)
+    with pytest.raises(ValueError, match="fourth-order"):
+        fedrcd(stats, order=4)
+
+
+def test_bad_method_or_order_is_an_error():
+    stats = _stats(_chain_clients(9))
+    with pytest.raises(ValueError, match="method"):
+        fedrcd(stats, method="bogus")
+    with pytest.raises(ValueError, match="order"):
+        fedrcd(stats, order=5)
 
 
 def test_result_is_a_frozen_dataclass_with_the_right_shapes():

@@ -98,7 +98,7 @@ def continuous_chain(seed: int, n: int = 6000, n_vars: int = 4) -> ContinuousDat
     x[:, 0] = e[:, 0]
     for j in range(1, n_vars):
         x[:, j] = 0.8 * x[:, j - 1] + e[:, j]
-    return ContinuousDataset.from_arrays(x, [f"x{j}" for j in range(n_vars)])
+    return ContinuousDataset(x, [f"x{j}" for j in range(n_vars)])
 
 
 def permuted_continuous_chain(seed: int, perm: Sequence[int], n: int = 6000) -> ContinuousDataset:
@@ -109,6 +109,4 @@ def permuted_continuous_chain(seed: int, perm: Sequence[int], n: int = 6000) -> 
     """
     n_vars = len(perm)
     base = continuous_chain(seed, n=n, n_vars=n_vars)
-    return ContinuousDataset.from_arrays(
-        base.values[:, list(perm)], [f"x{j}" for j in range(n_vars)]
-    )
+    return ContinuousDataset(base.values[:, list(perm)], [f"x{j}" for j in range(n_vars)])

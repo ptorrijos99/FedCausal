@@ -35,17 +35,7 @@ __all__ = [
 ]
 
 # The wire format: arrays are matched by position, so only ever append.
-_STATS_KEYS = (
-    "sum_x",
-    "sum_xx",
-    "sum_x3",
-    "sum_x1y2",
-    "sum_x2y1",
-    "sum_x4",
-    "sum_x1y3",
-    "sum_x3y1",
-    "sum_x2y2",
-)
+_STATS_KEYS = ("mean", "m11", "m21", "m31", "m22")
 
 
 def names_fingerprint(names: Sequence[str]) -> str:
@@ -85,36 +75,26 @@ def control_config(**scalars: Any) -> ConfigRecord:
 
 
 def stats_to_record(stats: RawStats) -> ArrayRecord:
-    """Pack fourth-order raw moment sums into an ``ArrayRecord``.
+    """Pack a site's moment sums into an ``ArrayRecord``.
 
     Parameters
     ----------
     stats : RawStats
-        Output of :func:`fedcausal.lingam.cumulants.compute_local_raw_stats`
-        with ``order=4``.
+        Output of :func:`fedcausal.lingam.cumulants.compute_local_raw_stats`.
 
     Returns
     -------
     ArrayRecord
-        The nine moment arrays in a fixed order; see :func:`record_to_stats`.
-
-    Raises
-    ------
-    ValueError
-        If `stats` lacks the fourth-order entries.
+        The mean and the moment-sum matrices in a fixed order, three of them
+        for third-order sums and five for fourth-order; see :func:`record_to_stats`.
     """
-    missing = [key for key in _STATS_KEYS if key not in stats]
-    if missing:
-        raise ValueError(
-            f"stats is missing fourth-order entries {missing}; the transport "
-            "requires compute_local_raw_stats(..., order=4)"
-        )
-    return ArrayRecord([np.ascontiguousarray(stats[key], dtype=np.float64) for key in _STATS_KEYS])
+    keys = _STATS_KEYS if "m31" in stats else _STATS_KEYS[:3]
+    return ArrayRecord([np.ascontiguousarray(stats[key], dtype=np.float64) for key in keys])
 
 
 def record_to_stats(rec: ArrayRecord, n: int) -> RawStats:
-    """Rebuild raw moment sums from a :func:`stats_to_record` record."""
+    """Rebuild moment sums from a :func:`stats_to_record` record."""
     arrays = rec.to_numpy_ndarrays()
     stats: RawStats = {"n": int(n)}
-    stats.update(dict(zip(_STATS_KEYS, arrays, strict=True)))
+    stats.update(dict(zip(_STATS_KEYS[: len(arrays)], arrays, strict=True)))
     return stats

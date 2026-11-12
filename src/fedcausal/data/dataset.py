@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-import pandas as pd
+
+from fedcausal._base import is_frame
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+    from typing import TypeAlias
 
-__all__ = ["DiscreteDataset"]
+    import numpy.typing as npt
+    import pandas as pd
+
+    DiscreteLike: TypeAlias = "DiscreteDataset | pd.DataFrame | npt.ArrayLike"
+    """Anything the discrete estimators accept as a table of observations."""
+
+__all__ = ["DiscreteDataset", "as_discrete", "as_discrete_sites"]
 
 
 class DiscreteDataset:
@@ -71,15 +79,15 @@ class DiscreteDataset:
     `subset`, so all sites split from one dataset agree on the variables.
     """
 
-    values: np.ndarray
-    cardinalities: np.ndarray
+    values: npt.NDArray[np.int32]
+    cardinalities: npt.NDArray[np.int32]
     names: tuple[str, ...]
     categories: tuple[tuple[str, ...], ...]
 
     def __init__(
         self,
-        values: np.ndarray,
-        cardinalities: np.ndarray,
+        values: npt.ArrayLike,
+        cardinalities: npt.ArrayLike,
         names: Sequence[str],
         categories: Sequence[Sequence[str]],
     ) -> None:
@@ -130,7 +138,7 @@ class DiscreteDataset:
         """int: Number of variables (columns) in the dataset."""
         return int(self.values.shape[1])
 
-    def subset(self, rows: np.ndarray) -> DiscreteDataset:
+    def subset(self, rows: npt.NDArray[np.integer[Any]]) -> DiscreteDataset:
         """Select a subset of rows, keeping the full parent variable domains.
 
         Parameters
@@ -155,82 +163,50 @@ class DiscreteDataset:
         return subset_ds
 
     @classmethod
-    def from_arrays(
-        cls,
-        values: np.ndarray,
-        cardinalities: np.ndarray,
-        names: Sequence[str],
-        categories: Sequence[Sequence[str]],
+    def from_pandas(
+        cls, df: pd.DataFrame, categories: Sequence[Sequence[str]] | None = None
     ) -> DiscreteDataset:
-        """Build a dataset directly from arrays, with full validation.
+        """Build a dataset from a DataFrame of categorical columns.
 
-        Parameters
-        ----------
-        values : np.ndarray
-            Integer-coded data, shape ``(n_rows, n_vars)``.
-        cardinalities : np.ndarray
-            Number of levels per variable, shape ``(n_vars,)``.
-        names : Sequence[str]
-            Variable names, length ``n_vars``. Coerced to a tuple.
-        categories : Sequence[Sequence[str]]
-            Level labels per variable. Coerced to a tuple of tuples.
-
-        Returns
-        -------
-        DiscreteDataset
-            The validated dataset.
-
-        Raises
-        ------
-        ValueError
-            See `DiscreteDataset`.
-        """
-        return cls(values, cardinalities, names, categories)
-
-    @classmethod
-    def from_pandas(cls, df: pd.DataFrame) -> DiscreteDataset:
-        """Build a dataset from a pandas DataFrame of categorical columns.
-
-        Each column's distinct values, read as strings, become its levels in
-        sorted order.
+        Values are read as strings, so ``1`` and ``"1"`` are the same level.
 
         Parameters
         ----------
         df : pandas.DataFrame
-            One column per variable, one row per observation. Column
-            names become `names`. Values are converted to `str` before
-            encoding (so, e.g., booleans become ``"True"``/``"False"``).
+            One column per variable, one row per observation.
+        categories : sequence of sequences of str, optional
+            The levels of each column. By default, the distinct values of each
+            column, sorted. Pass them to give several datasets one encoding.
 
         Returns
         -------
         DiscreteDataset
-            The encoded dataset.
 
         Raises
         ------
         ValueError
-            If any column contains missing values (``NaN``/``None``).
+            If a column has missing values, or a value outside `categories`.
         """
+        import pandas as pd
+
         names = [str(c) for c in df.columns]
-        n_rows = len(df)
-        n_vars = len(names)
-        values = np.empty((n_rows, n_vars), dtype=np.int32)
-        cardinalities = np.empty(n_vars, dtype=np.int32)
-        categories: list[list[str]] = []
+        values = np.empty((len(df), len(names)), dtype=np.int32)
+        levels: list[list[str]] = []
         for j, col in enumerate(df.columns):
             series = df[col]
             if bool(series.isna().any()):
-                raise ValueError(
-                    f"column {col!r} contains missing values; DiscreteDataset "
-                    "requires fully-observed discrete data"
-                )
-            str_values = series.astype(str)
-            levels = sorted(str_values.unique().tolist())
-            coded = pd.Categorical(str_values, categories=levels)
-            values[:, j] = coded.codes.astype(np.int32)
-            cardinalities[j] = len(levels)
-            categories.append(levels)
-        return cls(values, cardinalities, names, categories)
+                raise ValueError(f"column {col!r} has missing values")
+            labels = series.astype(str)
+            col_levels = (
+                sorted(labels.unique().tolist()) if categories is None else list(categories[j])
+            )
+            codes = pd.Categorical(labels, categories=col_levels).codes
+            if bool((codes < 0).any()):
+                unknown = sorted(set(labels) - set(col_levels))
+                raise ValueError(f"column {col!r} has values outside its levels: {unknown}")
+            values[:, j] = codes
+            levels.append(col_levels)
+        return cls(values, np.array([len(lv) for lv in levels]), names, levels)
 
     @classmethod
     def from_csv(cls, path: str | Path) -> DiscreteDataset:
@@ -256,6 +232,8 @@ class DiscreteDataset:
         ValueError
             If any column contains an empty or whitespace-only field.
         """
+        import pandas as pd
+
         df = pd.read_csv(path, dtype=str, keep_default_na=False, na_filter=False)
         for col in df.columns:
             if bool((df[col].str.strip() == "").any()):
@@ -266,5 +244,101 @@ class DiscreteDataset:
                 )
         return cls.from_pandas(df)
 
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the data as a DataFrame of level labels."""
+        import pandas as pd
+
+        return pd.DataFrame(
+            {
+                name: np.asarray(levels, dtype=object)[self.values[:, j]]
+                for j, (name, levels) in enumerate(zip(self.names, self.categories, strict=True))
+            }
+        )
+
     def __repr__(self) -> str:
         return f"DiscreteDataset(n_rows={self.n_rows}, n_vars={self.n_vars}, names={self.names!r})"
+
+
+def _as_frame(X: pd.DataFrame | npt.ArrayLike) -> pd.DataFrame:
+    import pandas as pd
+
+    if is_frame(X):
+        return cast("pd.DataFrame", X)
+    array = np.asarray(X)
+    if array.ndim != 2:
+        raise ValueError(f"expected a 2-D table, got an array of shape {array.shape}")
+    return pd.DataFrame(array, columns=[f"x{j}" for j in range(array.shape[1])])
+
+
+def as_discrete(
+    X: DiscreteLike, categories: Sequence[Sequence[str]] | None = None
+) -> DiscreteDataset:
+    """Return `X` as a :class:`DiscreteDataset`, encoding it if needed.
+
+    Parameters
+    ----------
+    X : DiscreteDataset, pandas.DataFrame or array-like of shape (n_rows, n_vars)
+        Every distinct value of a column is one level. Array columns are
+        named ``x0, x1, ...``.
+    categories : sequence of sequences of str, optional
+        The levels to encode each column with, to match another dataset.
+
+    Returns
+    -------
+    DiscreteDataset
+
+    Raises
+    ------
+    ValueError
+        If a value is not among the given `categories`.
+    """
+    if isinstance(X, DiscreteDataset):
+        if categories is None or X.categories == tuple(tuple(c) for c in categories):
+            return X
+        X = X.to_pandas()
+    return DiscreteDataset.from_pandas(_as_frame(X), categories)
+
+
+def as_discrete_sites(sites: Sequence[DiscreteLike]) -> list[DiscreteDataset]:
+    """Encode several sites' tables with one shared set of levels per variable.
+
+    A level that occurs at only one site still counts towards the variable's
+    cardinality everywhere, so every site scores over the same domains.
+
+    Parameters
+    ----------
+    sites : sequence of DiscreteDataset, pandas.DataFrame or array-like
+        One table per site, all with the same columns in the same order.
+
+    Returns
+    -------
+    list of DiscreteDataset
+
+    Raises
+    ------
+    ValueError
+        If there are no sites, or their columns differ.
+    """
+    if len(sites) == 0:
+        raise ValueError("expected at least one site")
+    first = sites[0]
+    if isinstance(first, DiscreteDataset) and all(
+        isinstance(s, DiscreteDataset)
+        and s.names == first.names
+        and s.categories == first.categories
+        for s in sites
+    ):
+        return list(sites)  # type: ignore[arg-type]
+    frames = [
+        _as_frame(site) if not isinstance(site, DiscreteDataset) else site.to_pandas()
+        for site in sites
+    ]
+    columns = list(frames[0].columns)
+    for k, frame in enumerate(frames[1:], start=1):
+        if list(frame.columns) != columns:
+            raise ValueError(f"site {k} has columns {list(frame.columns)}, expected {columns}")
+    levels = [
+        sorted(set().union(*(frame[col].astype(str).unique() for frame in frames)))
+        for col in columns
+    ]
+    return [DiscreteDataset.from_pandas(frame, levels) for frame in frames]

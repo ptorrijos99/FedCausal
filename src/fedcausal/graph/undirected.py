@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    import numpy.typing as npt
+
     from fedcausal.graph.dag import DAG
 
 __all__ = [
@@ -22,7 +24,7 @@ __all__ = [
 ]
 
 
-def moralize(dag: DAG) -> np.ndarray:
+def moralize(dag: DAG) -> npt.NDArray[np.bool_]:
     """Moralize a DAG into an undirected moral graph.
 
     The moral graph is the skeleton plus an edge between every two parents of
@@ -40,7 +42,7 @@ def moralize(dag: DAG) -> np.ndarray:
         ``(dag.num_nodes, dag.num_nodes)`` representing the moral graph.
     """
     directed = dag.adjacency()
-    moral: np.ndarray = directed | directed.T
+    moral: npt.NDArray[np.bool_] = directed | directed.T
     for v in range(dag.num_nodes):
         parents = sorted(dag.parents(v))
         for i in range(len(parents)):
@@ -51,7 +53,7 @@ def moralize(dag: DAG) -> np.ndarray:
     return moral
 
 
-def mcs_order(adj: np.ndarray) -> list[int]:
+def mcs_order(adj: npt.NDArray[np.bool_]) -> list[int]:
     """Compute a maximum cardinality search (MCS) ordering.
 
     Repeatedly picks the unnumbered node adjacent to the most numbered ones,
@@ -86,7 +88,7 @@ def mcs_order(adj: np.ndarray) -> list[int]:
     return order
 
 
-def fill_in(adj: np.ndarray, order: list[int]) -> np.ndarray:
+def fill_in(adj: npt.NDArray[np.bool_], order: list[int]) -> npt.NDArray[np.bool_]:
     """Triangulate a graph using the Tarjan and Yannakakis (1984) fill-in.
 
     Visits nodes in reverse `order` and connects every two neighbours of the
@@ -122,7 +124,7 @@ def fill_in(adj: np.ndarray, order: list[int]) -> np.ndarray:
     return filled
 
 
-def maximal_cliques(adj: np.ndarray, order: list[int]) -> list[frozenset[int]]:
+def maximal_cliques(adj: npt.NDArray[np.bool_], order: list[int]) -> list[frozenset[int]]:
     """Extract the maximal cliques of a chordal graph.
 
     Each node together with its neighbours earlier in `order` is a clique of a

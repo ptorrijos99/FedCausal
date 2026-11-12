@@ -6,13 +6,16 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
+
+from fedcausal._base import is_frame
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-__all__ = ["ContinuousDataset"]
+    import pandas as pd
+
+__all__ = ["ContinuousDataset", "as_continuous", "as_continuous_sites"]
 
 
 class ContinuousDataset:
@@ -99,31 +102,6 @@ class ContinuousDataset:
         return subset_ds
 
     @classmethod
-    def from_arrays(
-        cls, values: npt.NDArray[np.float64], names: Sequence[str]
-    ) -> ContinuousDataset:
-        """Build a dataset directly from an array and names, with full validation.
-
-        Parameters
-        ----------
-        values : numpy.ndarray
-            Real-valued data, shape ``(n_rows, n_vars)``.
-        names : Sequence[str]
-            Variable names, length ``n_vars``.
-
-        Returns
-        -------
-        ContinuousDataset
-            The validated dataset.
-
-        Raises
-        ------
-        ValueError
-            See :class:`ContinuousDataset`.
-        """
-        return cls(values, names)
-
-    @classmethod
     def from_pandas(cls, df: pd.DataFrame) -> ContinuousDataset:
         """Build a dataset from a pandas DataFrame of numeric columns.
 
@@ -143,6 +121,8 @@ class ContinuousDataset:
         ValueError
             If any column is non-numeric, or contains a non-finite value.
         """
+        import pandas as pd
+
         for col in df.columns:
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise ValueError(
@@ -172,9 +152,53 @@ class ContinuousDataset:
         ValueError
             If any column is non-numeric, or contains a non-finite value.
         """
+        import pandas as pd
+
         return cls.from_pandas(pd.read_csv(path))
 
     def __repr__(self) -> str:
         return (
             f"ContinuousDataset(n_rows={self.n_rows}, n_vars={self.n_vars}, names={self.names!r})"
         )
+
+
+def as_continuous(X: ContinuousDataset | pd.DataFrame | npt.ArrayLike) -> ContinuousDataset:
+    """Return `X` as a :class:`ContinuousDataset`; array columns are named ``x0, x1, ...``."""
+    return as_continuous_sites([X])[0]
+
+
+def as_continuous_sites(
+    sites: Sequence[ContinuousDataset | pd.DataFrame | npt.ArrayLike],
+) -> list[ContinuousDataset]:
+    """Return each site's table as a :class:`ContinuousDataset`, checking they share variables.
+
+    Parameters
+    ----------
+    sites : sequence of ContinuousDataset, pandas.DataFrame or array-like
+        One table per site. Array columns are named ``x0, x1, ...``.
+
+    Returns
+    -------
+    list of ContinuousDataset
+
+    Raises
+    ------
+    ValueError
+        If there are no sites, or their variables differ.
+    """
+    if len(sites) == 0:
+        raise ValueError("expected at least one site")
+    out = []
+    for site in sites:
+        if isinstance(site, ContinuousDataset):
+            out.append(site)
+        elif is_frame(site):
+            out.append(ContinuousDataset.from_pandas(site))  # type: ignore[arg-type]
+        else:
+            array = np.asarray(site, dtype=float)
+            names = [f"x{j}" for j in range(array.shape[1])] if array.ndim == 2 else []
+            out.append(ContinuousDataset(array, names))
+    for k, site in enumerate(out[1:], start=1):
+        if site.names != out[0].names:
+            raise ValueError(f"site {k} has variables {site.names}, expected {out[0].names}")
+    return out

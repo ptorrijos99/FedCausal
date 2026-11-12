@@ -19,9 +19,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from fedcausal.lingam.cumulants import cross_cumulants4, unbiased_cumulant4
-
-__all__ = ["tau_matrix_3rd", "tau_matrix_4th", "tau_matrix_4th_from_data"]
+__all__ = ["tau_matrix_3rd", "tau_matrix_4th"]
 
 
 def tau_matrix_3rd(
@@ -86,40 +84,4 @@ def tau_matrix_4th(
     """
     tau = np.abs(c4[:, np.newaxis] * c13 - c22 * c31)
     np.fill_diagonal(tau, 0.0)
-    return tau
-
-
-def tau_matrix_4th_from_data(
-    x: npt.NDArray[np.float64],
-    columns: list[int] | None = None,
-) -> npt.NDArray[np.float64]:
-    """Return the fourth-order tau matrix computed directly from a data matrix.
-
-    Parameters
-    ----------
-    x : numpy.ndarray
-        Data, shape ``(n, p)``.
-    columns : list of int, optional
-        Column indices to restrict to, in the order they should appear in the
-        result. Defaults to all columns.
-
-    Returns
-    -------
-    numpy.ndarray
-        Shape ``(len(columns), len(columns))``.
-
-    Notes
-    -----
-    Needs the raw data, so only for use on a single machine.
-    """
-    cols = list(range(x.shape[1])) if columns is None else list(columns)
-    size = len(cols)
-    c4_local = np.array([unbiased_cumulant4(x[:, c]) for c in cols], dtype=np.float64)
-    tau = np.zeros((size, size), dtype=np.float64)
-    for i in range(size):
-        for j in range(size):
-            if i == j:
-                continue
-            c13, c31, c22 = cross_cumulants4(x[:, cols[i]], x[:, cols[j]])
-            tau[i, j] = abs(c4_local[i] * c13 - c22 * c31)
     return tau
