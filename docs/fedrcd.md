@@ -5,7 +5,7 @@
 ```python
 from fedcausal import FedRCD
 
-model = FedRCD(method="deflation").fit(sites)   # one array or DataFrame per site
+model = FedRCD(method="deflation").fit(sites)  # one array or DataFrame per site
 model.causal_order_, model.coef_, model.dag_
 ```
 

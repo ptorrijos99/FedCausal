@@ -19,20 +19,20 @@ from fedcausal import GES, FedGES
 from fedcausal.data import contiguous_split
 from fedcausal.datasets import load_alarm
 
-data = load_alarm().data                       # 37 variables, 5000 rows, bundled
+data = load_alarm().data  # 37 variables, 5000 rows, bundled
 
-model = GES().fit(data)                        # also takes a DataFrame or an array
-model.adjacency_                               # the learned CPDAG, with variable names
+model = GES().fit(data)  # also takes a DataFrame or an array
+model.adjacency_  # the learned CPDAG, with variable names
 
-sites = contiguous_split(data, 5)              # or one DataFrame per site
-federated = FedGES(n_jobs=-1).fit(sites)       # the sites learn in parallel
+sites = contiguous_split(data, 5)  # or one DataFrame per site
+federated = FedGES(n_jobs=-1).fit(sites)  # the sites learn in parallel
 federated.dag_, federated.history_
 ```
 
 ```python
 from fedcausal import FedRCD
 
-model = FedRCD().fit([x_site1, x_site2, x_site3])   # one array or DataFrame per site
+model = FedRCD().fit([x_site1, x_site2, x_site3])  # one array or DataFrame per site
 model.causal_order_, model.coef_
 ```
 

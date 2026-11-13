@@ -7,8 +7,16 @@ What each estimator does, what its options change, and how it is made fast. The 
 Greedy Equivalence Search (Chickering, 2002) moves between Markov equivalence classes. A forward phase applies the Insert that most improves the score until none does; a backward phase does the same with Delete. The result is a CPDAG: directed edges are compelled, undirected ones are those the data cannot orient.
 
 ```python
-GES(criterion="bdeu", ess=1.0, expected_parents=1.0, penalty_discount=1.0,
-    max_parents=None, max_t_size=2, required=None, forbidden=None)
+GES(
+    criterion="bdeu",
+    ess=1.0,
+    expected_parents=1.0,
+    penalty_discount=1.0,
+    max_parents=None,
+    max_t_size=2,
+    required=None,
+    forbidden=None,
+)
 ```
 
 | Option | Default | What it does |
@@ -40,10 +48,22 @@ GES(criterion="bdeu", ess=1.0, expected_parents=1.0, penalty_discount=1.0,
 ## FedGES
 
 ```python
-FedGES(n_rounds=10, criterion="bdeu", ess=1.0, expected_parents=1.0,
-       penalty_discount=1.0, max_parents=None, max_t_size=2,
-       global_fusion=None, local_fusion=None, refinement=None,
-       convergence=None, required=None, forbidden=None, n_jobs=None)
+FedGES(
+    n_rounds=10,
+    criterion="bdeu",
+    ess=1.0,
+    expected_parents=1.0,
+    penalty_discount=1.0,
+    max_parents=None,
+    max_t_size=2,
+    global_fusion=None,
+    local_fusion=None,
+    refinement=None,
+    convergence=None,
+    required=None,
+    forbidden=None,
+    n_jobs=None,
+)
 ```
 
 The score options are GES's, applied at every site; with `criterion="gaussian_bic"` the sites hold continuous data.

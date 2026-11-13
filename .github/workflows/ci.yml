@@ -71,7 +71,8 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: pip install -e ".[docs]"
+      # flower too, or the API page of fedcausal.flower cannot import it.
+      - run: pip install -e ".[docs,flower]"
       # Builds the gallery too, so an example that stops running fails here.
       - run: sphinx-build -b html docs docs/_build/html
 

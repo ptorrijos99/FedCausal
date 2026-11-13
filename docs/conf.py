@@ -71,6 +71,8 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "show_signature": False,
     "download_all_examples": False,
+    # The examples draw no figures, so the build does not need matplotlib.
+    "image_scrapers": (),
 }
 
 # -- HTML -------------------------------------------------------------------

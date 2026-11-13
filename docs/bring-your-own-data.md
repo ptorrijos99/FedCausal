@@ -12,7 +12,7 @@ import pandas as pd
 from fedcausal import GES
 
 GES().fit(pd.read_csv("cohort.csv", dtype=str))
-GES().fit(array)                     # columns are named x0, x1, ...
+GES().fit(array)  # columns are named x0, x1, ...
 ```
 
 Every distinct value of a column is one level, so `1, 2, 3` are three categories, not a quantity. A DataFrame with missing values is rejected, naming the column; impute or drop those rows first.

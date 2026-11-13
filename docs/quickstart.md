@@ -20,9 +20,9 @@ Every distinct value of a column is one level, so numbers are read as labels too
 from fedcausal.datasets import load_asia
 from fedcausal.metrics import edge_scores, shd
 
-bundle = load_asia()                       # data sampled from a known network
+bundle = load_asia()  # data sampled from a known network
 model = GES().fit(bundle.data)
-shd(bundle.truth, model.dag_)              # structural Hamming distance
+shd(bundle.truth, model.dag_)  # structural Hamming distance
 edge_scores(bundle.truth, model.dag_).f1_skel
 ```
 
@@ -45,7 +45,7 @@ Each site's table stays a separate input: its rows are only ever seen by its own
 ```python
 from fedcausal import FedRCD
 
-model = FedRCD().fit([x1, x2, x3])         # one numeric array or DataFrame per site
+model = FedRCD().fit([x1, x2, x3])  # one numeric array or DataFrame per site
 model.causal_order_, model.coef_
 ```
 
