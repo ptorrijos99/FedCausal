@@ -6,13 +6,14 @@ given.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 
 from fedcausal.data.dataset import DiscreteDataset
 
 if TYPE_CHECKING:
+    import numpy.typing as npt
     from typing_extensions import Self
 
 __all__ = ["Partitionable", "contiguous_split", "dirichlet_split"]
@@ -32,7 +33,7 @@ class Partitionable(Protocol):
         """int: Number of variables (columns)."""
         ...
 
-    def subset(self, rows: np.ndarray) -> Self:
+    def subset(self, rows: npt.NDArray[np.integer[Any]]) -> Self:
         """Return a new dataset holding only `rows`."""
         ...
 
@@ -138,7 +139,7 @@ def dirichlet_split(
     return [ds.subset(np.array(sorted(rows), dtype=np.int64)) for rows in client_rows]
 
 
-def _round_sizes(total: int, proportions: np.ndarray) -> np.ndarray:
+def _round_sizes(total: int, proportions: npt.NDArray[np.float64]) -> npt.NDArray[np.int64]:
     """Round Dirichlet proportions to integer counts summing to `total`.
 
     Largest-remainder rounding, with ties going to the lowest index.
@@ -156,9 +157,9 @@ def _round_sizes(total: int, proportions: np.ndarray) -> np.ndarray:
         Nonnegative integer counts (``int64``), one per entry of
         `proportions`, summing exactly to `total`.
     """
-    weights: np.ndarray = proportions / proportions.sum()
-    raw: np.ndarray = weights * total
-    sizes: np.ndarray = np.floor(raw).astype(np.int64)
+    weights: npt.NDArray[np.float64] = proportions / proportions.sum()
+    raw: npt.NDArray[np.float64] = weights * total
+    sizes: npt.NDArray[np.int64] = np.floor(raw).astype(np.int64)
     remainder = int(total - sizes.sum())
     if remainder > 0:
         frac = raw - sizes

@@ -5,9 +5,9 @@ import pytest
 from fedcausal.data import ContinuousDataset
 
 
-def test_from_arrays_shape_and_names():
+def test_constructor_shape_and_names():
     values = np.arange(12, dtype=float).reshape(4, 3)
-    ds = ContinuousDataset.from_arrays(values, ["a", "b", "c"])
+    ds = ContinuousDataset(values, ["a", "b", "c"])
     assert ds.n_rows == 4
     assert ds.n_vars == 3
     assert ds.names == ("a", "b", "c")
@@ -16,19 +16,19 @@ def test_from_arrays_shape_and_names():
 
 def test_rejects_non_2d():
     with pytest.raises(ValueError, match="2-D"):
-        ContinuousDataset.from_arrays(np.zeros(5), ["a"])
+        ContinuousDataset(np.zeros(5), ["a"])
 
 
 def test_rejects_name_count_mismatch():
     with pytest.raises(ValueError, match="names must have 3 entries"):
-        ContinuousDataset.from_arrays(np.zeros((4, 3)), ["a", "b"])
+        ContinuousDataset(np.zeros((4, 3)), ["a", "b"])
 
 
 @pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
 def test_rejects_non_finite(bad):
     values = np.array([[1.0, 2.0], [bad, 4.0]])
     with pytest.raises(ValueError, match="non-finite"):
-        ContinuousDataset.from_arrays(values, ["a", "b"])
+        ContinuousDataset(values, ["a", "b"])
 
 
 def test_from_pandas_rejects_a_non_numeric_column():
@@ -39,7 +39,7 @@ def test_from_pandas_rejects_a_non_numeric_column():
 
 def test_subset_shares_names_and_selects_rows():
     values = np.arange(12, dtype=float).reshape(4, 3)
-    ds = ContinuousDataset.from_arrays(values, ["a", "b", "c"])
+    ds = ContinuousDataset(values, ["a", "b", "c"])
     sub = ds.subset(np.array([0, 2]))
     assert sub.n_rows == 2
     assert sub.names is ds.names

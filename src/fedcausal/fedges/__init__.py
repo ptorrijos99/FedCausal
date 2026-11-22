@@ -1,58 +1,35 @@
-"""FedGES: federated Bayesian network structure learning over discrete data.
-
-Every client learns a local structure with GES, the server fuses their DAGs
-with a structural :class:`~fedcausal.fusion.FusionOperator` and broadcasts the
-result, and convergence criteria stop the rounds. :func:`run_fedges` runs the
-whole thing in one process; :mod:`fedcausal.flower.fedges` runs the same loop
-over a real federation.
+"""FedGES: federated structure learning over discrete data.
 
 Torrijos, Gámez & Puerta, "FedGES: A Federated Learning Approach for Bayesian
 Network Structure Learning", *Machine Learning* 115, 9 (2026).
+
+:class:`FedGES` runs a whole federation in one machine, optionally across
+processes. The pieces it is built from, :class:`Site` and :func:`run_rounds`,
+are what the Flower transport in :mod:`fedcausal.flower` runs across machines.
 """
 
-from fedcausal.fedges.client import Client
 from fedcausal.fedges.convergence import (
+    AnyOf,
     Convergence,
-    IterationEquality,
     ModelEquality,
-    MultipleConvergence,
-    NoneConvergence,
     ScoreImprovement,
-)
-from fedcausal.fedges.defaults import (
-    default_client_fusion,
     default_convergence,
-    default_server_fusion,
 )
-from fedcausal.fedges.learner import GESLearner, LocalLearner, Refinement
+from fedcausal.fedges.estimator import FedGES
 from fedcausal.fedges.model import BNModel
-from fedcausal.fedges.observer import (
-    MetricsObserver,
-    ModelCollector,
-    RoundObserver,
-    RoundStats,
-)
-from fedcausal.fedges.server import Server, run_fedges
+from fedcausal.fedges.rounds import SitePool, run_rounds
+from fedcausal.fedges.site import Refinement, Site
 
 __all__ = [
+    "AnyOf",
     "BNModel",
-    "Client",
-    "Server",
-    "RoundStats",
-    "RoundObserver",
-    "MetricsObserver",
-    "ModelCollector",
-    "run_fedges",
-    "GESLearner",
-    "LocalLearner",
-    "Refinement",
     "Convergence",
-    "NoneConvergence",
-    "ScoreImprovement",
+    "FedGES",
     "ModelEquality",
-    "IterationEquality",
-    "MultipleConvergence",
-    "default_client_fusion",
-    "default_server_fusion",
+    "Refinement",
+    "ScoreImprovement",
+    "Site",
+    "SitePool",
     "default_convergence",
+    "run_rounds",
 ]

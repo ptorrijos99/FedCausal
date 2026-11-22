@@ -136,7 +136,7 @@ def test_to_dag_no_extension_raises() -> None:
     p.add_directed(0, 1)
     p.add_directed(1, 2)
     p.add_directed(2, 0)
-    with pytest.raises(ValueError, match="no consistent extension"):
+    with pytest.raises(ValueError, match="no consistent"):
         p.to_dag()
 
 

@@ -42,3 +42,9 @@ def test_input_is_not_mutated() -> None:
     before = set(g.edges())
     beta_to_alpha(g, [2, 1, 0])
     assert set(g.edges()) == before
+
+
+def test_the_transform_adds_only_the_edges_the_order_needs() -> None:
+    """For the order 1, 0, 3, 2, node 3 needs parents {0, 1} and node 2 needs {0, 1, 3}."""
+    dag = DAG.from_edges(4, [(0, 3), (2, 1), (2, 3)])
+    assert beta_to_alpha(dag, [1, 0, 3, 2]).num_edges == 5

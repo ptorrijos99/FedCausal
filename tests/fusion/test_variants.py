@@ -21,14 +21,13 @@ def test_max_frequency_keeps_only_unanimous() -> None:
     assert frozenset({1, 2}) not in skel
 
 
-def test_consensus_pct_threshold_with_four_clients() -> None:
-    """At 50% of four clients an edge needs two of them."""
+def test_consensus_pct_needs_at_least_the_given_share_of_votes() -> None:
+    """50% of four inputs is two votes, and of three inputs also two."""
     d01 = DAG.from_edges(3, [(0, 1)])
-    dags = [d01, d01.copy(), DAG.from_edges(3, [(1, 2)]), DAG(3)]
-    out = consensus_pct(dags, 50)
-    skel = {frozenset(e) for e in out.edges()}
-    assert frozenset({0, 1}) in skel  # 2/4 = 50% >= lim 2
-    assert frozenset({1, 2}) not in skel  # 1/4 < lim 2
+    d12 = DAG.from_edges(3, [(1, 2)])
+    four = {frozenset(e) for e in consensus_pct([d01, d01.copy(), d12, DAG(3)], 50).edges()}
+    three = {frozenset(e) for e in consensus_pct([d01, d01.copy(), d12], 50).edges()}
+    assert four == three == {frozenset({0, 1})}
 
 
 def test_max_edges_int_budget() -> None:

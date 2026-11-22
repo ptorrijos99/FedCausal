@@ -83,12 +83,12 @@ def test_from_pandas_rejects_nan() -> None:
         DiscreteDataset.from_pandas(df)
 
 
-def test_from_arrays_round_trip() -> None:
+def test_constructor_round_trip() -> None:
     values = np.array([[0, 1], [1, 0]])
     cardinalities = np.array([2, 2])
     names = ["X", "Y"]
     categories = [["lo", "hi"], ["no", "yes"]]
-    ds = DiscreteDataset.from_arrays(values, cardinalities, names, categories)
+    ds = DiscreteDataset(values, cardinalities, names, categories)
     assert ds.n_rows == 2
     assert ds.n_vars == 2
     assert ds.values.dtype == np.int32
@@ -97,9 +97,9 @@ def test_from_arrays_round_trip() -> None:
     assert ds.categories == tuple(tuple(cats) for cats in categories)
 
 
-def test_from_arrays_rejects_non_2d_values() -> None:
+def test_constructor_rejects_non_2d_values() -> None:
     with pytest.raises(ValueError):
-        DiscreteDataset.from_arrays(
+        DiscreteDataset(
             np.array([0, 1, 2]),
             np.array([3]),
             ["A"],
@@ -107,9 +107,9 @@ def test_from_arrays_rejects_non_2d_values() -> None:
         )
 
 
-def test_from_arrays_rejects_cardinality_length_mismatch() -> None:
+def test_constructor_rejects_cardinality_length_mismatch() -> None:
     with pytest.raises(ValueError):
-        DiscreteDataset.from_arrays(
+        DiscreteDataset(
             np.zeros((3, 2), dtype=np.int32),
             np.array([2]),  # should have length 2
             ["A", "B"],
@@ -117,9 +117,9 @@ def test_from_arrays_rejects_cardinality_length_mismatch() -> None:
         )
 
 
-def test_from_arrays_rejects_categories_length_mismatch_with_cardinalities() -> None:
+def test_constructor_rejects_categories_length_mismatch_with_cardinalities() -> None:
     with pytest.raises(ValueError):
-        DiscreteDataset.from_arrays(
+        DiscreteDataset(
             np.zeros((3, 1), dtype=np.int32),
             np.array([3]),
             ["A"],
@@ -127,9 +127,9 @@ def test_from_arrays_rejects_categories_length_mismatch_with_cardinalities() -> 
         )
 
 
-def test_from_arrays_rejects_names_length_mismatch() -> None:
+def test_constructor_rejects_names_length_mismatch() -> None:
     with pytest.raises(ValueError):
-        DiscreteDataset.from_arrays(
+        DiscreteDataset(
             np.zeros((3, 2), dtype=np.int32),
             np.array([2, 2]),
             ["A"],  # should have length 2
@@ -137,9 +137,9 @@ def test_from_arrays_rejects_names_length_mismatch() -> None:
         )
 
 
-def test_from_arrays_rejects_out_of_range_code() -> None:
+def test_constructor_rejects_out_of_range_code() -> None:
     with pytest.raises(ValueError):
-        DiscreteDataset.from_arrays(
+        DiscreteDataset(
             np.array([[0], [2]], dtype=np.int32),  # code 2 invalid for cardinality 2
             np.array([2]),
             ["A"],
@@ -176,12 +176,10 @@ def test_cardinalities_is_read_only() -> None:
         ds.cardinalities[0] = 99
 
 
-def test_from_arrays_copies_caller_cardinalities_array() -> None:
+def test_constructor_copies_caller_cardinalities_array() -> None:
     values = np.array([[0, 1], [1, 0]])
     caller_cardinalities = np.array([2, 2])
-    ds = DiscreteDataset.from_arrays(
-        values, caller_cardinalities, ["X", "Y"], [["a", "b"], ["c", "d"]]
-    )
+    ds = DiscreteDataset(values, caller_cardinalities, ["X", "Y"], [["a", "b"], ["c", "d"]])
     caller_cardinalities[0] = 99  # mutating the caller's own array afterwards...
     assert ds.cardinalities[0] == 2  # ...must not affect the stored dataset
 

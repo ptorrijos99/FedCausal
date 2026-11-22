@@ -69,25 +69,17 @@ def test_stats_round_trip_is_exact():
     stats = compute_local_raw_stats(x, order=4)
     restored = record_to_stats(stats_to_record(stats), n=stats["n"])
     assert restored["n"] == stats["n"]
-    for key in (
-        "sum_x",
-        "sum_xx",
-        "sum_x3",
-        "sum_x1y2",
-        "sum_x2y1",
-        "sum_x4",
-        "sum_x1y3",
-        "sum_x3y1",
-        "sum_x2y2",
-    ):
+    for key in ("mean", "m11", "m21", "m31", "m22"):
         np.testing.assert_array_equal(restored[key], stats[key])
 
 
-def test_stats_round_trip_rejects_third_order_only():
-    """Order-3 stats have no place on the wire: the transport is fourth-order."""
+def test_third_order_stats_travel_without_the_fourth_order_sums():
     x = np.random.default_rng(1).laplace(0.0, 1.0, size=(100, 3))
-    with pytest.raises(ValueError, match="fourth-order"):
-        stats_to_record(compute_local_raw_stats(x, order=3))
+    stats = compute_local_raw_stats(x, order=3)
+    restored = record_to_stats(stats_to_record(stats), n=stats["n"])
+    assert restored.keys() == stats.keys()
+    for key in ("mean", "m11", "m21"):
+        np.testing.assert_array_equal(restored[key], stats[key])
 
 
 def test_names_fingerprint_agrees_on_equal_names_and_differs_on_order():

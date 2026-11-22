@@ -14,6 +14,7 @@ __all__ = [
     "ConvergedBeforeFusionError",
     "SchemaMismatchError",
     "ClientFailureError",
+    "DenseFusionWarning",
 ]
 
 
@@ -48,3 +49,14 @@ class SchemaMismatchError(FedCausalError):
 
 class ClientFailureError(FedCausalError):
     """Too few clients returned a usable reply in a federated round."""
+
+
+class DenseFusionWarning(UserWarning):
+    """A fused global model came out far denser than the sites' own models.
+
+    The consensus operators transform every input into one shared order, and
+    the edges that transformation adds are much the same at every site, so they
+    pass any vote threshold. It happens when the sites disagree on their
+    v-structures, typically because each overfits a small share of the data.
+    The rounds then slow down as every site searches back from a dense graph.
+    """

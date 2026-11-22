@@ -1,141 +1,66 @@
 # Benchmarks
 
-Measured on one machine, single-threaded, with the default settings. Structures are exact; timings are not, so read them as orders of magnitude and see the note at the end.
+Measured on one laptop with the default settings, 5000 rows per network, from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/). Structures are exact; timings are not, so read them as orders of magnitude.
 
-## How fast, and how large
+## How fast, and how close to the truth
 
-5000 rows per network. Times are search only.
+| Network | Variables | Seconds | Edges | True edges | SHD | SMHD |
+|---|---:|---:|---:|---:|---:|---:|
+| cancer | 5 | < 0.01 | 3 | 4 | 1 | 2 |
+| asia | 8 | 0.01 | 7 | 8 | 2 | 1 |
+| child | 20 | 0.04 | 25 | 25 | 2 | 0 |
+| insurance | 27 | 0.05 | 44 | 52 | 17 | 19 |
+| water | 32 | 0.04 | 31 | 66 | 50 | 88 |
+| mildew | 35 | 0.06 | 33 | 46 | 22 | 40 |
+| alarm | 37 | 0.06 | 47 | 46 | 10 | 11 |
+| hailfinder | 56 | 0.10 | 62 | 66 | 58 | 72 |
+| hepar2 | 70 | 0.10 | 71 | 123 | 64 | 73 |
+| win95pts | 76 | 0.13 | 109 | 112 | 40 | 52 |
+| pathfinder | 109 | 0.29 | 157 | 195 | 203 | 245 |
+| andes | 223 | 0.60 | 286 | 338 | 60 | 147 |
+| diabetes | 413 | 4.36 | 583 | 602 | 309 | 251 |
+| pigs | 441 | 2.65 | 592 | 592 | 0 | 0 |
+| link | 724 | 7.22 | 855 | 1125 | 679 | 987 |
+| munin | 1041 | 20.7 | 994 | 1397 | 1233 | 1601 |
 
-| Network | Variables | Seconds | Edges found | SHD | SMHD |
-|---|---:|---:|---:|---:|---:|
-| cancer | 5 | < 0.01 | 3 | 1 | 2 |
-| asia | 8 | < 0.01 | 7 | 2 | 1 |
-| child | 20 | 0.05 | 25 | 2 | 0 |
-| insurance | 27 | 0.12 | 44 | 17 | 19 |
-| water | 32 | 0.11 | 29 | 49 | 91 |
-| mildew | 35 | 0.21 | 33 | 22 | 40 |
-| alarm | 37 | 0.20 | 46 | 10 | 10 |
-| hailfinder | 56 | 0.58 | 59 | 58 | 72 |
-| hepar2 | 70 | 0.69 | 69 | 66 | 75 |
-| win95pts | 76 | 1.03 | 108 | 39 | 53 |
-| pathfinder | 109 | 1.94 | 147 | 196 | 235 |
-| andes | 223 | 6.26 | 285 | 59 | 146 |
-| diabetes | 413 | 57.9 | 583 | 309 | 251 |
-| pigs | 441 | 38.1 | 592 | 0 | 0 |
-| link | 724 | 140 | 855 | 679 | 987 |
-| munin | 1041 | 842 | 977 | 1230 | 1582 |
+Runtime follows how dense and interconnected a network is more than its size: `pigs` has more variables than `diabetes` and finishes faster. For comparison, causal-learn's GES on the same data takes 53 s on `alarm` and does not finish `andes` in half an hour.
 
-Runtime tracks how dense and interconnected a network is, not just how many variables it has. `pigs` has 441 variables to `diabetes`'s 413, and still finishes in 38 s against 58 s.
+## Against the previous release
 
-## Against causal-learn
+The same data and the same structure prior through 0.1.0 and 0.2.0, on the same machine:
 
-The same data through both, same machine.
-
-| Network | Variables | fedcausal | causal-learn | Ratio |
+| Network | Variables | 0.1.0 (s) | 0.2.0 (s) | Speedup |
 |---|---:|---:|---:|---:|
-| cancer | 5 | < 0.01 | 0.06 |  |
-| asia | 8 | < 0.01 | 0.20 |  |
-| child | 20 | 0.05 | 7.45 | 139x |
-| insurance | 27 | 0.12 | 31.8 | 255x |
-| water | 32 | 0.11 | 18.1 | 159x |
-| mildew | 35 | 0.21 | 209 | 1002x |
-| alarm | 37 | 0.20 | 52.9 | 258x |
-| hailfinder | 56 | 0.58 | 1459 | 2508x |
-| hepar2 | 70 | 0.69 | 53.2 | 78x |
-| win95pts | 76 | 1.03 | 97.5 | 94x |
-| pathfinder | 109 | 1.94 | 552 | 284x |
-| andes | 223 | 6.26 | > 30 min |  |
-| diabetes | 413 | 57.9 | > 30 min |  |
-| pigs | 441 | 38.1 | > 30 min |  |
-| link | 724 | 140 | not run |  |
-| munin | 1041 | 842 | not run |  |
+| alarm | 37 | 0.89 | 0.05 | 18x |
+| hailfinder | 56 | 2.26 | 0.10 | 23x |
+| win95pts | 76 | 3.59 | 0.15 | 24x |
+| pathfinder | 109 | 7.14 | 0.33 | 22x |
+| andes | 223 | 24.8 | 0.72 | 34x |
+| pigs | 441 | 113.5 | 2.71 | 42x |
 
-## What federating costs you
+Both versions learn structures with the same number of edges and the same BDeu score on every network in the table. The prior was 0.1.0's default, one parent expected per `n_rows - 1` candidates, which 0.2.0 expresses as `expected_parents=(n_vars - 1) / (n_rows - 1)`.
 
-Mean SMHD against the true network, over five sampled datasets per cell. Lower is better. The first column learns from everything at once; the rest split the same data across that many sites.
+## What federating costs
+
+Mean SHD against the true network over three samples. The first column learns from all the data in one place; the others split the same rows across that many sites.
 
 | Network | Variables | Centralised | 5 sites | 10 sites | 20 sites |
 |---|---:|---:|---:|---:|---:|
-| cancer | 5 | 0.6 | 1.8 | 1.8 | 2.6 |
-| asia | 8 | 1.4 | 2.6 | 1.2 | 2.6 |
-| child | 20 | 0.0 | 6.4 | 9.4 | 9.4 |
-| insurance | 27 | 21.6 | 29.0 | 33.8 | 39.0 |
-| alarm | 37 | 11.2 | 11.6 | 8.0 | 12.2 |
-| hepar2 | 70 | 72.2 | 119.6 | 123.8 | 217.8 |
+| cancer | 5 | 0.7 | 1.0 | 2.0 | 3.0 |
+| asia | 8 | 2.0 | 2.3 | 2.0 | 4.3 |
+| child | 20 | 2.0 | 7.0 | 10.0 | 10.0 |
+| insurance | 27 | 21.7 | 26.0 | 28.0 | 29.7 |
+| alarm | 37 | 10.0 | 5.0 | 5.0 | 6.7 |
+| hepar2 | 70 | 62.7 | 76.7 | 96.7 | 109.7 |
 
-Splitting the same data across more sites costs accuracy, because each site sees less of it. How much depends on the network rather than on its size. The largest cost here is `hepar2`: 72 structural errors learning centrally against 218 across twenty sites. On the smallest networks the gap is a couple of edges either way, which is within the spread between samples.
+Each site sees less data the more sites there are, and on most networks the error grows with the number of sites; `hepar2` goes from 63 learning centrally to 110 across twenty sites. `alarm` is the exception: the fused structure is closer to the truth than the one learned from all the data at once, as it already was with 0.1.0.
 
-## What the options buy
-
-`max_t_size=2`, the default, against the exhaustive scan on `hailfinder`, measured back to back:
-
-| | Seconds | Same BDeu |
-|---|---:|---|
-| `max_t_size=2` (default) | 0.53 | |
-| `max_t_size=None` | 4.8 | yes |
-
-That is 9x for an identical result on this network. The cap forfeits the optimality guarantee in theory; in practice it has not changed a recovered structure on any network the two have been compared on.
-
-`incremental=True`, the default, against the full scan:
-
-| Network | Variables | Incremental | Full scan | Speedup |
-|---|---:|---:|---:|---:|
-| alarm | 37 | 0.22 | 0.5 | 2.3x |
-| hepar2 | 70 | 0.63 | 2.0 | 3.1x |
-| win95pts | 76 | 1.09 | 4.0 | 3.6x |
-| andes | 223 | 7.98 | 71.1 | 8.9x |
-
-Both defaults return scores identical to the slower setting everywhere the two have been compared. For `max_t_size` that runs up to `link` at 724 variables, where 2, 4 and `None` all give the same graph. For `incremental` it runs up to `andes` at 223, since a full scan above that is expensive. Neither has been compared on `munin`. The one option known to cost accuracy is `empty_t_gate`; see [Algorithms](algorithms.md).
-
-The `accel` extra JITs the semi-directed path check, the dominant cost on large graphs. Measured back to back on `link` (724 variables) it is 1.67x end to end, for a bit-identical result. Below a variable-count threshold the pure-Python walk wins and is used instead, so on small networks the extra changes nothing.
-
-## Cross-checked against the original implementation
-
-The reference tests pin the search against the original Java implementation on networks up to 37 variables. `link`, at 724, has been run through both on the same data:
-
-| | Edges | SHD | SMHD | BDeu |
-|---|---:|---:|---:|---:|
-| true structure | 1125 | 0 | 0 | -1,059,715 |
-| BayesFL (Java) | 1779 | 1597 | 3153 | -1,114,310 |
-| fedcausal | 1770 | 1591 | 3098 | -1,114,303 |
-
-The two scores differ by 7 in 1.1 million, and the skeletons share 1666 edges. Both were scored without a structure prior, which is what the Java implementation effectively uses. fedcausal took 186 s against 2900 s.
-
-## Structure quality on the largest networks
-
-The two biggest networks recover badly, and it is worth being explicit about why, because the cause is not a defect in the search.
-
-On `link` (724 variables, 1125 true edges) the search returns 1770 edges scoring -1,114,303. The true structure scores -1,059,715, so the result is 54,588 worse than the answer. That rules out overfitting, which would score *better* than the truth. Warm-starting the same search from the true structure lands at -1,058,834, better than the truth itself. The search is therefore working; greedy search from an empty graph simply reaches a poor local optimum on a network this large and this sparsely sampled. Chickering's optimality guarantee is asymptotic, and 5000 rows over 724 variables is not that regime.
-
-`max_t_size` is not involved: 2, 4, and `None` return the same graph on `link`.
-
-Two levers help if you work at this scale. A complexity penalty helps most: `structure_prior=1.0` takes `link` from 1770 edges to 855, and SMHD from 3098 to 987. Warm-starting from any reasonable prior structure helps too, which is also what the federated loop gives its clients after the first round.
-
-## Regenerating this page
-
-The tables above are generated, not written:
+## Running them
 
 ```bash
-python benchmarks/build_docs.py
+export FEDCAUSAL_NETWORKS=/path/to/networks   # holds xbif/<net>.xbif and BBDD/<net>/<net>.<seed>.csv.gz
+python benchmarks/scale_ges.py
+python benchmarks/fedges_sites.py --seeds 3
 ```
 
-Every number comes from `benchmarks/results/`, so re-running the benchmarks and then this script keeps the page honest. The prose describing each table is derived from it too, so an observation cannot outlive the data behind it.
-
-## Running them yourself
-
-```bash
-export FEDCAUSAL_NETWORKS=/path/to/networks
-python benchmarks/scale_ges.py                    # the size ladder
-python benchmarks/compare_ges.py                  # fedcausal vs causal-learn
-python benchmarks/compare_fedges.py               # quality against site count
-python benchmarks/compare_hpool.py                # the two H pools, ours and BayesFL's
-python benchmarks/build_docs.py                   # regenerate this page
-```
-
-`FEDCAUSAL_NETWORKS` should point at a directory laid out as `<root>/res/networks/BBDD/<net>/<net>.0.csv` for the data and `<root>/res/networks/<net>.xbif` for the ground truths. Networks come from the [Bayesian Network Repository](https://www.bnlearn.com/bnrepository/); the five smallest ship with the package under `tests/fixtures/networks/`.
-
-`compare_ges.py` runs one subprocess per cell and appends results as they finish, so a hang costs one cell and the run resumes where it stopped.
-
-## A note on timing
-
-Treat the absolute seconds loosely. Repeating the whole ladder on the same machine, with the same code and identical resulting structures, moved individual timings by up to a factor of two, and a sync client running in the background made it worse still. What survives that noise is the ratios, which are taken back to back in one process, and the orders of magnitude. If you re-run these, do it outside a synced folder and compare within a run rather than across runs.
+Both print the Markdown tables above. Compare timings within one run rather than across runs: a synced folder or a busy machine moves them by tens of percent.

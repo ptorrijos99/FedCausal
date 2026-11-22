@@ -30,7 +30,7 @@ def _synthetic_dataset(
         [str(i) for i in range(n_rows)],
         [f"L{k}" for k in range(n_label_levels)],
     ]
-    return DiscreteDataset.from_arrays(values, cardinalities, names, categories)
+    return DiscreteDataset(values, cardinalities, names, categories)
 
 
 # --------------------------------------------------------------------------
@@ -214,7 +214,7 @@ def test_dirichlet_split_rejects_out_of_range_by() -> None:
 
 
 def test_contiguous_split_accepts_continuous():
-    ds = ContinuousDataset.from_arrays(np.arange(30, dtype=float).reshape(10, 3), ["a", "b", "c"])
+    ds = ContinuousDataset(np.arange(30, dtype=float).reshape(10, 3), ["a", "b", "c"])
     parts = contiguous_split(ds, 3)
     assert len(parts) == 3
     assert all(isinstance(p, ContinuousDataset) for p in parts)
@@ -223,7 +223,7 @@ def test_contiguous_split_accepts_continuous():
 
 
 def test_dirichlet_split_accepts_continuous():
-    ds = ContinuousDataset.from_arrays(np.arange(60, dtype=float).reshape(20, 3), ["a", "b", "c"])
+    ds = ContinuousDataset(np.arange(60, dtype=float).reshape(20, 3), ["a", "b", "c"])
     parts = dirichlet_split(ds, 4, alpha=1.0, seed=0)
     assert len(parts) == 4
     assert all(isinstance(p, ContinuousDataset) for p in parts)
@@ -231,7 +231,7 @@ def test_dirichlet_split_accepts_continuous():
 
 
 def test_dirichlet_split_rejects_by_with_continuous():
-    ds = ContinuousDataset.from_arrays(np.arange(60, dtype=float).reshape(20, 3), ["a", "b", "c"])
+    ds = ContinuousDataset(np.arange(60, dtype=float).reshape(20, 3), ["a", "b", "c"])
     with pytest.raises(
         TypeError, match=r"by is only supported for a DiscreteDataset, got ContinuousDataset"
     ):

@@ -78,7 +78,7 @@ def test_run_flower_rcd_exact_matches_the_in_process_solver_via_simulation() -> 
 
     data = continuous_chain(1)
     expected = fedrcd_exact(list(np.array_split(data.values, 3, axis=0)))
-    actual = run_flower_rcd_exact(data, n_clients=3)
+    actual = run_flower_rcd_exact(contiguous_split(data, 3))
 
     assert actual.causal_order == expected.causal_order
     np.testing.assert_allclose(actual.b, expected.b, rtol=1e-10, atol=1e-10)

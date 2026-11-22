@@ -1,7 +1,7 @@
 import numpy as np
 
 from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
-from fedcausal.lingam.tau import tau_matrix_3rd, tau_matrix_4th, tau_matrix_4th_from_data
+from fedcausal.lingam.tau import tau_matrix_3rd, tau_matrix_4th
 
 
 def _chain(seed: int, n: int = 4000) -> np.ndarray:
@@ -43,11 +43,3 @@ def test_third_order_also_ranks_the_source_lowest():
     cum = aggregate_and_compute_cumulants([compute_local_raw_stats(_skewed_chain(2), order=3)])
     tau = tau_matrix_3rd(cum["c3"], cum["c12"], cum["c21"])
     assert int(np.argmin(tau.sum(axis=1))) == 0
-
-
-def test_from_data_matches_the_stats_version():
-    x = _chain(3)
-    cum = aggregate_and_compute_cumulants([compute_local_raw_stats(x, order=4)])
-    from_stats = tau_matrix_4th(cum["c4"], cum["c13"], cum["c31"], cum["c22"])
-    from_data = tau_matrix_4th_from_data(x)
-    np.testing.assert_allclose(from_stats, from_data, rtol=1e-6, atol=1e-6)

@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from fedcausal.data import DiscreteDataset
 
 if TYPE_CHECKING:
+    import numpy.typing as npt
+
     from fedcausal.io.xbif import DiscreteBN
 
 __all__ = ["forward_sample"]
 
 
 def _parent_row_indices(
-    codes: np.ndarray, parents: tuple[int, ...], cardinalities: list[int]
-) -> np.ndarray:
+    codes: npt.NDArray[np.integer[Any]],
+    parents: tuple[int, ...],
+    cardinalities: list[int],
+) -> npt.NDArray[np.int64]:
     """Map each row's parent codes to a CPT row index.
 
     Parameters
@@ -90,7 +94,7 @@ def forward_sample(bn: DiscreteBN, n: int, seed: int) -> DiscreteDataset:
         lut = np.array([sorted_outcomes.index(label) for label in xbif_outcomes], dtype=np.int32)
         values[:, j] = lut[codes[:, j]]
 
-    return DiscreteDataset.from_arrays(
+    return DiscreteDataset(
         values=values,
         cardinalities=np.array(cardinalities, dtype=np.int32),
         names=bn.names,

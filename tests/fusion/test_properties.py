@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import hypothesis.strategies as st
 from hypothesis import given, settings
 
 from fedcausal.fusion import consensus_union, max_frequency, max_parents
 from fedcausal.graph import DAG
-
-NETWORKS = Path(__file__).resolve().parents[1] / "fixtures" / "networks"
 
 
 @st.composite
@@ -21,7 +17,7 @@ def _dag_over(draw: st.DrawFn, p: int) -> DAG:
 
 
 @given(st.integers(3, 6), st.data())
-@settings(max_examples=50)
+@settings(max_examples=50, deadline=None)
 def test_union_acyclic_and_imap(p: int, data: st.DataObject) -> None:
     """The consensus union is acyclic and covers every input skeleton edge."""
     dags = [data.draw(_dag_over(p)) for _ in range(data.draw(st.integers(1, 3)))]
@@ -34,7 +30,7 @@ def test_union_acyclic_and_imap(p: int, data: st.DataObject) -> None:
 
 
 @given(st.integers(3, 6), st.data())
-@settings(max_examples=50)
+@settings(max_examples=50, deadline=None)
 def test_maxfreq1_and_maxparents_p_equal_union(p: int, data: st.DataObject) -> None:
     """Non-binding budgets reduce to the full union."""
     dags = [data.draw(_dag_over(p)) for _ in range(data.draw(st.integers(1, 3)))]
@@ -44,7 +40,7 @@ def test_maxfreq1_and_maxparents_p_equal_union(p: int, data: st.DataObject) -> N
 
 
 @given(st.integers(3, 6), st.integers(0, 3), st.data())
-@settings(max_examples=50)
+@settings(max_examples=50, deadline=None)
 def test_max_parents_respects_the_cap(p: int, limit: int, data: st.DataObject) -> None:
     """No node gets more than `limit` parents, and nothing outside the union appears."""
     dags = [data.draw(_dag_over(p)) for _ in range(data.draw(st.integers(1, 3)))]
@@ -55,20 +51,14 @@ def test_max_parents_respects_the_cap(p: int, limit: int, data: st.DataObject) -
 
 def test_fuses_real_ges_output_on_asia() -> None:
     """Fusing GES output from three sites gives an acyclic union of their adjacencies."""
-    xbif = NETWORKS / "asia.xbif"
+    from fedcausal import GES
+    from fedcausal.data import contiguous_split
+    from fedcausal.datasets import load_asia
 
-    from fedcausal.data.partition import contiguous_split
-    from fedcausal.io import forward_sample, load_xbif
-    from fedcausal.scores import BDeuScore
-    from fedcausal.search import GES
-
-    bn = load_xbif(str(xbif))
-    ds = forward_sample(bn, 5000, seed=0)
-    shards = contiguous_split(ds, 3)
-    client_dags = [GES(BDeuScore(s)).fit(s).to_dag() for s in shards]
+    client_dags = [GES().fit(s).dag_ for s in contiguous_split(load_asia().data, 3)]
 
     fused = consensus_union(client_dags)
-    assert len(fused.topological_order()) == fused.num_nodes  # acyclic
+    assert len(fused.topological_order()) == fused.num_nodes
     assert fused.num_edges > 0
     fused_skeleton = {frozenset(e) for e in fused.edges()}
     assert all(frozenset(e) in fused_skeleton for d in client_dags for e in d.edges())

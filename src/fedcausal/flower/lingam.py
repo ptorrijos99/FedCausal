@@ -9,8 +9,8 @@ site deflates its own data by it and replies with fresh sums; the deflated
 data stays in the site's ``context.state`` between rounds.
 
 :func:`run_server_loop` and :func:`run_exact_server_loop` take any ``Grid``;
-:func:`run_flower_rcd` and :func:`run_flower_rcd_exact` split a dataset and
-run it on Flower's simulation engine.
+:func:`run_flower_rcd` and :func:`run_flower_rcd_exact` run a list of sites on
+Flower's simulation engine.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from flwr.client import ClientApp
-from flwr.common import ArrayRecord, Context, Message, RecordDict
+from flwr.common import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid, ServerApp
 
 from fedcausal.data import ContinuousDataset
@@ -41,13 +41,12 @@ from fedcausal.flower.serde import (
     stats_to_record,
 )
 from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
-from fedcausal.lingam.ishc import fedhc, fedishc
-from fedcausal.lingam.rcd import RCDResult, fedrcd, fedrcd_noniterative, ishc_beta
-from fedcausal.lingam.solvers import estimate_b_from_cov, estimate_b_lasso_from_cov
-from fedcausal.lingam.tau import tau_matrix_4th
+from fedcausal.lingam.rcd import RCDResult, _coefficients, exact_order, fedrcd
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
+
+    import numpy.typing as npt
 
     from fedcausal.flower.loaders import PartitionLoader
     from fedcausal.lingam.cumulants import Cumulants
@@ -69,14 +68,6 @@ _STATS_KEY = "stats"
 _BETAS_KEY = "betas"
 _WORKING_STATE_KEY = "rcd_working"
 
-_SOLVERS: dict[str, Callable[..., RCDResult]] = {
-    "fedrcd": fedrcd,
-    "fedrcd_noniterative": fedrcd_noniterative,
-    "ishc_beta": ishc_beta,
-    "fedishc": fedishc,
-    "fedhc": fedhc,
-}
-
 
 def handle_stats_message(
     msg: Message, context: Context, loader: PartitionLoader[ContinuousDataset]
@@ -95,11 +86,11 @@ def handle_stats_message(
     Returns
     -------
     Message
-        A reply carrying the nine moment-sum arrays, the local row count, and
+        A reply carrying the mean and moment sums, the local row count, and
         the client's variable-name fingerprint.
     """
     data = loader(context)
-    stats = compute_local_raw_stats(data.values, order=4)
+    stats = compute_local_raw_stats(data.values, _order(msg))
     reply = RecordDict(
         {
             _STATS_KEY: stats_to_record(stats),
@@ -127,8 +118,9 @@ def build_client_app(loader: PartitionLoader[ContinuousDataset]) -> ClientApp:
 def run_server_loop(
     grid: Grid,
     n_clients: int,
-    solver: str = "fedrcd",
+    method: str = "deflation",
     *,
+    order: int = 4,
     min_clients: int | None = None,
     **solver_kwargs: Any,
 ) -> RCDResult:
@@ -140,13 +132,15 @@ def run_server_loop(
         Anything that can send and receive Flower messages.
     n_clients : int
         Number of supernodes to wait for before broadcasting.
-    solver : {"fedrcd", "fedrcd_noniterative", "ishc_beta", "fedishc", "fedhc"}, optional
-        Which one-shot solver to run on the aggregated statistics.
+    method : {"deflation", "ratio", "sort"}, optional
+        Passed to :func:`fedcausal.lingam.fedrcd`.
+    order : {3, 4}, optional
+        Order of the moment sums the sites send and of the tau discriminator.
     min_clients : int or None, optional
         How many usable replies the round needs. Default `n_clients`, so a
         failed client stops the run; lower it to tolerate dropouts.
     **solver_kwargs : Any
-        Passed through to the selected solver (``use_lasso``, ``lmbda_type``).
+        Passed to :func:`fedcausal.lingam.fedrcd` (``use_lasso``, ``lmbda_type``).
 
     Returns
     -------
@@ -156,29 +150,30 @@ def run_server_loop(
     Raises
     ------
     ConfigurationError
-        If `solver` is not one of the supported names, or `min_clients` is not
+        If `method` or `order` is not supported, or `min_clients` is not
         between 1 and `n_clients`.
     ClientFailureError
         If too few supernodes register, or too few reply.
     SchemaMismatchError
         If the clients do not agree on their variables.
     """
-    solver_fn = _resolve_solver(solver)
+    _check_method(method, order)
     required = required_clients(n_clients, min_clients)
 
     node_ids = await_nodes(grid, n_clients)
     replies = grid.send_and_receive(
-        broadcast(node_ids, RecordDict({CTRL_KEY: control_config(phase="stats")}))
+        broadcast(node_ids, RecordDict({CTRL_KEY: control_config(phase="stats", order=order)}))
     )
     good = usable_replies(replies, required, "stats")
     check_schemas(good)
 
-    return solver_fn(_aggregate_replies(good), **solver_kwargs)
+    stats = _aggregate_replies(good)
+    return fedrcd(stats, method=method, order=order, **solver_kwargs)  # type: ignore[arg-type]
 
 
 def build_server_app(
     n_clients: int,
-    solver: str = "fedrcd",
+    method: str = "deflation",
     *,
     min_clients: int | None = None,
     results: list[RCDResult] | None = None,
@@ -193,7 +188,7 @@ def build_server_app(
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
-        result = run_server_loop(grid, n_clients, solver, min_clients=min_clients, **solver_kwargs)
+        result = run_server_loop(grid, n_clients, method, min_clients=min_clients, **solver_kwargs)
         if results is not None:
             results.append(result)
 
@@ -201,26 +196,22 @@ def build_server_app(
 
 
 def run_flower_rcd(
-    data: ContinuousDataset,
-    n_clients: int,
-    solver: str = "fedrcd",
+    sites: Sequence[ContinuousDataset],
+    method: str = "deflation",
     **solver_kwargs: Any,
 ) -> RCDResult:
     """Run a one-shot FedRCD solver over a Flower simulation and return the result.
 
-    Splits `data` into `n_clients` contiguous blocks, one per simulated
-    supernode. Needs ``fedcausal[flower-simulation]``.
+    One simulated supernode per site. Needs ``fedcausal[flower-simulation]``.
 
     Parameters
     ----------
-    data : ContinuousDataset
-        Full dataset to partition across clients.
-    n_clients : int
-        Number of clients and supernodes.
-    solver : {"fedrcd", "fedrcd_noniterative", "ishc_beta", "fedishc", "fedhc"}, optional
-        Which one-shot solver to run on the aggregated statistics.
+    sites : sequence of ContinuousDataset
+        Each site's data, over the same variables.
+    method : {"deflation", "ratio", "sort"}, optional
+        Passed to :func:`fedcausal.lingam.fedrcd`.
     **solver_kwargs : Any
-        Passed through to the selected solver (``use_lasso``, ``lmbda_type``).
+        Passed to :func:`run_server_loop` (``order``, ``use_lasso``, ``lmbda_type``).
 
     Returns
     -------
@@ -230,8 +221,8 @@ def run_flower_rcd(
     Raises
     ------
     ConfigurationError
-        If Flower's simulation extra is not installed, or `solver` is not one of
-        the supported names.
+        If Flower's simulation extra is not installed, or `method` or `order`
+        is not supported.
     ClientFailureError
         If too few supernodes register, or too few reply.
     SchemaMismatchError
@@ -240,9 +231,8 @@ def run_flower_rcd(
     results: list[RCDResult] = []
     _simulate(
         build_client_app,
-        build_server_app(n_clients, solver, results=results, **solver_kwargs),
-        data,
-        n_clients,
+        build_server_app(len(sites), method, results=results, **solver_kwargs),
+        sites,
     )
     if not results:
         raise ClientFailureError("the Flower simulation completed without producing a result")
@@ -286,13 +276,12 @@ def handle_deflate_message(
         src_local = int(cast(int, control["src_local"]))
         betas = cast(ArrayRecord, msg.content[_BETAS_KEY]).to_numpy_ndarrays()[0]
         x_prev = cast(ArrayRecord, context.state[_WORKING_STATE_KEY]).to_numpy_ndarrays()[0]
-        x_s = x_prev[:, src_local]
-        remaining = [j for j in range(x_prev.shape[1]) if j != src_local]
-        x_curr = np.column_stack([x_prev[:, j] - betas[j] * x_s for j in remaining])
+        keep = np.arange(x_prev.shape[1]) != src_local
+        x_curr = x_prev[:, keep] - np.outer(x_prev[:, src_local], betas[keep])
         schema = None
 
     context.state[_WORKING_STATE_KEY] = ArrayRecord([x_curr])
-    stats = compute_local_raw_stats(x_curr, order=4)
+    stats = compute_local_raw_stats(x_curr, _order(msg))
     ctrl: dict[str, Any] = {"n": int(stats["n"]), "n_vars": x_curr.shape[1]}
     if schema is not None:
         ctrl["schema"] = schema
@@ -315,6 +304,7 @@ def run_exact_server_loop(
     grid: Grid,
     n_clients: int,
     *,
+    order: int = 4,
     min_clients: int | None = None,
     use_lasso: bool = False,
     lmbda_type: str = "fixed",
@@ -329,6 +319,8 @@ def run_exact_server_loop(
         Anything that can send and receive Flower messages.
     n_clients : int
         Number of supernodes to wait for before broadcasting.
+    order : {3, 4}, optional
+        Order of the moment sums the sites send and of the tau discriminator.
     min_clients : int or None, optional
         How many usable replies each round needs. Defaults to `n_clients`.
     use_lasso : bool, optional
@@ -344,70 +336,44 @@ def run_exact_server_loop(
     Raises
     ------
     ConfigurationError
-        If `min_clients` is not between 1 and `n_clients`.
+        If `order` is not 3 or 4, or `min_clients` is not between 1 and `n_clients`.
     ClientFailureError
         If too few supernodes register, or too few reply in any round.
     SchemaMismatchError
         If the clients do not agree on their variables at round 0.
     """
+    _check_method("deflation", order)
     required = required_clients(n_clients, min_clients)
     node_ids = await_nodes(grid, n_clients)
 
     replies = grid.send_and_receive(
-        broadcast(node_ids, RecordDict({CTRL_KEY: control_config(round=0)}))
+        broadcast(node_ids, RecordDict({CTRL_KEY: control_config(round=0, order=order)}))
     )
     good = usable_replies(replies, required, "stats")
     check_schemas(good)
 
-    agg = _aggregate_replies(good)
-    cov_original = np.asarray(agg["cov"], dtype=np.float64)
-    n_total = int(agg["n"])
-    n_vars = cov_original.shape[0]
+    first = _aggregate_replies(good)
+    step = 0
 
-    active_global = list(range(n_vars))
-    causal_order: list[int] = []
-
-    for step in range(n_vars - 1):
-        n_active = len(active_global)
-        tau = tau_matrix_4th(
-            np.asarray(agg["c4"], dtype=np.float64),
-            np.asarray(agg["c13"], dtype=np.float64),
-            np.asarray(agg["c31"], dtype=np.float64),
-            np.asarray(agg["c22"], dtype=np.float64),
-        )
-        src_local = int(np.argmin(np.sum(tau, axis=1)))
-        causal_order.append(active_global[src_local])
-
-        cov_curr = np.asarray(agg["cov"], dtype=np.float64)
-        var_s = max(float(cov_curr[src_local, src_local]), 1e-15)
-        betas = cov_curr[:, src_local] / var_s
-
-        remaining_local = [j for j in range(n_active) if j != src_local]
-        active_global = [active_global[j] for j in remaining_local]
-
-        if step < n_vars - 2:
-            round_replies = grid.send_and_receive(
-                broadcast(
-                    node_ids,
-                    RecordDict(
-                        {
-                            CTRL_KEY: control_config(round=step + 1, src_local=src_local),
-                            _BETAS_KEY: ArrayRecord([betas]),
-                        }
-                    ),
-                )
+    def deflate(src: int, betas: npt.NDArray[np.float64]) -> Cumulants:
+        nonlocal step
+        step += 1
+        replies = grid.send_and_receive(
+            broadcast(
+                node_ids,
+                RecordDict(
+                    {
+                        CTRL_KEY: control_config(round=step, src_local=src, order=order),
+                        _BETAS_KEY: ArrayRecord([betas]),
+                    }
+                ),
             )
-            agg = _aggregate_replies(usable_replies(round_replies, required, "stats"))
-
-    if active_global:
-        causal_order.append(active_global[0])
-
-    if use_lasso:
-        b = estimate_b_lasso_from_cov(
-            causal_order, cov_original, n_samples=n_total, lmbda_type=lmbda_type
         )
-    else:
-        b = estimate_b_from_cov(causal_order, cov_original)
+        return _aggregate_replies(usable_replies(replies, required, "stats"))
+
+    causal_order = exact_order(first, deflate, order)  # type: ignore[arg-type]
+    cov = np.asarray(first["cov"], dtype=np.float64)
+    b = _coefficients(causal_order, cov, int(first["n"]), use_lasso, lmbda_type)
 
     return RCDResult(tuple(causal_order), b)
 
@@ -435,8 +401,7 @@ def build_exact_server_app(
 
 
 def run_flower_rcd_exact(
-    data: ContinuousDataset,
-    n_clients: int,
+    sites: Sequence[ContinuousDataset],
     **solver_kwargs: Any,
 ) -> RCDResult:
     """Run the multi-round FedRCD-Exact solver over a Flower simulation.
@@ -445,10 +410,8 @@ def run_flower_rcd_exact(
 
     Parameters
     ----------
-    data : ContinuousDataset
-        Full dataset to partition across clients.
-    n_clients : int
-        Number of clients and supernodes.
+    sites : sequence of ContinuousDataset
+        Each site's data, over the same variables.
     **solver_kwargs : Any
         Passed through to :func:`run_exact_server_loop` (``use_lasso``,
         ``lmbda_type``).
@@ -470,9 +433,8 @@ def run_flower_rcd_exact(
     results: list[RCDResult] = []
     _simulate(
         build_exact_client_app,
-        build_exact_server_app(n_clients, results=results, **solver_kwargs),
-        data,
-        n_clients,
+        build_exact_server_app(len(sites), results=results, **solver_kwargs),
+        sites,
     )
     if not results:
         raise ClientFailureError("the Flower simulation completed without producing a result")
@@ -482,36 +444,31 @@ def run_flower_rcd_exact(
 def _simulate(
     make_client: Callable[[PartitionLoader[ContinuousDataset]], ClientApp],
     server_app: ServerApp,
-    data: ContinuousDataset,
-    n_clients: int,
+    sites: Sequence[ContinuousDataset],
 ) -> None:
-    """Partition `data` and drive both apps through Flower's simulation engine."""
-    from fedcausal.data import contiguous_split
+    """Drive both apps through Flower's simulation engine, one supernode per site."""
     from fedcausal.flower.loaders import InMemoryPartitions
 
     run_simulation = simulation_runner()
-    parts = contiguous_split(data, n_clients)
     run_simulation(
         server_app=server_app,
-        client_app=make_client(InMemoryPartitions(parts)),
-        num_supernodes=n_clients,
+        client_app=make_client(InMemoryPartitions(list(sites))),
+        num_supernodes=len(sites),
     )
 
 
-def _resolve_solver(solver: str) -> Callable[..., RCDResult]:
-    """Look up a one-shot solver by name.
+def _check_method(method: str, order: int) -> None:
+    if method not in ("deflation", "ratio", "sort"):
+        raise ConfigurationError(f"unknown method {method!r}; use 'deflation', 'ratio' or 'sort'")
+    if order not in (3, 4):
+        raise ConfigurationError(f"order must be 3 or 4, got {order!r}")
 
-    Raises
-    ------
-    ConfigurationError
-        If `solver` is not one of the names in `_SOLVERS`.
-    """
-    try:
-        return _SOLVERS[solver]
-    except KeyError as exc:
-        raise ConfigurationError(
-            f"unknown solver {solver!r}; use one of {sorted(_SOLVERS)}"
-        ) from exc
+
+def _order(msg: Message) -> int:
+    """Return the order of moment sums the server asked for, 4 if it did not say."""
+    if CTRL_KEY not in msg.content:
+        return 4
+    return int(cast(int, cast(ConfigRecord, msg.content[CTRL_KEY]).get("order", 4)))
 
 
 def _aggregate_replies(replies: Iterable[Message]) -> Cumulants:

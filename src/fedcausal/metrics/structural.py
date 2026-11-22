@@ -1,8 +1,9 @@
 """Structural distances and edge-recovery scores between two DAGs.
 
-* :func:`shd` compares the DAGs' directed edges, not their CPDAGs. Per node
-  pair it costs 1 if only one graph has the edge and 1 if both have it in
-  opposite directions. It is not invariant across a Markov equivalence class.
+* :func:`shd` counts the node pairs on which two graphs differ: an edge only
+  one has, or one they orient differently. It takes DAGs or PDAGs; on two
+  DAGs it is not invariant across a Markov equivalence class, so compare
+  CPDAGs to measure what GES can identify.
 * :func:`smhd` compares the moral graphs, so it is invariant across the class.
   :func:`smhd_graphs` does the same for graphs already moralised.
 * :func:`shd_skeleton` compares adjacencies, ignoring direction.
@@ -20,7 +21,10 @@ import numpy as np
 from fedcausal.graph.undirected import moralize
 
 if TYPE_CHECKING:
+    import numpy.typing as npt
+
     from fedcausal.graph.dag import DAG
+    from fedcausal.graph.pdag import PDAG
 
 __all__ = ["EdgeScores", "shd", "shd_skeleton", "smhd", "smhd_graphs", "edge_scores"]
 
@@ -57,9 +61,9 @@ class EdgeScores:
     f1_skel: float
 
 
-def _skeleton(adjacency: np.ndarray) -> np.ndarray:
+def _skeleton(adjacency: npt.NDArray[np.bool_]) -> npt.NDArray[np.bool_]:
     """Return the symmetric skeleton (adjacency ignoring direction)."""
-    skeleton: np.ndarray = adjacency | adjacency.T
+    skeleton: npt.NDArray[np.bool_] = adjacency | adjacency.T
     return skeleton
 
 
@@ -75,21 +79,23 @@ def _prf(tp: int, n_pred: int, n_true: int) -> tuple[float, float, float]:
     return precision, recall, f1
 
 
-def shd(g1: DAG, g2: DAG) -> int:
-    """Return the structural Hamming distance between two DAGs.
+def shd(g1: DAG | PDAG, g2: DAG | PDAG) -> int:
+    """Return the structural Hamming distance between two graphs.
 
     Parameters
     ----------
-    g1 : DAG
-        First DAG.
-    g2 : DAG
-        Second DAG, with the same `num_nodes` as `g1`.
+    g1 : DAG or PDAG
+        First graph.
+    g2 : DAG or PDAG
+        Second graph, with the same `num_nodes` as `g1`.
 
     Returns
     -------
     int
-        The number of edge additions, deletions, and reversals (each
-        reversal costing 1) needed to turn `g1` into `g2`.
+        The number of node pairs that are adjacent in only one graph, or
+        adjacent in both but marked differently (``u -> v``, ``v -> u`` or
+        ``u - v``). Between DAGs, the additions, deletions and reversals that
+        turn one into the other.
 
     Raises
     ------
@@ -98,11 +104,8 @@ def shd(g1: DAG, g2: DAG) -> int:
     """
     if g1.num_nodes != g2.num_nodes:
         raise ValueError(f"node count mismatch: {g1.num_nodes} != {g2.num_nodes}")
-    a1 = g1.adjacency()
-    a2 = g2.adjacency()
-    differing = a1 ^ a2
-    reversed_pairs = a1 & a2.T
-    return int(differing.sum()) - int(reversed_pairs.sum())
+    differing = g1.adjacency() ^ g2.adjacency()
+    return int(np.triu(differing | differing.T, 1).sum())
 
 
 def shd_skeleton(g1: DAG, g2: DAG) -> int:
@@ -131,7 +134,7 @@ def shd_skeleton(g1: DAG, g2: DAG) -> int:
     return smhd_graphs(_skeleton(g1.adjacency()), _skeleton(g2.adjacency()))
 
 
-def smhd_graphs(m1: np.ndarray, m2: np.ndarray) -> int:
+def smhd_graphs(m1: npt.ArrayLike, m2: npt.ArrayLike) -> int:
     """Return the number of node pairs adjacent in exactly one of two undirected graphs.
 
     Parameters

@@ -18,6 +18,8 @@ from fedcausal.graph import DAG
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import numpy.typing as npt
+
 __all__ = ["DiscreteBN", "load_xbif"]
 
 
@@ -47,7 +49,7 @@ class DiscreteBN:
     names: list[str]
     outcomes: list[list[str]]
     parent_order: list[tuple[int, ...]]
-    cpts: list[np.ndarray]
+    cpts: list[npt.NDArray[np.float64]]
 
 
 def _text(elem: ET.Element, tag: str) -> str:
@@ -108,7 +110,7 @@ def load_xbif(path: str | Path) -> DiscreteBN:
 
     num_nodes = len(names)
     parent_order: list[tuple[int, ...]] = [() for _ in range(num_nodes)]
-    cpts: list[np.ndarray | None] = [None for _ in range(num_nodes)]
+    cpts: list[npt.NDArray[np.float64] | None] = [None for _ in range(num_nodes)]
     edges: list[tuple[int, int]] = []
 
     for def_elem in network.findall("DEFINITION"):
@@ -164,7 +166,7 @@ def load_xbif(path: str | Path) -> DiscreteBN:
         raise ValueError(f"{path_str}: no <DEFINITION> found for variable(s): {missing}")
 
     dag = DAG.from_edges(num_nodes, edges)
-    resolved_cpts: list[np.ndarray] = [cpt for cpt in cpts if cpt is not None]
+    resolved_cpts: list[npt.NDArray[np.float64]] = [cpt for cpt in cpts if cpt is not None]
     return DiscreteBN(
         dag=dag,
         names=names,

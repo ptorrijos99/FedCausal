@@ -1,86 +1,50 @@
-"""Recover a causal order from continuous data split across sites, with FedRCD.
-
-Generates a small linear non-Gaussian SEM, splits it across simulated clients,
-and runs the one-shot and multi-round FedRCD solvers over the aggregated
-cumulant statistics -- never the raw rows:
-
-    python examples/03_fedrcd.py
 """
+Learn a linear model from continuous data held by several sites
+===============================================================
 
-from __future__ import annotations
+:class:`~fedcausal.lingam.FedRCD` assumes a linear structural equation model with
+non-Gaussian noise, ``x = Bx + e``. Each site sends additive moment sums of
+its rows; their totals give third- and fourth-order cumulants, from which the
+causal order is identified and ``B`` estimated. No row leaves a site.
+"""
 
 import numpy as np
 
-from fedcausal.data import ContinuousDataset, contiguous_split
+from fedcausal import FedRCD
 from fedcausal.graph import DAG
-from fedcausal.lingam import (
-    aggregate_and_compute_cumulants,
-    compute_local_raw_stats,
-    fedrcd,
-    fedrcd_exact,
-)
 from fedcausal.metrics import shd
 
-N_VARS = 5
-N_ROWS = 4000
-N_CLIENTS = 4
-NAMES = [f"x{i}" for i in range(N_VARS)]
+rng = np.random.default_rng(0)
+n_vars, n_rows = 6, 8000
+b = np.zeros((n_vars, n_vars))
+for child in range(1, n_vars):
+    for parent in range(child):
+        if rng.random() < 0.4:
+            b[child, parent] = rng.uniform(0.5, 1.5) * rng.choice([-1, 1])
+noise = rng.uniform(-1, 1, size=(n_rows, n_vars))
+x = noise @ np.linalg.inv(np.eye(n_vars) - b).T
+truth = DAG.from_amat(b.T != 0)
 
+sites = np.array_split(x, 4)
 
-def _make_sem(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
-    """Build a chain SEM x0 -> x1 -> ... -> x{N_VARS-1} with skewed noise.
+# %%
+# ``"deflation"`` needs one round of communication. ``"exact"`` needs one per
+# variable but carries no estimation error from one step to the next.
 
-    Centred exponential noise is skewed (skewness 2), which is what the
-    non-Gaussianity of LiNGAM-family methods needs: under Gaussian noise the
-    causal order is not identifiable from the joint distribution at all.
-    """
-    b = np.zeros((N_VARS, N_VARS))
-    for child in range(1, N_VARS):
-        b[child, child - 1] = rng.uniform(0.5, 1.5) * rng.choice([-1.0, 1.0])
+for method in ("deflation", "exact"):
+    model = FedRCD(method=method).fit(sites)
+    print(f"{method:9s}  order {model.causal_order_}  SHD {shd(truth, model.dag_)}")
 
-    e = rng.exponential(1.0, size=(N_ROWS, N_VARS)) - 1.0  # centred, skewed
-    x = np.zeros((N_ROWS, N_VARS))
-    for j in range(N_VARS):
-        x[:, j] = e[:, j] + x @ b[j]
-    return x, b
+# %%
+# The published baselines are settings of the same estimator: FedISHC is
+# ``FedRCD(method="ratio", order=3)`` and FedHC ``FedRCD(method="sort", order=3)``.
 
+for method in ("ratio", "sort"):
+    baseline = FedRCD(method=method, order=3).fit(sites)
+    print(f"{method:9s}  order {baseline.causal_order_}  SHD {shd(truth, baseline.dag_)}")
 
-def main() -> None:
-    """Split a synthetic SEM across sites and recover its causal order."""
-    rng = np.random.default_rng(0)
-    values, b_true = _make_sem(rng)
-    data = ContinuousDataset.from_arrays(values, NAMES)
-    truth = DAG.from_edges(
-        N_VARS,
-        [(p, c) for c in range(N_VARS) for p in range(N_VARS) if b_true[c, p] != 0.0],
-    )
+# %%
+# ``coef_[child, parent]`` holds the estimated coefficients; the adaptive lasso
+# sets the absent ones to zero.
 
-    print(f"{data.n_rows} rows, {data.n_vars} variables across {N_CLIENTS} sites")
-    print(f"true causal order: {' -> '.join(NAMES)}\n")
-
-    clients = contiguous_split(data, N_CLIENTS)
-
-    # Only nine moment-sum arrays per client cross the network here, never a
-    # row of `values`: compute_local_raw_stats is purely additive, so the
-    # server can sum what each client sends without seeing any sample.
-    raw_stats = [compute_local_raw_stats(c.values, order=4) for c in clients]
-    stats = aggregate_and_compute_cumulants(raw_stats)
-
-    # One-shot: a single round of communication, deflating the aggregated
-    # cumulants algebraically on the server.
-    one_shot = fedrcd(stats)
-    order_names = " -> ".join(NAMES[i] for i in one_shot.causal_order)
-    print(f"fedrcd (one round):     {order_names}")
-    print(f"  SHD against truth:    {shd(truth, one_shot.to_dag(threshold=0.3))}")
-
-    # Multi-round: p - 1 rounds, each client re-deflating its own local data
-    # and sending fresh statistics, which avoids the algebraic error the
-    # one-shot deflation can accumulate under finite samples.
-    exact = fedrcd_exact([c.values for c in clients])
-    order_names = " -> ".join(NAMES[i] for i in exact.causal_order)
-    print(f"fedrcd_exact ({N_VARS - 1} rounds): {order_names}")
-    print(f"  SHD against truth:    {shd(truth, exact.to_dag(threshold=0.3))}")
-
-
-if __name__ == "__main__":
-    main()
+np.round(model.coef_, 2)

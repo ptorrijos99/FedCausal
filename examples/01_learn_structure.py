@@ -1,51 +1,42 @@
-"""Learn one Bayesian network structure and score it against the truth.
+"""
+Learn a structure from discrete data
+====================================
 
-Uses the asia network bundled with the test fixtures, so it runs with no setup:
-
-    python examples/01_learn_structure.py
+:class:`~fedcausal.search.GES` learns the Markov equivalence class of a causal
+structure from discrete observations. It takes a DataFrame, an array or a
+:class:`~fedcausal.data.DiscreteDataset`, and every distinct value of a column
+is one level.
 """
 
-from __future__ import annotations
+from fedcausal import GES
+from fedcausal.datasets import load_asia
+from fedcausal.metrics import edge_scores, shd
 
-from pathlib import Path
+bundle = load_asia()
+frame = bundle.data.to_pandas()
+frame.head()
 
-from fedcausal.data import DiscreteDataset
-from fedcausal.graph import DAG
-from fedcausal.io import load_xbif
-from fedcausal.metrics import edge_scores, shd, smhd
-from fedcausal.scores import BDeuScore
-from fedcausal.search import GES
+# %%
+# Fitting follows scikit-learn: hyperparameters go to the constructor, and
+# the results end in an underscore. ``cpdag_`` is the equivalence class;
+# ``adjacency_`` is the same graph with the variable names.
 
-NETWORKS = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "networks"
+model = GES().fit(frame)
+model.adjacency_
 
+# %%
+# A directed edge is one every DAG of the class agrees on. An undirected edge
+# is one the data cannot orient.
 
-def main() -> None:
-    """Learn asia's structure from 5000 samples and report how close it is."""
-    data = DiscreteDataset.from_csv(NETWORKS / "asia.0.csv.gz")
-    print(f"{data.n_rows} rows, {data.n_vars} variables: {', '.join(data.names)}\n")
+names = model.feature_names_in_
+for u, v in model.cpdag_.directed_edges():
+    print(f"{names[u]} -> {names[v]}")
+for u, v in model.cpdag_.undirected_edges():
+    print(f"{names[u]} -- {names[v]}")
 
-    cpdag = GES(BDeuScore(data)).fit(data)
+# %%
+# ``dag_`` is one member of the class, which is what the metrics compare.
 
-    print("Compelled edges (every DAG in the class agrees):")
-    for u, v in cpdag.directed_edges():
-        print(f"  {data.names[u]} -> {data.names[v]}")
-    print("\nReversible edges (the data cannot tell the direction):")
-    for u, v in cpdag.undirected_edges():
-        print(f"  {data.names[u]} - {data.names[v]}")
-
-    # The .xbif declares its own variable order, so re-index onto the data's.
-    bn = load_xbif(NETWORKS / "asia.xbif")
-    index = {name: i for i, name in enumerate(data.names)}
-    truth = DAG.from_edges(
-        data.n_vars,
-        [(index[bn.names[u]], index[bn.names[v]]) for u, v in bn.dag.edges()],
-    )
-
-    learned = cpdag.to_dag()
-    scores = edge_scores(truth, learned)
-    print(f"\nSHD {shd(truth, learned)}, SMHD {smhd(truth, learned)}")
-    print(f"Skeleton precision {scores.precision_skel:.3f}, recall {scores.recall_skel:.3f}")
-
-
-if __name__ == "__main__":
-    main()
+scores = edge_scores(bundle.truth, model.dag_)
+print(f"SHD {shd(bundle.truth, model.dag_)}")
+print(f"Skeleton precision {scores.precision_skel:.2f}, recall {scores.recall_skel:.2f}")

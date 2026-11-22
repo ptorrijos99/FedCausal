@@ -6,6 +6,7 @@ direction, in every other DAG. Orientations come from ``dags[0]``.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fedcausal.graph import DAG
@@ -47,6 +48,7 @@ def intersection_fusion(dags: Sequence[DAG]) -> DAG:
     return out
 
 
+@dataclass(frozen=True)
 class Intersection:
     """Skeleton-intersection fusion as a :class:`FusionOperator`."""
 

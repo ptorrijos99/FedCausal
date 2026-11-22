@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from fedcausal.lingam._kernels import solve_lasso_cd
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -118,19 +120,21 @@ def estimate_b_lasso_from_cov(
 
         if lmbda_type == "fixed":
             lmbda = float(0.01 * np.mean(np.diag(sigma_pp)))
-            beta = _solve_lasso_cd(sigma_pp, sigma_pc, lmbda, weights)
+            beta = solve_lasso_cd(sigma_pp, sigma_pc, lmbda, weights, np.zeros(len(parents)))
         elif lmbda_type == "bic":
             lmbda_max = np.max(np.abs(sigma_pc)) if len(sigma_pc) > 0 else 0
             if lmbda_max < 1e-12:
                 beta = np.zeros(len(parents))
             else:
-                lambdas = np.logspace(np.log10(lmbda_max * 1e-3), np.log10(lmbda_max), 20)
+                # From the largest penalty down, each fit starting from the last.
+                lambdas = np.logspace(np.log10(lmbda_max), np.log10(lmbda_max * 1e-3), 20)
                 best_bic = np.inf
                 beta = np.zeros(len(parents))
                 log_n = np.log(n_samples)
+                curr_beta = np.zeros(len(parents))
 
                 for lam in lambdas:
-                    curr_beta = _solve_lasso_cd(sigma_pp, sigma_pc, float(lam), weights)
+                    curr_beta = solve_lasso_cd(sigma_pp, sigma_pc, float(lam), weights, curr_beta)
                     # RSS / n from the covariance alone.
                     rss_n = (
                         sigma_cc
@@ -150,55 +154,3 @@ def estimate_b_lasso_from_cov(
 
     b_est[np.abs(b_est) < prune_thres] = 0.0
     return b_est
-
-
-def _solve_lasso_cd(
-    cxx: npt.NDArray[np.float64],
-    cxy: npt.NDArray[np.float64],
-    lmbda: float,
-    weights: npt.NDArray[np.float64],
-    max_iter: int = 100,
-    tol: float = 1e-5,
-) -> npt.NDArray[np.float64]:
-    """Solve the weighted Lasso by coordinate descent, from covariances alone.
-
-    Minimises ``min_beta 1/2 beta' Cxx beta - Cxy' beta + lambda |w * beta|``.
-
-    Parameters
-    ----------
-    cxx : numpy.ndarray
-        Parent-parent covariance block, shape ``(q, q)``.
-    cxy : numpy.ndarray
-        Parent-child covariance vector, shape ``(q,)``.
-    lmbda : float
-        Regularisation strength.
-    weights : numpy.ndarray
-        Adaptive per-coefficient weights, shape ``(q,)``.
-    max_iter : int
-        Maximum number of coordinate-descent sweeps.
-    tol : float
-        Convergence tolerance on the coefficient update norm.
-
-    Returns
-    -------
-    numpy.ndarray
-        Coefficient vector, shape ``(q,)``.
-    """
-    q = len(cxy)
-    beta = np.zeros(q)
-    for _ in range(max_iter):
-        beta_old = beta.copy()
-        for j in range(q):
-            r_j = cxy[j] - (cxx[j, :].dot(beta) - cxx[j, j] * beta[j])
-
-            threshold = lmbda * weights[j]
-            if r_j > threshold:
-                beta[j] = (r_j - threshold) / cxx[j, j]
-            elif r_j < -threshold:
-                beta[j] = (r_j + threshold) / cxx[j, j]
-            else:
-                beta[j] = 0.0
-
-        if np.linalg.norm(beta - beta_old) < tol:
-            break
-    return beta

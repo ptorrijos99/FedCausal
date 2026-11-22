@@ -8,7 +8,9 @@ import pytest
 from fedcausal.io import forward_sample, load_xbif
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
-ASIA_XBIF = FIXTURES / "networks" / "asia.xbif"
+ASIA_XBIF = (
+    Path(__file__).resolve().parents[2] / "src" / "fedcausal" / "datasets" / "data" / "asia.xbif"
+)
 
 
 def test_asia_has_eight_nodes_and_edges() -> None:

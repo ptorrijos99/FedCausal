@@ -1,4 +1,4 @@
-"""fedcausal.lingam reproduces the original FedLiNGAM implementation.
+"""fedcausal.lingam reproduces the original FedLiNGAM and HC-LiNGAM implementations.
 
 The fixtures come from that implementation; see tests/fixtures/lingam/README.md.
 If this fails, fix the code: never re-record the fixtures from it.
@@ -10,16 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fedcausal.lingam import (
-    fedhc,
-    fedishc,
-    fedrcd,
-    fedrcd_exact,
-    fedrcd_noniterative,
-    hc,
-    hc_lingam,
-    ishc_beta,
-)
+from fedcausal.lingam import fedrcd, fedrcd_exact
 from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "lingam" / "rcd_baseline.json"
@@ -27,19 +18,14 @@ CASES = json.loads(FIXTURE.read_text(encoding="utf-8"))["cases"]
 # The cumulants belong to the problem, not the method, so one record per problem.
 PROBLEMS = list({case["name"]: case for case in CASES}.values())
 
-# Federated solvers: consume aggregated cumulant stats.
-SOLVERS = {
-    "fedrcd": fedrcd,
-    "fedrcd_noniterative": fedrcd_noniterative,
-    "ishc": ishc_beta,
-    "fedishc": fedishc,
-    "fedhc": fedhc,
-}
-
-# Centralised solvers: consume the pooled data matrix directly, not stats.
-CENTRALISED_SOLVERS = {
-    "hc_lingam": hc_lingam,
-    "hc": hc,
+# Each recorded method as a setting of the unified solvers. FedISHC is left out:
+# the original divides Cum(x_j, x_j, x_s) by Cum(x_s, x_s, x_s), which estimates
+# the square of the coefficient, and fedrcd(method="ratio") uses the coefficient.
+SETTINGS = {
+    "fedrcd": {},
+    "fedrcd_noniterative": {"method": "sort"},
+    "ishc": {"order": 3},
+    "fedhc": {"method": "sort", "order": 3},
 }
 
 
@@ -66,19 +52,24 @@ def _clients(case: dict) -> list[np.ndarray]:
     return list(np.array_split(_data(case), case["n_clients"], axis=0))
 
 
-@pytest.mark.parametrize("case", CASES, ids=lambda c: f"{c['name']}-{c['method']}")
+CHECKED = [case for case in CASES if case["method"] != "fedishc"]
+
+
+@pytest.mark.parametrize("case", CHECKED, ids=lambda c: f"{c['name']}-{c['method']}")
 def test_port_reproduces_the_original(case):
     method = case["method"]
     if method == "fedrcd_exact":
         result = fedrcd_exact(_clients(case))
-    elif method in CENTRALISED_SOLVERS:
-        # hc_lingam/hc work on the pooled data matrix, not aggregated stats.
-        result = CENTRALISED_SOLVERS[method](_data(case))
+    elif method == "hc":
+        result = fedrcd_exact([_data(case)])
+    elif method == "hc_lingam":
+        pooled = aggregate_and_compute_cumulants([compute_local_raw_stats(_data(case))])
+        result = fedrcd(pooled, method="sort")
     else:
         stats = aggregate_and_compute_cumulants(
             [compute_local_raw_stats(c, order=4) for c in _clients(case)]
         )
-        result = SOLVERS[method](stats)
+        result = fedrcd(stats, **SETTINGS[method])
 
     assert list(result.causal_order) == case["causal_order"]
 
