@@ -14,10 +14,10 @@ from fedcausal.graph import DAG
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["intersection_fusion", "Intersection"]
+__all__ = ["intersection", "Intersection"]
 
 
-def intersection_fusion(dags: Sequence[DAG]) -> DAG:
+def intersection(dags: Sequence[DAG]) -> DAG:
     """Return the skeleton intersection of `dags`, oriented by ``dags[0]``.
 
     Parameters
@@ -37,7 +37,7 @@ def intersection_fusion(dags: Sequence[DAG]) -> DAG:
         If `dags` is empty.
     """
     if not dags:
-        raise ValueError("intersection_fusion requires at least one DAG")
+        raise ValueError("intersection requires at least one DAG")
     base = dags[0]
     skeletons = [{frozenset((u, v)) for (u, v) in d.edges()} for d in dags[1:]]
     out = DAG(base.num_nodes)
@@ -53,5 +53,5 @@ class Intersection:
     """Skeleton-intersection fusion as a :class:`FusionOperator`."""
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
-        """Return :func:`intersection_fusion` of `dags`."""
-        return intersection_fusion(dags)
+        """Return :func:`intersection` of `dags`."""
+        return intersection(dags)

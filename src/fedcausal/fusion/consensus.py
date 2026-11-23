@@ -10,7 +10,7 @@ depends on dictionary order.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from fedcausal.fusion.alpha import alpha_order
 from fedcausal.fusion.beta import beta_to_alpha
@@ -22,10 +22,11 @@ if TYPE_CHECKING:
 __all__ = [
     "consensus_union",
     "ConsensusUnion",
+    "EdgeBudget",
     "edge_frequency",
     "max_edges",
     "max_frequency",
-    "consensus_pct",
+    "consensus",
     "max_parents",
     "MaxEdges",
     "MaxFrequency",
@@ -102,29 +103,33 @@ def edge_frequency(transformed: Sequence[DAG]) -> list[tuple[tuple[int, int], in
     return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0][1], kv[0][0]))
 
 
-def _int_limit(limit: int | str, edge_counts: list[int]) -> int:
-    """Resolve a `max_edges` budget, allowing ``"Mean"``/``"Max"``/``"Min"``."""
-    if isinstance(limit, int):
+EdgeBudget = Literal["mean", "max", "min"]
+"""A `max_edges` budget relative to the inputs' edge counts."""
+
+
+def _int_limit(limit: int | EdgeBudget, edge_counts: list[int]) -> int:
+    """Resolve a `max_edges` budget, allowing ``"mean"``, ``"max"`` or ``"min"``."""
+    if isinstance(limit, int) and not isinstance(limit, bool):
         return limit
-    if limit == "Mean":
+    if limit == "mean":
         return sum(edge_counts) // len(edge_counts)
-    if limit == "Max":
+    if limit == "max":
         return max(edge_counts)
-    if limit == "Min":
+    if limit == "min":
         return min(edge_counts)
-    raise ValueError(f"unknown edge limit {limit!r}; expected int or Mean/Max/Min")
+    raise ValueError(f"unknown edge limit {limit!r}; expected an int, 'mean', 'max' or 'min'")
 
 
-def max_edges(dags: Sequence[DAG], limit: int | str = "Max") -> DAG:
+def max_edges(dags: Sequence[DAG], limit: int | EdgeBudget = "max") -> DAG:
     """Union the highest-frequency edges up to a total-edge budget.
 
     Parameters
     ----------
     dags : Sequence[DAG]
         Input DAGs over the same node set.
-    limit : int | str, optional
-        The budget: an int, or the ``"Mean"``, ``"Max"`` or ``"Min"`` of the
-        transformed inputs' edge counts. Default ``"Max"``.
+    limit : int or {"mean", "max", "min"}, default="max"
+        The budget: a number of edges, or the mean, largest or smallest edge
+        count of the transformed inputs.
 
     Returns
     -------
@@ -144,7 +149,7 @@ def max_frequency(dags: Sequence[DAG], limit: int) -> DAG:
     return DAG.from_edges(dags[0].num_nodes, kept)
 
 
-def consensus_pct(dags: Sequence[DAG], percent: int) -> DAG:
+def consensus(dags: Sequence[DAG], percent: int) -> DAG:
     """Union every edge appearing in at least `percent` percent of the inputs.
 
     An edge needs ``ceil(percent * len(dags) / 100)`` votes, and at least one:
@@ -181,7 +186,7 @@ def max_parents(dags: Sequence[DAG], limit: int) -> DAG:
 class MaxEdges:
     """`FusionOperator` for :func:`max_edges` with a stored budget."""
 
-    limit: int | str = "Max"
+    limit: int | EdgeBudget = "max"
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
         """Return :func:`max_edges` of `dags` at the stored budget."""
@@ -201,13 +206,13 @@ class MaxFrequency:
 
 @dataclass(frozen=True)
 class Consensus:
-    """`FusionOperator` for :func:`consensus_pct` with a stored percentage."""
+    """`FusionOperator` for :func:`consensus` with a stored percentage."""
 
     percent: int
 
     def fuse(self, dags: Sequence[DAG]) -> DAG:
-        """Return :func:`consensus_pct` of `dags` at the stored percentage."""
-        return consensus_pct(dags, self.percent)
+        """Return :func:`consensus` of `dags` at the stored percentage."""
+        return consensus(dags, self.percent)
 
 
 @dataclass(frozen=True)

@@ -79,7 +79,7 @@ All of them transform the input DAGs into one shared topological order and combi
 | `ConsensusUnion()` | Every transformed edge |
 | `Consensus(pct)` | Edges in at least `pct`% of the inputs |
 | `MaxFrequency(k)` | Edges in at least `k` inputs |
-| `MaxEdges(k)` | The `k` most agreed edges; `k` may also be `"Mean"`, `"Max"` or `"Min"` of the inputs' edge counts |
+| `MaxEdges(k)` | The `k` most agreed edges; `k` may also be `"mean"`, `"max"` (the default) or `"min"` of the inputs' edge counts |
 | `MaxParents(k)` | The most agreed edges, at most `k` parents per node |
 | `Intersection()` | Only what every input has |
 

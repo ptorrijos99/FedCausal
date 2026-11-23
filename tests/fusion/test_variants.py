@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from fedcausal.fusion import (
-    consensus_pct,
+    consensus,
     max_edges,
     max_frequency,
     max_parents,
@@ -25,8 +27,8 @@ def test_consensus_pct_needs_at_least_the_given_share_of_votes() -> None:
     """50% of four inputs is two votes, and of three inputs also two."""
     d01 = DAG.from_edges(3, [(0, 1)])
     d12 = DAG.from_edges(3, [(1, 2)])
-    four = {frozenset(e) for e in consensus_pct([d01, d01.copy(), d12, DAG(3)], 50).edges()}
-    three = {frozenset(e) for e in consensus_pct([d01, d01.copy(), d12], 50).edges()}
+    four = {frozenset(e) for e in consensus([d01, d01.copy(), d12, DAG(3)], 50).edges()}
+    three = {frozenset(e) for e in consensus([d01, d01.copy(), d12], 50).edges()}
     assert four == three == {frozenset({0, 1})}
 
 
@@ -46,3 +48,13 @@ def test_max_parents_caps_each_nodes_in_degree() -> None:
 
     chain = DAG.from_edges(3, [(0, 1), (1, 2)])
     assert set(max_parents([chain, chain.copy()], 1).edges()) == {(0, 1), (1, 2)}
+
+
+def test_max_edges_budgets_by_the_inputs_edge_counts() -> None:
+    dense = DAG.from_edges(4, [(0, 1), (1, 2), (2, 3)])
+    sparse = DAG.from_edges(4, [(0, 1)])
+    assert max_edges([dense, sparse], "min").num_edges == 1
+    assert max_edges([dense, sparse], "max").num_edges == 3
+    assert max_edges([dense, sparse], "mean").num_edges == 2
+    with pytest.raises(ValueError, match="unknown edge limit"):
+        max_edges([dense, sparse], "Max")  # type: ignore[arg-type]
