@@ -72,7 +72,7 @@ def is_clique(pdag: PDAG, nodes: frozenset[int]) -> bool:
     """Return whether every two nodes of `nodes` are adjacent."""
     ordered = sorted(nodes)
     for i, u in enumerate(ordered):
-        adj_u = pdag.adjacent_set(u)
+        adj_u = pdag._adjacent_set(u)
         for v in ordered[i + 1 :]:
             if v not in adj_u:
                 return False
@@ -88,9 +88,9 @@ def semidirected_reachable(pdag: PDAG, source: int, avoid: frozenset[int]) -> np
     `avoid`.
     """
     avoid_array = np.fromiter(avoid, dtype=np.int32, count=len(avoid)) if avoid else _NO_NODES
-    nbr, deg = pdag.neighbour_lists()
+    nbr, deg = pdag._neighbour_lists()
     reached: npt.NDArray[np.bool_] = semidirected_reach_lists(
-        pdag.adjacency_view().view(np.uint8), nbr, deg, source, avoid_array
+        pdag._adjacency().view(np.uint8), nbr, deg, source, avoid_array
     )
     return reached
 
@@ -111,7 +111,7 @@ def _cliques(pdag: PDAG, nodes: list[int]) -> list[frozenset[int]]:
         for i, v in enumerate(candidates):
             grown = clique | {v}
             found.append(grown)
-            adjacent = pdag.adjacent_set(v)
+            adjacent = pdag._adjacent_set(v)
             extend(grown, [w for w in candidates[i + 1 :] if w in adjacent])
 
     extend(_EMPTY, nodes)
@@ -149,9 +149,9 @@ def best_inserts_into(
 ) -> Best:
     """Return what :func:`inserts_into` does, as arrays."""
     n = pdag.num_nodes
-    undirected = pdag.undirected_set(y)
-    parents = frozenset(pdag.parents_set(y))
-    amat = pdag.adjacency_view()
+    undirected = pdag._undirected_set(y)
+    parents = frozenset(pdag._parents_set(y))
+    amat = pdag._adjacency()
     apart = ~(amat[y] | amat[:, y])
     apart[y] = False
     others = np.flatnonzero(apart)
@@ -207,11 +207,11 @@ def deletes_into(score: Score, pdag: PDAG, y: int) -> dict[int, Candidate]:
     same improvement the smallest is kept. Nodes with no improving Delete are
     left out.
     """
-    undirected = pdag.undirected_set(y)
-    parents = pdag.parents_set(y)
+    undirected = pdag._undirected_set(y)
+    parents = pdag._parents_set(y)
     best: dict[int, Candidate] = {}
     for x in sorted(parents | undirected):
-        na = frozenset(undirected & pdag.adjacent_set(x))
+        na = frozenset(undirected & pdag._adjacent_set(x))
         others = frozenset(parents) - {x}
         # A Delete is valid iff the part of NaYX it keeps is a clique, so the
         # cliques of NaYX are exactly the candidates, and enumerating them is

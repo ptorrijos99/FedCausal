@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from fedcausal.graph._kernels import (
-    changed_pairs,
     complete_marks,
     consistent_extension,
     link,
@@ -51,17 +50,10 @@ class PDAG:
         self._parents: list[set[int]] = [set() for _ in range(num_nodes)]
         self._children: list[set[int]] = [set() for _ in range(num_nodes)]
         self._undirected: list[set[int]] = [set() for _ in range(num_nodes)]
-        # Built on first use. The adjacency matrix and the neighbour lists are
-        # then edited by every mutation; the other two are dropped and rebuilt.
+        # Built on first use, then edited by every mutation.
         self._amat: npt.NDArray[np.bool_] | None = None
         self._nbr: npt.NDArray[np.int32] | None = None
         self._deg: npt.NDArray[np.int32] | None = None
-        self._skeleton: npt.NDArray[np.bool_] | None = None
-        self._succ_csr: tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]] | None = None
-
-    def _invalidate(self) -> None:
-        self._skeleton = None
-        self._succ_csr = None
 
     def _link(self, u: int, v: int) -> None:
         if self._nbr is None or self._deg is None:
@@ -91,23 +83,17 @@ class PDAG:
     # a frozenset on every call dominates the runtime. The first three return
     # the graph's own storage: never mutate it, and never let it escape.
 
-    def children_set(self, v: int) -> set[int]:
-        """Return the live child set of `v` (read-only; do not mutate)."""
+    def _children_set(self, v: int) -> set[int]:
         return self._children[v]
 
-    def parents_set(self, v: int) -> set[int]:
-        """Return the live parent set of `v` (read-only; do not mutate)."""
+    def _parents_set(self, v: int) -> set[int]:
         return self._parents[v]
 
-    def undirected_set(self, v: int) -> set[int]:
-        """Return the live undirected-neighbour set of `v` (read-only; do not mutate)."""
+    def _undirected_set(self, v: int) -> set[int]:
         return self._undirected[v]
 
-    def adjacent_set(self, v: int) -> set[int]:
-        """Return a fresh plain-set union of `v`'s parents, children and undirected neighbours.
-
-        Cheaper than :meth:`adjacent`, which also builds a frozenset.
-        """
+    def _adjacent_set(self, v: int) -> set[int]:
+        # A fresh set, cheaper than `adjacent`, which also builds a frozenset.
         return self._parents[v] | self._children[v] | self._undirected[v]
 
     def has_directed(self, u: int, v: int) -> bool:
@@ -152,7 +138,6 @@ class PDAG:
         if self._amat is not None:
             self._amat[u, v] = True
         self._link(u, v)
-        self._invalidate()
 
     def add_undirected(self, u: int, v: int) -> None:
         """Add the undirected edge `{u, v}`.
@@ -184,7 +169,6 @@ class PDAG:
         if self._amat is not None:
             self._amat[u, v] = self._amat[v, u] = True
         self._link(u, v)
-        self._invalidate()
 
     def orient(self, u: int, v: int) -> None:
         """Orient the undirected edge `{u, v}` as the directed edge `u -> v`.
@@ -209,7 +193,6 @@ class PDAG:
         self._parents[v].add(u)
         if self._amat is not None:
             self._amat[v, u] = False
-        self._invalidate()
 
     def remove_edge(self, u: int, v: int) -> None:
         """Remove the edge between `u` and `v`, of either kind and orientation.
@@ -242,29 +225,8 @@ class PDAG:
             self._amat[u, v] = self._amat[v, u] = False
         if self._nbr is not None and self._deg is not None:
             unlink(self._nbr, self._deg, u, v)
-        self._invalidate()
 
-    def update_to(self, adj: npt.ArrayLike) -> npt.NDArray[np.int64]:
-        """Make this PDAG the one `adj` encodes, in place, touching only the pairs that differ.
-
-        ``adj[u, v]`` alone is ``u -> v`` and both entries are ``u - v``, as in
-        :meth:`adjacency`. Returns the pairs ``(u, v)``, ``u < v``, that changed.
-        """
-        new = np.ascontiguousarray(adj, dtype=bool)
-        old = self._adjacency()
-        pairs: npt.NDArray[np.int64] = changed_pairs(old.view(np.uint8), new.view(np.uint8))
-        for u, v in pairs.tolist():
-            if old[u, v] or old[v, u]:
-                self.remove_edge(u, v)
-            if new[u, v] and new[v, u]:
-                self.add_undirected(u, v)
-            elif new[u, v]:
-                self.add_directed(u, v)
-            elif new[v, u]:
-                self.add_directed(v, u)
-        return pairs
-
-    def complete_in_place(self) -> npt.NDArray[np.int64]:
+    def _complete_in_place(self) -> npt.NDArray[np.int64]:
         """Make this PDAG the CPDAG of the equivalence class it extends to, in place.
 
         Returns the pairs ``(u, v)``, ``u < v``, whose marks changed, in
@@ -276,7 +238,7 @@ class PDAG:
             If this PDAG has no consistent extension; it is then left as it was.
         """
         amat = self._adjacency()
-        nbr, deg = self.neighbour_lists()
+        nbr, deg = self._neighbour_lists()
         pairs: npt.NDArray[np.int64]
         pairs, ok = complete_marks(amat.view(np.uint8), nbr, deg)
         if not ok:
@@ -295,8 +257,6 @@ class PDAG:
             else:
                 self._children[v].add(u)
                 self._parents[u].add(v)
-        if len(pairs):
-            self._invalidate()
         return pairs
 
     def directed_edges(self) -> list[tuple[int, int]]:
@@ -331,14 +291,7 @@ class PDAG:
             self._amat = amat
         return self._amat
 
-    def adjacency_view(self) -> npt.NDArray[np.bool_]:
-        """Return the live adjacency matrix of :meth:`adjacency` (read-only; do not mutate).
-
-        Later mutations of the graph show in it.
-        """
-        return self._adjacency()
-
-    def neighbour_lists(self) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+    def _neighbour_lists(self) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
         """Return the live padded lists of adjacent nodes (read-only; do not mutate).
 
         ``nbr[v, :deg[v]]`` are the nodes adjacent to ``v`` by any edge, in no
@@ -361,36 +314,6 @@ class PDAG:
                 nbr[v, : len(row)] = row
             self._nbr, self._deg = nbr, deg
         return self._nbr, self._deg
-
-    def skeleton_view(self) -> npt.NDArray[np.bool_]:
-        """Return the cached symmetric boolean matrix of adjacencies (read-only; do not mutate)."""
-        if self._skeleton is None:
-            amat = self._adjacency()
-            self._skeleton = amat | amat.T
-        return self._skeleton
-
-    def successor_csr(self) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
-        """Return CSR arrays of each node's semi-directed successors (children ∪ undirected).
-
-        ``indices[indptr[v]:indptr[v + 1]]`` are the nodes a semi-directed path
-        can step to from ``v``. Both arrays are ``int32``; the order within a
-        node is unspecified. Cached until the next mutation.
-
-        Returns
-        -------
-        tuple[np.ndarray, np.ndarray]
-            ``(indptr, indices)`` with ``indptr`` of length ``num_nodes + 1``.
-        """
-        if self._succ_csr is None:
-            n = self.num_nodes
-            indptr = np.zeros(n + 1, dtype=np.int32)
-            rows: list[int] = []
-            for v in range(n):
-                rows.extend(self._children[v] | self._undirected[v])
-                indptr[v + 1] = len(rows)
-            indices = np.array(rows, dtype=np.int32) if rows else np.zeros(0, dtype=np.int32)
-            self._succ_csr = (indptr, indices)
-        return self._succ_csr
 
     def copy(self) -> PDAG:
         """Return an independent deep copy of this graph.

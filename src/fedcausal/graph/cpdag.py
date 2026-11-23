@@ -48,7 +48,7 @@ def _directed_path(pdag: PDAG, source: int, target: int) -> bool:
         node = stack.pop()
         if node == target:
             return True
-        for nxt in pdag.children_set(node):
+        for nxt in pdag._children_set(node):
             if nxt not in seen:
                 seen.add(nxt)
                 stack.append(nxt)

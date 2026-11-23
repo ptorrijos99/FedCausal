@@ -118,10 +118,10 @@ def _climb(
         # Every node whose marks may differ from before the step: those the operator
         # edited and those the completion changed. A node edited and then restored is
         # re-scored for nothing, which leaves its cached operators as they were.
-        changed = {x, y, *subset, *current.complete_in_place().ravel().tolist()}
+        changed = {x, y, *subset, *current._complete_in_place().ravel().tolist()}
         affected = set(changed)
         for v in changed:
-            affected |= current.undirected_set(v)
+            affected |= current._undirected_set(v)
         rescore(sorted(affected))
 
 

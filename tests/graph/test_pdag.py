@@ -176,7 +176,7 @@ def _fresh(pdag: PDAG) -> PDAG:
 
 
 def _neighbours(pdag: PDAG) -> list[list[int]]:
-    nbr, deg = pdag.neighbour_lists()
+    nbr, deg = pdag._neighbour_lists()
     return [sorted(nbr[v, : deg[v]].tolist()) for v in range(pdag.num_nodes)]
 
 
@@ -185,8 +185,8 @@ def test_cached_arrays_follow_every_mutation(seed: int) -> None:
     rng = np.random.default_rng(seed)
     n = 12
     pdag = PDAG(n)
-    pdag.adjacency_view()
-    pdag.neighbour_lists()
+    pdag._adjacency()
+    pdag._neighbour_lists()
     for _ in range(300):
         u, v = (int(i) for i in rng.choice(n, size=2, replace=False))
         if v in pdag.adjacent(u):
@@ -199,14 +199,13 @@ def test_cached_arrays_follow_every_mutation(seed: int) -> None:
         else:
             pdag.add_undirected(u, v)
         fresh = _fresh(pdag)
-        assert np.array_equal(pdag.adjacency_view(), fresh.adjacency())
-        assert np.array_equal(pdag.skeleton_view(), fresh.skeleton_view())
+        assert np.array_equal(pdag._adjacency(), fresh.adjacency())
         assert _neighbours(pdag) == [sorted(fresh.adjacent(w)) for w in range(n)]
 
 
 def test_neighbour_lists_grow_past_their_first_width() -> None:
     pdag = PDAG(30)
-    pdag.neighbour_lists()
+    pdag._neighbour_lists()
     for v in range(1, 30):
         pdag.add_undirected(0, v)
     assert _neighbours(pdag)[0] == list(range(1, 30))
@@ -225,15 +224,15 @@ def test_complete_in_place_gives_the_cpdag_and_its_changes(seed: int) -> None:
                 dag.add_edge(int(order[i]), int(order[j]))
     pdag = PDAG.from_dag(dag)
     before = pdag.adjacency()
-    pairs = pdag.complete_in_place()
+    pairs = pdag._complete_in_place()
     want = dag_to_cpdag(dag)
     assert pdag == want
-    assert np.array_equal(pdag.adjacency_view(), want.adjacency())
+    assert np.array_equal(pdag._adjacency(), want.adjacency())
     changed = before != want.adjacency()
     assert sorted(map(tuple, pairs.tolist())) == sorted(
         {(min(u, v), max(u, v)) for u, v in zip(*np.nonzero(changed), strict=True)}
     )
-    assert len(pdag.complete_in_place()) == 0
+    assert len(pdag._complete_in_place()) == 0
 
 
 def test_complete_in_place_without_extension_raises_and_keeps_the_graph() -> None:
@@ -242,5 +241,5 @@ def test_complete_in_place_without_extension_raises_and_keeps_the_graph() -> Non
         pdag.add_undirected(u, v)
     before = pdag.copy()
     with pytest.raises(ValueError, match="no consistent extension"):
-        pdag.complete_in_place()
+        pdag._complete_in_place()
     assert pdag == before
