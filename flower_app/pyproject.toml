@@ -41,7 +41,7 @@ order = 4
 default = "local-simulation"
 
 # Every site in one process, on synthetic data. Needs Flower's Ray-based
-# engine: pip install "fedcausal[flower-simulation]"
+# engine: pip install "fedcausal[federated-simulation]"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 3
 

@@ -43,7 +43,25 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: pip install -e ".[dev,flower]"
+      - run: pip install -e ".[dev,federated]"
+      - run: pytest --tb=short
+
+  # The oldest dependencies pyproject.toml allows, and no extras: the core and
+  # the in-process FedGES and FedRCD must work without Flower, and the lower
+  # bounds must be true. The Flower tests skip themselves without flwr.
+  minimum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: >-
+          pip install -e .
+          "numba==0.59.*" "numpy==1.24.*" "pandas==2.0.*" "typing_extensions==4.0.*"
+          "pytest>=8" "hypothesis>=6"
+      - run: python -c "import importlib.util as u, sys; sys.exit(u.find_spec('flwr') is not None)"
       - run: pytest --tb=short
 
   examples:
@@ -54,7 +72,7 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: pip install -e ".[flower]"
+      - run: pip install -e ".[federated]"
       - run: python examples/01_learn_structure.py
       - run: python examples/02_federated_structure.py
       - run: python examples/03_fedrcd.py
@@ -72,7 +90,7 @@ jobs:
           python-version: "3.13"
           cache: pip
       # flower too, or the API page of fedcausal.flower cannot import it.
-      - run: pip install -e ".[docs,flower]"
+      - run: pip install -e ".[docs,federated]"
       # Builds the gallery too, so an example that stops running fails here.
       - run: sphinx-build -b html docs docs/_build/html
 

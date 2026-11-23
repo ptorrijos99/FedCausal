@@ -5,12 +5,12 @@ One app, both method families, and the same code whether it runs in one process 
 ## Trying it in one process
 
 ```bash
-pip install -e ".[flower-simulation]"   # from the repository root
+pip install -e ".[federated-simulation]"   # from the repository root
 flwr run flower_app
 flwr run flower_app --run-config "algorithm='fedrcd'"
 ```
 
-That runs three sites inside one process on a bundled synthetic chain, so you need no data files. It does need Ray, which is what the `flower-simulation` extra pulls in. A real deployment does not.
+That runs three sites inside one process on a bundled synthetic chain, so you need no data files. It does need Ray, which is what the `federated-simulation` extra pulls in. A real deployment does not.
 
 ## Running it across machines
 

@@ -68,12 +68,16 @@ docs = [
   "myst-parser>=2",
   "sphinx-copybutton>=0.5",
 ]
-# The transport itself. Deployment against a SuperLink needs nothing more.
-flower = ["flwr>=1.23"]
+# What only federation across processes needs: the Flower transport in
+# fedcausal.flower. The core (data, graph, scores, search, metrics, io,
+# datasets) and the in-process FedGES and FedRCD need none of it. Deployment
+# against a SuperLink needs nothing more. Flower changes its API between
+# minor releases, so the range stops at the next major one.
+federated = ["flwr>=1.23,<2"]
 # Flower's simulation engine runs on Ray, which has no wheel for every Python
 # version and platform, so it is a separate extra rather than a hard cost of
 # using the transport.
-flower-simulation = ["flwr[simulation]>=1.23"]
+federated-simulation = ["flwr[simulation]>=1.23,<2"]
 
 [tool.hatch.version]
 path = "src/fedcausal/__init__.py"

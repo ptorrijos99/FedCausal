@@ -143,7 +143,7 @@ def simulation_runner() -> Callable[..., Any]:
     except ImportError as exc:  # pragma: no cover - depends on the environment
         raise ConfigurationError(
             "Flower's simulation engine is not installed. Install it with "
-            "`pip install 'fedcausal[flower-simulation]'`, or deploy against a "
+            "`pip install 'fedcausal[federated-simulation]'`, or deploy against a "
             "real SuperLink instead; see docs/deployment.md."
         ) from exc
     return cast("Callable[..., Any]", run_simulation)

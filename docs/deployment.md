@@ -6,9 +6,9 @@ Running fedcausal across real machines, where each site holds its own data and n
 
 Two different things, and it is worth being clear about which you want.
 
-Simulation runs every site inside one process. It is what you want for experiments, and `run_flower_fedges`, `run_flower_rcd`, or `flwr run flower_app` gets you there in a line. It needs Flower's Ray-based engine, so install `fedcausal[flower-simulation]`. Ray has no wheel for every Python version and platform, which is why it is a separate extra.
+Simulation runs every site inside one process. It is what you want for experiments, and `run_flower_fedges`, `run_flower_rcd`, or `flwr run flower_app` gets you there in a line. It needs Flower's Ray-based engine, so install `fedcausal[federated-simulation]`. Ray has no wheel for every Python version and platform, which is why it is a separate extra.
 
-Deployment runs each site as its own process, usually on its own machine. It needs `fedcausal[flower]` only, no Ray. This page is about that.
+Deployment runs each site as its own process, usually on its own machine. It needs `fedcausal[federated]` only, no Ray. This page is about that.
 
 ## What each site provides
 
