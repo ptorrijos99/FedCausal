@@ -8,7 +8,7 @@ authors:
     affiliation: "Universidad de Castilla-La Mancha"
 repository-code: "https://github.com/ptorrijos99/fedcausal"
 license: MIT
-version: 0.1.0
+version: 1.0.0
 abstract: >-
   A Python implementation of federated causal discovery over two data regimes.
   FedGES learns Bayesian network structure from discrete data: each site runs

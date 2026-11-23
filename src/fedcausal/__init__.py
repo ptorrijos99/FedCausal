@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from fedcausal.lingam import FedRCD
     from fedcausal.search import GES
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"
 
 __all__ = ["DAG", "GES", "PDAG", "FedGES", "FedRCD", "__version__"]
 

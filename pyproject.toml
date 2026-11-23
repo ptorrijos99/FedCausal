@@ -19,7 +19,7 @@ keywords = [
   "LiNGAM",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -31,6 +31,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
+  # llvmlite comes with numba at the version numba pins; it is named because
+  # the BDeu kernels import it directly, for the popcount intrinsic.
+  "llvmlite",
   "numba>=0.59",
   "numpy>=1.24",
   "pandas>=2.0",

@@ -1,15 +1,38 @@
 # Changelog
 
-This project follows [Semantic Versioning](https://semver.org/). While the version is below 1.0, the public API may change between minor releases.
+This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, what the [API reference](docs/api.rst) lists changes incompatibly only in a major release; the exact structure learned when several score the same, up to rounding, may still change in a minor one.
 
-## Unreleased
+## 1.0.0
+
+The first stable release: the API of 0.2.0, faster, with stricter input checks and a smaller surface to keep stable.
 
 ### Speed
 
-- GES learns the same structures two to ten times faster: `link` (724 variables) takes 1.6 s against 17 s, `munin` (1041) 4.1 s against 41 s, and on one thread `diabetes` (413) takes 11.5 s against 60 s.
+- GES learns the same structures two to ten times faster: `link` (724 variables) takes 1.6 s against 17 s, `munin` (1041) 4.1 s against 41 s, and on one thread `diabetes` (413) takes 11.5 s against 60 s. With the default prior, `win95pts` and `munin` end at a different structure of the same score, up to rounding, because ties between equally good operators break differently; see [Benchmarks](docs/benchmarks.md).
 - BDeu groups the rows by the configuration of the shared parents once per batch and counts each added parent without sorting rows: with bitsets for small tables, in one pass for the rest. It sums over the distinct counts, so `log Gamma` is evaluated once per count value, and a family scores the same, bit for bit, in a batch or alone.
 - The CPDAG is completed over neighbour lists kept up to date by every edit, so a step costs in the edges it touches rather than in the square of the number of variables.
 - The search keeps only the best operator per child and computes candidate improvements in compiled code.
+
+### Added
+
+- `fedcausal.graph.dag_to_cpdag`, previously reachable only through `fedcausal.graph.cpdag`.
+- The API reference says what 1.0 promises, documents `fedcausal.flower.fedges` and `fedcausal.flower.lingam`, and notes that score objects are not safe to share between threads.
+
+### Changed
+
+- `PDAG.children_set`, `parents_set`, `undirected_set`, `adjacent_set`, `adjacency_view`, `neighbour_lists` and `complete_in_place` are private (underscored): they hand out the graph's own storage for the search's inner loop. `PDAG.update_to`, `skeleton_view` and `successor_csr`, which nothing called, are removed. `parents`, `children`, `undirected_neighbors`, `adjacent` and `adjacency` remain.
+- `FedGES.fit` and `FedRCD.fit` raise a `TypeError` when given one table instead of one per site; a DataFrame used to be read as its column names and an array as its rows.
+- `GES` and `FedGES` refuse data with no rows, `FedGES(n_jobs=0)` is an error (it ran serially), and `max_parents` and `max_t_size` must be non-negative integers or `None`.
+- The package declares `llvmlite`, which the BDeu kernels import directly, and is classified Production/Stable.
+
+### Fixed
+
+- Two variables with one name are refused; `from_pandas` used to fail with pandas' ambiguous truth-value error, or call a numeric column non-numeric.
+- A NaN or infinite `ess` or `penalty_discount`, or a NaN `expected_parents`, is refused instead of scoring every family NaN.
+- `GaussianBICScore` and `log_likelihood` on continuous data read a single row as a single variable (as `np.cov` does) and failed.
+- A variable with no levels, which a table with no rows gives, divided by zero in the BDeu kernel; it is now refused with its name.
+- `DAG.from_edges` and `add_edge` took a negative index as a node counted from the end; `DAG.from_amat` and `PDAG.from_adjacency` refuse a non-square matrix.
+- The Flower app in `flower_app/` ran FedRCD with the solver names 0.2.0 removed, so `algorithm='fedrcd'` stopped with a `ConfigurationError`; it now takes `method` and `order`, as `FedRCD` does.
 
 ## 0.2.0
 
