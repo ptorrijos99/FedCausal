@@ -4,7 +4,7 @@ This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, wha
 
 ## 1.0.0
 
-The first stable release: the API of 0.2.0, faster, with stricter input checks and a smaller surface to keep stable.
+The first stable release: the API of 0.2.0, faster, with stricter input checks, one naming scheme across the methods, and a smaller surface to keep stable. The library is split in two layers, a core that learns structures in one place and a federated part built on it.
 
 ### Speed
 
@@ -18,9 +18,18 @@ The first stable release: the API of 0.2.0, faster, with stricter input checks a
 - `fedcausal.graph.dag_to_cpdag`, previously reachable only through `fedcausal.graph.cpdag`.
 - `fedcausal.exceptions.NotFittedError`, raised when a result is read before `fit`; it was importable only from a private module. It is now a `FedCausalError` as well as an `AttributeError`, and the module's docstring says which errors are which instead of claiming every deliberate error is a `FedCausalError`.
 - The API reference says what 1.0 promises, documents `fedcausal.flower.fedges` and `fedcausal.flower.lingam`, and notes that score objects are not safe to share between threads.
+- `Score` is documented as the extension point for new scores, and `FamilyScore`'s hooks are public: a subclass implements `compute_family` (and may override `compute_extensions`) and gets the cache, the batching and the structure prior.
+- `fedcausal.fusion.EdgeBudget`, and `fedcausal.lingam.Pruning`, `LambdaSelection`, `MomentSums` and `Cumulants`, for type hints.
+- Tests that the core imports nothing federated and runs without it or Flower, that every docstring example runs, and a CI job on the oldest dependencies with no extras.
 
 ### Changed
 
+- The package has two layers. The core (`data`, `graph`, `scores`, `search`, `metrics`, `io`, `datasets`) never imports the federated part (`fedges`, `fusion`, `lingam`, `flower`), and only the transport needs an extra, now called `federated` (`federated-simulation` with Ray) instead of `flower` (`flower-simulation`). Both stop below `flwr` 2.
+- `fedrcd` and `fedrcd_exact` take `pruning` and `lambda_selection`, with `FedRCD`'s defaults (adaptive lasso, BIC), instead of `use_lasso=False` and `lmbda_type="fixed"`, so they give what the estimator gives. `RCDResult.b` is `RCDResult.coef`. `compute_local_raw_stats`, which returns centred sums, is `moment_sums`; `aggregate_and_compute_cumulants` is `cumulants_from_sums`; `stats_to_record` and `record_to_stats` are `sums_to_record` and `record_to_sums`.
+- `fedcausal.flower.lingam` has one `handle_train_message`, `build_client_app`, `run_server_loop`, `build_server_app` and `run_flower_rcd` for every method, `"exact"` included, with `FedRCD`'s options as keywords; the exact-only functions are gone. `fedcausal.flower.fedges.run_server_loop` and `build_server_app` take the same shape, the grid and then keywords: the server context is an optional keyword and `n_vars` is gone, read from the sites' replies. Both `build_server_app`s take `results`.
+- `BICScore` and `GaussianBICScore` default to `expected_parents=1.0`, like `BDeuScore` and the estimators (pass `None` for the plain BIC); what `GES` and `FedGES` learn does not change, since they always passed 1.0. Every score's options after the data are keyword-only, and `make_score` refuses the wrong kind of dataset with a `TypeError`.
+- `consensus_pct` is `consensus` and `intersection_fusion` is `intersection`, each named after its operator class; `MaxEdges` takes the budgets `"mean"`, `"max"` and `"min"` in lower case.
+- `CycleError` is a `FedCausalError`, still a `ValueError`, defined in `fedcausal.exceptions` and re-exported by `fedcausal.graph`.
 - `PDAG.children_set`, `parents_set`, `undirected_set`, `adjacent_set`, `adjacency_view`, `neighbour_lists` and `complete_in_place` are private (underscored): they hand out the graph's own storage for the search's inner loop. `PDAG.update_to`, `skeleton_view` and `successor_csr`, which nothing called, are removed. `parents`, `children`, `undirected_neighbors`, `adjacent` and `adjacency` remain.
 - `FedGES.fit` and `FedRCD.fit` raise a `TypeError` when given one table instead of one per site; a DataFrame used to be read as its column names and an array as its rows.
 - `GES` and `FedGES` refuse data with no rows, `FedGES(n_jobs=0)` is an error (it ran serially), and `max_parents` and `max_t_size` must be non-negative integers or `None`.
