@@ -79,37 +79,39 @@ def _run_without(blocked: list[str], code: str) -> subprocess.CompletedProcess[s
     )
 
 
-def test_the_core_runs_without_the_federated_part_or_flower() -> None:
-    blocked = ["flwr", "ray"] + [f"fedcausal.{p}" for p in FEDERATED]
+def test_without_flower_the_core_stands_alone_and_the_methods_run() -> None:
+    """In a fresh interpreter where Flower cannot be imported.
+
+    The core learns without loading any federated module; FedGES and FedRCD run
+    in one process; and the transport says which extra it needs.
+    """
     result = _run_without(
-        blocked,
+        ["flwr", "ray"],
         """
+        import sys
+        import numpy as np
         from fedcausal import GES
         from fedcausal.datasets import load_cancer
         from fedcausal.metrics import shd
 
         bundle = load_cancer()
-        print(shd(bundle.truth, GES().fit(bundle.data).dag_))
-        """,
-    )
-    assert result.returncode == 0, result.stderr
+        shd(bundle.truth, GES().fit(bundle.data).dag_)
+        federated = ("fedcausal.fedges", "fedcausal.fusion", "fedcausal.lingam", "fedcausal.flower")
+        loaded = sorted(m for m in sys.modules if m.startswith(federated))
+        assert not loaded, loaded
 
-
-def test_without_flower_the_methods_run_and_the_transport_names_its_extra() -> None:
-    result = _run_without(
-        ["flwr", "ray"],
-        """
-        import numpy as np
         from fedcausal import FedGES, FedRCD
         from fedcausal.data import contiguous_split
-        from fedcausal.datasets import load_cancer
 
-        FedGES(n_rounds=2).fit(contiguous_split(load_cancer().data, 2))
+        FedGES(n_rounds=2).fit(contiguous_split(bundle.data, 2))
         x = np.random.default_rng(0).laplace(size=(400, 3))
         FedRCD().fit([x[:200], x[200:]])
+        try:
+            import fedcausal.flower.fedges
+        except ModuleNotFoundError as exc:
+            assert "pip install 'fedcausal[federated]'" in str(exc), exc
+        else:
+            raise AssertionError("fedcausal.flower imported without flwr")
         """,
     )
     assert result.returncode == 0, result.stderr
-    result = _run_without(["flwr"], "import fedcausal.flower.fedges")
-    assert result.returncode != 0
-    assert "pip install 'fedcausal[federated]'" in result.stderr

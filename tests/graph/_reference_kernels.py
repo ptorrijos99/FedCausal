@@ -8,7 +8,7 @@ from numba import njit
 __all__ = ["changed_pairs", "consistent_extension", "cpdag_of_dag", "semidirected_reach"]
 
 
-@njit(cache=False)
+@njit(cache=True)
 def _neighbour_lists(adj: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return CSR lists of each node's neighbours in `adj`, by any mark, in index order."""
     n = adj.shape[0]
@@ -29,7 +29,7 @@ def _neighbour_lists(adj: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return indptr, nbr
 
 
-@njit(cache=False)
+@njit(cache=True)
 def consistent_extension(adj: np.ndarray) -> tuple[np.ndarray, bool]:
     """Return a DAG extending the PDAG `adj` (Dor & Tarsi, 1992), and whether one exists.
 
@@ -83,7 +83,7 @@ def consistent_extension(adj: np.ndarray) -> tuple[np.ndarray, bool]:
     return dag, True
 
 
-@njit(cache=False)
+@njit(cache=True)
 def cpdag_of_dag(dag: np.ndarray) -> np.ndarray:
     """Return the CPDAG of `dag`, by Chickering's (1995) edge labelling."""
     n = dag.shape[0]
@@ -185,7 +185,7 @@ def cpdag_of_dag(dag: np.ndarray) -> np.ndarray:
     return out
 
 
-@njit(cache=False)
+@njit(cache=True)
 def changed_pairs(old: np.ndarray, new: np.ndarray) -> np.ndarray:
     """Return the pairs ``(u, v)``, ``u < v``, whose marks differ between two adjacency matrices."""
     n = old.shape[0]
@@ -205,7 +205,7 @@ def changed_pairs(old: np.ndarray, new: np.ndarray) -> np.ndarray:
     return pairs
 
 
-@njit(cache=False)
+@njit(cache=True)
 def semidirected_reach(
     indptr: np.ndarray, indices: np.ndarray, source: int, avoid: np.ndarray
 ) -> np.ndarray:

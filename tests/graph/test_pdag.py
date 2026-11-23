@@ -55,6 +55,9 @@ def test_malformed_edits_are_refused() -> None:
     pdag = PDAG(3)
     pdag.add_directed(0, 1)
     pdag.add_undirected(1, 2)
+    pdag.add_directed(0, 1)  # adding an edge again changes nothing
+    pdag.add_undirected(2, 1)
+    assert (pdag.directed_edges(), pdag.undirected_edges()) == ([(0, 1)], [(1, 2)])
     for edit, args in [
         (pdag.add_directed, (1, 0)),  # the opposite direction
         (pdag.add_directed, (1, 2)),  # over an undirected edge
