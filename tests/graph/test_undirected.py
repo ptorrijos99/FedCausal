@@ -1,134 +1,54 @@
+"""Moralisation, triangulation, cliques and the treewidth bound."""
+
+import itertools
+
 import numpy as np
-import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from fedcausal.graph import DAG
-from fedcausal.graph.undirected import (
-    fill_in,
-    maximal_cliques,
-    mcs_order,
-    moralize,
-    treewidth,
-)
+from fedcausal.graph.undirected import fill_in, maximal_cliques, mcs_order, moralize, treewidth
 
 
-def _symmetric_and_hollow(adj: np.ndarray) -> bool:
-    n = adj.shape[0]
-    if not np.array_equal(adj, adj.T):
-        return False
-    return not adj.diagonal().any() if n else True
+@st.composite
+def _dags(draw: st.DrawFn) -> DAG:
+    n = draw(st.integers(0, 9))
+    order = draw(st.permutations(range(n)))
+    edges = [(order[i], order[j]) for i in range(n) for j in range(i + 1, n) if draw(st.booleans())]
+    return DAG.from_edges(n, edges)
 
 
-def test_moralize_collider_adds_edge_between_parents() -> None:
-    # 0 -> 2, 1 -> 2: parents of the collider get an edge added.
-    dag = DAG.from_edges(3, [(0, 2), (1, 2)])
+def test_moralize_marries_the_parents_of_each_node() -> None:
+    # A diamond: 3's parents 1 and 2 are married; 0 and 3 stay apart.
+    moral = moralize(DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)]))
+    expected = {(0, 1), (0, 2), (1, 3), (2, 3), (1, 2)}
+    assert {(u, v) for u, v in zip(*np.nonzero(np.triu(moral)), strict=True)} == expected
+    assert np.array_equal(moral, moral.T)
+    assert not moral.diagonal().any()
+
+
+@given(_dags())
+@settings(max_examples=60, deadline=None)
+def test_fill_in_triangulates_and_the_cliques_cover_it(dag: DAG) -> None:
     moral = moralize(dag)
-    assert _symmetric_and_hollow(moral)
-    assert moral[0, 1] and moral[1, 0]
-    assert moral[0, 2] and moral[2, 0]
-    assert moral[1, 2] and moral[2, 1]
+    chordal = fill_in(moral, mcs_order(moral))
+    assert np.array_equal(chordal & moral, moral)
+    assert np.array_equal(chordal, chordal.T)
+    # Chordal iff, along an MCS order, each node's earlier neighbours form a clique.
+    order = mcs_order(chordal)
+    position = {v: i for i, v in enumerate(order)}
+    for i, v in enumerate(order):
+        earlier = [w for w in np.flatnonzero(chordal[v]) if position[w] < i]
+        assert all(chordal[a, b] for a, b in itertools.combinations(earlier, 2))
+    cliques = maximal_cliques(chordal, order)
+    assert not any(a < b for a in cliques for b in cliques)
+    for u, v in zip(*np.nonzero(chordal), strict=True):
+        assert any({u, v} <= c for c in cliques)
+    if dag.num_nodes:
+        assert treewidth(dag) == max(len(c) for c in cliques) - 1
 
 
-def test_moralize_chain_is_just_the_skeleton() -> None:
-    # 0 -> 1 -> 2: no node has more than one parent, so no edges are added.
-    dag = DAG.from_edges(3, [(0, 1), (1, 2)])
-    moral = moralize(dag)
-    expected = np.array(
-        [
-            [False, True, False],
-            [True, False, True],
-            [False, True, False],
-        ]
-    )
-    np.testing.assert_array_equal(moral, expected)
-
-
-def test_moralize_diamond_adds_edge_between_co_parents() -> None:
-    # 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3: 3's parents {1, 2} get an edge.
-    dag = DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])
-    moral = moralize(dag)
-    assert moral[1, 2] and moral[2, 1]
-    # Skeleton edges are still present.
-    assert moral[0, 1] and moral[0, 2] and moral[1, 3] and moral[2, 3]
-    # No spurious edges.
-    assert not moral[0, 3]
-
-
-def test_mcs_order_empty_graph() -> None:
-    adj = np.zeros((0, 0), dtype=bool)
-    assert mcs_order(adj) == []
-
-
-def test_fill_in_diamond_moral_graph_already_chordal() -> None:
-    dag = DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])
-    moral = moralize(dag)
-    order = mcs_order(moral)
-    triangulated = fill_in(moral, order)
-    # The diamond's moral graph is already chordal (1-2 chord exists), so
-    # fill-in should not add any edges.
-    np.testing.assert_array_equal(triangulated, moral)
-    assert _symmetric_and_hollow(triangulated)
-
-
-def test_fill_in_produces_chordal_graph_via_perfect_elimination_check() -> None:
-    # A 4-cycle 0-1-2-3-0 is NOT chordal; fill-in must add a chord.
-    adj = np.array(
-        [
-            [False, True, False, True],
-            [True, False, True, False],
-            [False, True, False, True],
-            [True, False, True, False],
-        ]
-    )
-    order = mcs_order(adj)
-    triangulated = fill_in(adj, order)
-    assert _symmetric_and_hollow(triangulated)
-
-    # Chordal iff, in an MCS order, each node's earlier neighbours form a clique.
-    check_order = mcs_order(triangulated)
-    position = {node: idx for idx, node in enumerate(check_order)}
-    for i in range(len(check_order) - 1, -1, -1):
-        v = check_order[i]
-        earlier_neighbors = [
-            w for w in range(triangulated.shape[0]) if triangulated[v, w] and position[w] < i
-        ]
-        for a in range(len(earlier_neighbors)):
-            for b in range(a + 1, len(earlier_neighbors)):
-                assert triangulated[earlier_neighbors[a], earlier_neighbors[b]]
-
-    # Original edges preserved, and at least one chord added.
-    assert np.array_equal(triangulated & adj, adj)
-    assert triangulated.sum() > adj.sum()
-
-
-def test_maximal_cliques_no_subset_cliques() -> None:
-    dag = DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])
-    moral = moralize(dag)
-    order = mcs_order(moral)
-    triangulated = fill_in(moral, order)
-    order2 = mcs_order(triangulated)
-    cliques = maximal_cliques(triangulated, order2)
-
-    # No clique is a subset of another.
-    for i, c1 in enumerate(cliques):
-        for j, c2 in enumerate(cliques):
-            if i != j:
-                assert not c1 <= c2
-
-    node_sets = set(cliques)
-    assert frozenset({0, 1, 2}) in node_sets
-    assert frozenset({1, 2, 3}) in node_sets
-
-
-def test_treewidth_diamond_is_two() -> None:
-    dag = DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])
-    assert treewidth(dag) == 2
-
-
-def test_treewidth_tree_is_one() -> None:
-    dag = DAG.from_edges(5, [(0, 1), (0, 2), (1, 3), (1, 4)])
-    assert treewidth(dag) == 1
-
-
-@pytest.mark.parametrize("n", [0, 1, 3])
-def test_treewidth_without_edges_is_zero(n: int) -> None:
-    assert treewidth(DAG(n)) == 0
+def test_treewidth_of_known_graphs() -> None:
+    assert treewidth(DAG.from_edges(4, [(0, 1), (0, 2), (1, 3), (2, 3)])) == 2
+    assert treewidth(DAG.from_edges(5, [(0, 1), (0, 2), (1, 3), (1, 4)])) == 1
+    assert treewidth(DAG(0)) == treewidth(DAG(3)) == 0
