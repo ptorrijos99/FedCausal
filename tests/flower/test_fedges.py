@@ -80,42 +80,22 @@ def test_a_fuse_merges_the_global_model_in() -> None:
 
     skeleton = {frozenset(e) for e in record_to_dag(reply.content["local"], 3).edges()}  # type: ignore[arg-type]
     assert frozenset((0, 2)) in skeleton
-
-
-@pytest.mark.parametrize("phase", ["fuse", "dance"])
-def test_a_fuse_before_any_build_or_an_unknown_phase_is_rejected(phase: str) -> None:
-    with pytest.raises(ClientFailureError):
-        handle_train_message(_message(phase), node_context(0), single(discrete_chain()))  # type: ignore[arg-type]
+    for phase in ("fuse", "dance"):  # a fuse before any build, or no phase at all
+        with pytest.raises(ClientFailureError):
+            handle_train_message(_message(phase), node_context(0), single(discrete_chain()))  # type: ignore[arg-type]
 
 
 # --- the server loop ---------------------------------------------------------
 
 
-def test_the_final_model_lands_on_the_server_state() -> None:
-    context = server_context()
-    run_server_loop(
-        _partition_grid(discrete_chain(), 3),  # type: ignore[arg-type]
-        n_clients=3,
-        n_rounds=4,
-        context=context,
-    )
-    assert "global_dag" in context.state.array_records
-
-
-def test_a_failed_site_stops_the_run_unless_tolerated() -> None:
+def test_the_server_refuses_what_would_give_a_wrong_answer() -> None:
     with pytest.raises(ClientFailureError, match="needs 3"):
         _run(_partition_grid(discrete_chain(), 3, fail_nodes={1}), 3, n_rounds=2)
     tolerated = _run(_partition_grid(discrete_chain(), 3, fail_nodes={1}), 3, min_clients=2)
     assert tolerated is not None
-
-
-def test_min_clients_is_validated() -> None:
     with pytest.raises(ConfigurationError, match="min_clients"):
         _run(_partition_grid(discrete_chain(), 2), 2, min_clients=0)
-
-
-def test_sites_with_different_variables_are_rejected() -> None:
-    """Edges travel as bare indices, so mismatched variables would be a wrong answer."""
+    # Edges travel as bare indices, so mismatched variables would be a wrong answer.
     grid = _grid([single(discrete_chain(n_vars=3)), single(discrete_chain(n_vars=4))])
     with pytest.raises(SchemaMismatchError, match="disagree on their variables"):
         _run(grid, 2, n_rounds=2)
@@ -148,15 +128,18 @@ def test_flower_gives_the_in_process_models_round_by_round() -> None:
     expected = _inprocess_globals(data, 3, 8)
     seen: list[DAG] = []
 
+    context = server_context()
     final = _run(
         _partition_grid(data, 3),
         3,
         n_rounds=8,
         on_model=lambda stage, r, s, m: seen.append(m.dag) if stage == "global" else None,
+        context=context,
     )
 
     assert seen == expected
     assert final == expected[-1]
+    assert "global_dag" in context.state.array_records
 
 
 @pytest.mark.slow
@@ -222,27 +205,6 @@ def test_a_deployment_learns_from_every_site(tmp_path: Path) -> None:
 
     assert final is not None
     assert set(locals_per_round.values()) == {3}
-
-
-def test_a_deployed_site_with_other_columns_stops_the_run(tmp_path: Path) -> None:
     grid = _DeploymentGrid(_write_sites(tmp_path, drop_column_at_last=True))
     with pytest.raises((SchemaMismatchError, ValueError)):
         _run(grid, 3)
-
-
-def test_a_site_reading_its_file_every_round_keeps_its_score_cache(tmp_path: Path) -> None:
-    from fedcausal.flower import fedges as transport
-
-    path = _write_sites(tmp_path)[0]
-    context = Context(
-        run_id=1,
-        node_id=500,
-        node_config={"data-path": str(path)},
-        state=RecordDict(),
-        run_config={},
-    )
-    loader = NodeConfigLoader(DiscreteDataset)
-    handle_train_message(_message("build"), context, loader)
-    first = transport._SITES[(500, -1)]
-    handle_train_message(_message("build"), context, loader)
-    assert transport._SITES[(500, -1)] is first

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import re
 from pathlib import Path
-
-import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -42,22 +41,25 @@ DOC_IMPORTS = sorted(
 )
 
 
-@pytest.mark.parametrize("name", SUBPACKAGES)
-def test_every_export_resolves(name: str) -> None:
+def test_every_export_resolves() -> None:
     """Nothing in an ``__all__`` has been renamed out from under it."""
-    module = importlib.import_module(name)
-    for export in getattr(module, "__all__", []):
-        assert hasattr(module, export), f"{name}.__all__ names missing {export}"
+    missing = [
+        f"{name}.{export}"
+        for name in SUBPACKAGES
+        for export in getattr(importlib.import_module(name), "__all__", [])
+        if not hasattr(importlib.import_module(name), export)
+    ]
+    assert not missing
 
 
-@pytest.mark.parametrize(("module", "name"), DOC_IMPORTS, ids=lambda v: str(v))
-def test_documented_imports_work(module: str, name: str) -> None:
+def test_documented_imports_work() -> None:
     """Every ``from fedcausal... import ...`` shown in the docs actually runs."""
-    if module.startswith("fedcausal.flower"):
-        pytest.importorskip("flwr")
-    assert hasattr(importlib.import_module(module), name)
-
-
-def test_the_docs_import_something() -> None:
-    """Guard the guard: an empty scrape would make the test above vacuous."""
-    assert len(DOC_IMPORTS) > 15
+    has_flwr = importlib.util.find_spec("flwr") is not None
+    broken = [
+        f"{module}.{name}"
+        for module, name in DOC_IMPORTS
+        if (has_flwr or not module.startswith("fedcausal.flower"))
+        and not hasattr(importlib.import_module(module), name)
+    ]
+    assert not broken
+    assert len(DOC_IMPORTS) > 15  # guard the guard: the scrape found the imports

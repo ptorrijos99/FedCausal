@@ -7,8 +7,6 @@ import importlib
 import importlib.util
 import pkgutil
 
-import pytest
-
 import fedcausal
 
 
@@ -21,23 +19,13 @@ def _modules() -> list[str]:
     return sorted(names)
 
 
-@pytest.mark.parametrize("name", _modules())
-def test_docstring_examples_run(name: str) -> None:
-    module = importlib.import_module(name)
+def test_docstring_examples_run() -> None:
     flags = doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE
     finder = doctest.DocTestFinder(exclude_empty=True)
     runner = doctest.DocTestRunner(optionflags=flags)
-    for test in finder.find(module, name):
-        runner.run(test)
+    for name in _modules():
+        for test in finder.find(importlib.import_module(name), name):
+            runner.run(test)
     result = runner.summarize(verbose=False)
-    assert result.failed == 0, f"{result.failed} of {result.attempted} examples failed in {name}"
-
-
-def test_some_examples_exist() -> None:
-    """Guard the guard: a finder that found nothing would make the test above vacuous."""
-    finder = doctest.DocTestFinder(exclude_empty=True)
-    found = sum(
-        len(finder.find(importlib.import_module(n), n))
-        for n in ("fedcausal.datasets", "fedcausal.search._ges", "fedcausal.scores._family")
-    )
-    assert found >= 3
+    assert result.failed == 0
+    assert result.attempted >= 6  # guard the guard: the finder found the examples

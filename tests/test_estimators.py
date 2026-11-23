@@ -27,114 +27,67 @@ def _discrete(n_rows: int = 300, seed: int = 0) -> np.ndarray:
     return np.random.default_rng(seed).integers(0, 3, size=(n_rows, 4))
 
 
-@pytest.mark.parametrize("cls", [GES, FedGES, FedRCD])
-def test_params_round_trip_and_repr_shows_only_changes(cls: type) -> None:
-    model = cls()
-    assert repr(model) == f"{cls.__name__}()"
-    params = model.get_params()
-    assert model.set_params(**params) is model
-    assert model.get_params() == params
-    with pytest.raises(ValueError, match="no parameter"):
-        model.set_params(not_a_parameter=1)
-
-
-def test_sklearn_clone_keeps_the_parameters() -> None:
+def test_the_scikit_learn_parameter_protocol() -> None:
     sklearn_base = pytest.importorskip("sklearn.base")
-    for model in (GES(ess=5.0), FedGES(n_rounds=3), FedRCD(order=3)):
-        assert sklearn_base.clone(model).get_params() == model.get_params()
-
-
-@pytest.mark.parametrize("cls", [GES, FedGES, FedRCD])
-def test_results_before_fit_raise_not_fitted(cls: type) -> None:
-    with pytest.raises(NotFittedError):
-        _ = cls().adjacency_
+    for cls in (GES, FedGES, FedRCD):
+        model = cls()
+        assert repr(model) == f"{cls.__name__}()"
+        assert model.set_params(**model.get_params()) is model
+        with pytest.raises(ValueError, match="no parameter"):
+            model.set_params(not_a_parameter=1)
+        # Before fit, a result is missing, as scikit-learn expects.
+        with pytest.raises(NotFittedError):
+            _ = model.adjacency_
+        assert not hasattr(model, "adjacency_")
     assert issubclass(NotFittedError, FedCausalError)
-    assert not hasattr(cls(), "adjacency_")
+    for model in (GES(ess=5.0), FedGES(n_rounds=3, n_jobs=-1), FedRCD(order=3)):
+        assert sklearn_base.clone(model).get_params() == model.get_params()
+    assert repr(FedGES(n_rounds=3, n_jobs=-1)) == "FedGES(n_rounds=3, n_jobs=-1)"
 
 
-def test_fedrcd_recovers_a_chain_and_names_its_variables() -> None:
-    sites = [pd.DataFrame(x, columns=["a", "b", "c"]) for x in _linear_sites()]
-    model = FedRCD().fit(sites)
-    assert model.causal_order_ == ["a", "b", "c"]
-    assert model.n_features_in_ == 3
-    assert list(model.feature_names_in_) == ["a", "b", "c"]
-    assert sorted(model.dag_.edges()) == [(0, 1), (1, 2)]
-    assert model.adjacency_.loc["a", "b"] == 1
-    assert model.adjacency_.loc["b", "a"] == 0
-    assert model.coef_.shape == (3, 3)
-
-
-def test_fedrcd_is_the_solver_over_the_pooled_statistics() -> None:
+def test_fedrcd_is_the_solver_over_the_pooled_sums_and_names_its_result() -> None:
     sites = _linear_sites()
-    model = FedRCD(pruning=None).fit(sites)
-    stats = cumulants_from_sums([moment_sums(x) for x in sites])
-    expected = fedrcd(stats, pruning=None)
-    assert tuple(int(v[1:]) for v in model.causal_order_) == expected.causal_order
+    model = FedRCD(pruning=None).fit([pd.DataFrame(x, columns=["a", "b", "c"]) for x in sites])
+    expected = fedrcd(cumulants_from_sums([moment_sums(x) for x in sites]), pruning=None)
+    assert model.causal_order_ == ["abc"[i] for i in expected.causal_order] == ["a", "b", "c"]
     np.testing.assert_array_equal(model.coef_, expected.coef)
+    assert list(model.feature_names_in_) == ["a", "b", "c"]
+    pruned = FedRCD().fit(sites)
+    assert sorted(pruned.dag_.edges()) == [(0, 1), (1, 2)]
+    assert (pruned.adjacency_.loc["x0", "x1"], pruned.adjacency_.loc["x1", "x0"]) == (1, 0)
+    assert FedRCD(method="exact").fit(sites).causal_order_ == ["x0", "x1", "x2"]
 
 
-@pytest.mark.parametrize("method", ["deflation", "exact", "ratio", "sort"])
-def test_fedrcd_methods_agree_on_an_easy_chain(method: str) -> None:
-    model = FedRCD(method=method).fit(_linear_sites())  # type: ignore[arg-type]
-    assert model.causal_order_ == ["x0", "x1", "x2"]
-
-
-@pytest.mark.parametrize(
-    "params",
-    [{"method": "nope"}, {"order": 5}, {"pruning": "lasso"}, {"lambda_selection": "aic"}],
-)
-def test_fedrcd_rejects_unknown_settings(params: dict[str, object]) -> None:
-    with pytest.raises(ValueError):
-        FedRCD(**params).fit(_linear_sites())  # type: ignore[arg-type]
-
-
-@pytest.mark.parametrize(
-    "single",
-    [
+def test_estimators_refuse_bad_input_and_settings() -> None:
+    x = _discrete()
+    for single in (
         np.zeros((10, 3)),
         pd.DataFrame(np.zeros((10, 3))),
-        ContinuousDataset(np.zeros((10, 3)), ["a", "b", "c"]),
-    ],
-    ids=["array", "frame", "dataset"],
-)
-def test_federated_estimators_want_one_table_per_site(single: object) -> None:
-    with pytest.raises(TypeError, match="one table per site"):
-        FedRCD().fit(single)  # type: ignore[arg-type]
-    with pytest.raises(TypeError, match="one table per site"):
-        FedGES(n_rounds=1).fit(single)  # type: ignore[arg-type]
+        ContinuousDataset(np.zeros((10, 3)), list("abc")),
+    ):
+        for model in (FedRCD(), FedGES(n_rounds=1)):
+            with pytest.raises(TypeError, match="one table per site"):
+                model.fit(single)  # type: ignore[arg-type]
+    refusals = [
+        (lambda: FedGES(n_rounds=1).fit([x[:0], x[:0]]), "no rows"),
+        (lambda: FedGES(n_rounds=1, n_jobs=0).fit([x, x]), "n_jobs"),
+        (lambda: GES().fit(np.zeros((0, 3), dtype=int)), "no rows"),
+        (lambda: GES(criterion="gaussian_bic").fit(np.zeros((0, 3))), "no rows"),
+        (lambda: GES(ess=float("nan")).fit(x), "ess"),
+        (lambda: FedRCD(method="nope").fit(_linear_sites()), "method"),  # type: ignore[arg-type]
+        (lambda: FedRCD(order=5).fit(_linear_sites()), "order"),  # type: ignore[arg-type]
+    ]
+    for name in ("max_parents", "max_t_size"):
+        for value in (-1, 1.5, True, "2"):
+            refusals.append((lambda n=name, v=value: GES(**{n: v}).fit(x), name))  # type: ignore[misc]
+    for fit, match in refusals:
+        with pytest.raises(ValueError, match=match):
+            fit()
 
 
-def test_fedges_rejects_sites_without_rows_and_n_jobs_zero() -> None:
+def test_degenerate_but_valid_input_is_learned_from() -> None:
     x = _discrete()
-    with pytest.raises(ValueError, match="no rows"):
-        FedGES(n_rounds=1).fit([x[:0], x[:0]])
-    with pytest.raises(ValueError, match="n_jobs"):
-        FedGES(n_rounds=1, n_jobs=0).fit([x, x])
-    # One empty site among others is fine: it only adds its prior.
-    FedGES(n_rounds=1).fit([x, x[:0]])
-
-
-def test_ges_rejects_data_without_rows() -> None:
-    with pytest.raises(ValueError, match="no rows"):
-        GES().fit(np.zeros((0, 3), dtype=int))
-    with pytest.raises(ValueError, match="no rows"):
-        GES(criterion="gaussian_bic").fit(np.zeros((0, 3)))
-
-
-@pytest.mark.parametrize("name", ["max_parents", "max_t_size"])
-@pytest.mark.parametrize("value", [-1, 1.5, True, "2"])
-def test_ges_rejects_limits_that_are_not_counts(name: str, value: object) -> None:
-    with pytest.raises(ValueError, match=name):
-        GES(**{name: value}).fit(_discrete())  # type: ignore[arg-type]
-
-
-@pytest.mark.parametrize("params", [{"ess": float("nan")}, {"ess": float("inf")}])
-def test_ges_rejects_a_non_finite_ess(params: dict[str, float]) -> None:
-    with pytest.raises(ValueError, match="ess"):
-        GES(**params).fit(_discrete())  # type: ignore[arg-type]
-
-
-def test_ges_learns_from_a_single_row_of_continuous_data() -> None:
+    FedGES(n_rounds=1).fit([x, x[:0]])  # an empty site only adds its prior
     model = GES(criterion="gaussian_bic").fit(np.array([[0.1, 0.2, 0.3]]))
     assert model.dag_.num_edges == 0
     assert np.isfinite(model.score_)

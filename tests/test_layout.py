@@ -13,8 +13,6 @@ import sys
 import textwrap
 from pathlib import Path
 
-import pytest
-
 SRC = Path(__file__).resolve().parent.parent / "src" / "fedcausal"
 CORE = ["data", "graph", "scores", "search", "metrics", "io", "datasets"]
 CORE_MODULES = ["_base.py", "exceptions.py"]
@@ -38,17 +36,21 @@ def _imported_modules(path: Path) -> set[str]:
     return names
 
 
-@pytest.mark.parametrize("path", _core_files(), ids=lambda p: str(p.relative_to(SRC)))
-def test_the_core_never_imports_the_federated_part(path: Path) -> None:
-    """Not even under TYPE_CHECKING: a split package would not have the names."""
-    forbidden = {
+def _federated_imports(path: Path) -> set[str]:
+    return {
         name
         for name in _imported_modules(path)
         if any(name == f"fedcausal.{p}" or name.startswith(f"fedcausal.{p}.") for p in FEDERATED)
         or name == "flwr"
         or name.startswith("flwr.")
     }
-    assert not forbidden, f"{path.name} imports {sorted(forbidden)}"
+
+
+def test_the_core_never_imports_the_federated_part() -> None:
+    """Not even under TYPE_CHECKING: a split package would not have the names."""
+    offenders = {p.name: sorted(i) for p in _core_files() if (i := _federated_imports(p))}
+    assert not offenders
+    assert len(_core_files()) > 20  # the walk found the core
 
 
 def _run_without(blocked: list[str], code: str) -> subprocess.CompletedProcess[str]:
@@ -93,7 +95,21 @@ def test_the_core_runs_without_the_federated_part_or_flower() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_the_transport_names_the_extra_it_needs() -> None:
+def test_without_flower_the_methods_run_and_the_transport_names_its_extra() -> None:
+    result = _run_without(
+        ["flwr", "ray"],
+        """
+        import numpy as np
+        from fedcausal import FedGES, FedRCD
+        from fedcausal.data import contiguous_split
+        from fedcausal.datasets import load_cancer
+
+        FedGES(n_rounds=2).fit(contiguous_split(load_cancer().data, 2))
+        x = np.random.default_rng(0).laplace(size=(400, 3))
+        FedRCD().fit([x[:200], x[200:]])
+        """,
+    )
+    assert result.returncode == 0, result.stderr
     result = _run_without(["flwr"], "import fedcausal.flower.fedges")
     assert result.returncode != 0
     assert "pip install 'fedcausal[federated]'" in result.stderr

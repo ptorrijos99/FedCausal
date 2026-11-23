@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from fedcausal.lingam import fedrcd, fedrcd_exact
 from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
@@ -56,38 +55,40 @@ def _clients(case: dict) -> list[np.ndarray]:
 CHECKED = [case for case in CASES if case["method"] != "fedishc"]
 
 
-@pytest.mark.parametrize("case", CHECKED, ids=lambda c: f"{c['name']}-{c['method']}")
-def test_port_reproduces_the_original(case):
-    method = case["method"]
-    if method == "fedrcd_exact":
-        result = fedrcd_exact(_clients(case), pruning=None)
-    elif method == "hc":
-        result = fedrcd_exact([_data(case)], pruning=None)
-    elif method == "hc_lingam":
-        pooled = cumulants_from_sums([moment_sums(_data(case))])
-        result = fedrcd(pooled, method="sort", pruning=None)
-    else:
-        stats = cumulants_from_sums([moment_sums(c, order=4) for c in _clients(case)])
-        result = fedrcd(stats, pruning=None, **SETTINGS[method])
+def test_port_reproduces_the_original():
+    for case in CHECKED:
+        method = case["method"]
+        if method == "fedrcd_exact":
+            result = fedrcd_exact(_clients(case), pruning=None)
+        elif method == "hc":
+            result = fedrcd_exact([_data(case)], pruning=None)
+        elif method == "hc_lingam":
+            pooled = cumulants_from_sums([moment_sums(_data(case))])
+            result = fedrcd(pooled, method="sort", pruning=None)
+        else:
+            stats = cumulants_from_sums([moment_sums(c, order=4) for c in _clients(case)])
+            result = fedrcd(stats, pruning=None, **SETTINGS[method])
 
-    assert list(result.causal_order) == case["causal_order"]
+        assert list(result.causal_order) == case["causal_order"], case["name"]
 
-    if case["B"] is None:
-        # The original returns no B for fedhc.
-        return
+        if case["B"] is None:
+            # The original returns no B for fedhc.
+            continue
 
-    np.testing.assert_allclose(result.coef, np.array(case["B"]), rtol=1e-9, atol=1e-9)
+        np.testing.assert_allclose(
+            result.coef, np.array(case["B"]), rtol=1e-9, atol=1e-9, err_msg=case["name"]
+        )
 
 
-@pytest.mark.parametrize("case", PROBLEMS, ids=lambda c: c["name"])
-def test_cumulants_match_the_recording(case):
+def test_cumulants_match_the_recording():
     """The aggregated cumulants match, not just the order they lead to.
 
     B is estimated from the covariance alone, so a small error in the higher
     cumulants could pass the other test unless it flipped the order.
     """
-    stats = cumulants_from_sums([moment_sums(c, order=4) for c in _clients(case)])
-    for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22"):
-        np.testing.assert_allclose(
-            stats[key], np.array(case["cumulants"][key]), rtol=1e-12, atol=1e-12
-        )
+    for case in PROBLEMS:
+        stats = cumulants_from_sums([moment_sums(c, order=4) for c in _clients(case)])
+        for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22"):
+            np.testing.assert_allclose(
+                stats[key], np.array(case["cumulants"][key]), rtol=1e-12, atol=1e-12
+            )
