@@ -54,3 +54,10 @@ def test_from_pandas_and_from_csv_agree(tmp_path):
     from_csv = ContinuousDataset.from_csv(path)
     np.testing.assert_array_equal(from_df.values, from_csv.values)
     assert from_df.names == from_csv.names == ("x", "y")
+
+
+def test_repeated_names_are_rejected():
+    with pytest.raises(ValueError, match="repeated"):
+        ContinuousDataset(np.zeros((2, 2)), ["a", "a"])
+    with pytest.raises(ValueError, match="repeated"):
+        ContinuousDataset.from_pandas(pd.DataFrame(np.zeros((2, 2)), columns=["a", "a"]))

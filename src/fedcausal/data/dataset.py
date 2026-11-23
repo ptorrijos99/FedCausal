@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -20,6 +21,13 @@ if TYPE_CHECKING:
     """Anything the discrete estimators accept as a table of observations."""
 
 __all__ = ["DiscreteDataset", "as_discrete", "as_discrete_sites"]
+
+
+def _check_unique_names(names: Sequence[str]) -> None:
+    """Raise a ValueError naming the variables that occur more than once in `names`."""
+    repeated = sorted(name for name, count in Counter(names).items() if count > 1)
+    if repeated:
+        raise ValueError(f"variable names must be unique; repeated: {repeated}")
 
 
 class DiscreteDataset:
@@ -62,7 +70,8 @@ class DiscreteDataset:
     ------
     ValueError
         If `values` is not 2-D, if `cardinalities`, `names`, or
-        `categories` do not each have exactly `n_vars` entries, if some
+        `categories` do not each have exactly `n_vars` entries, if two
+        variables share a name, if some
         ``categories[j]`` does not have exactly ``cardinalities[j]``
         entries, or if any entry of `values` falls outside
         ``[0, cardinalities[j])`` for its column.
@@ -106,6 +115,7 @@ class DiscreteDataset:
             )
         if len(names) != n_vars:
             raise ValueError(f"names must have {n_vars} entries, got {len(names)}")
+        _check_unique_names(names)
         if len(categories) != n_vars:
             raise ValueError(f"categories must have {n_vars} entries, got {len(categories)}")
         for j, cats in enumerate(categories):
@@ -185,11 +195,13 @@ class DiscreteDataset:
         Raises
         ------
         ValueError
-            If a column has missing values, or a value outside `categories`.
+            If two columns share a name, a column has missing values, or a
+            value is outside `categories`.
         """
         import pandas as pd
 
         names = [str(c) for c in df.columns]
+        _check_unique_names(names)
         values = np.empty((len(df), len(names)), dtype=np.int32)
         levels: list[list[str]] = []
         for j, col in enumerate(df.columns):

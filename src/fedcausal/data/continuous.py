@@ -8,6 +8,7 @@ import numpy as np
 import numpy.typing as npt
 
 from fedcausal._base import is_frame
+from fedcausal.data.dataset import _check_unique_names
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -44,7 +45,7 @@ class ContinuousDataset:
     ------
     ValueError
         If `values` is not 2-D, if `names` does not have exactly `n_vars`
-        entries, or if `values` contains any non-finite entry (``NaN`` or
+        entries or repeats a name, or if `values` contains any non-finite entry (``NaN`` or
         infinity).
 
     Notes
@@ -64,6 +65,7 @@ class ContinuousDataset:
         n_vars = arr.shape[1]
         if len(names) != n_vars:
             raise ValueError(f"names must have {n_vars} entries, got {len(names)}")
+        _check_unique_names(names)
         if arr.size and not bool(np.isfinite(arr).all()):
             raise ValueError(
                 "values contains a non-finite entry (NaN or infinity); "
@@ -119,16 +121,19 @@ class ContinuousDataset:
         Raises
         ------
         ValueError
-            If any column is non-numeric, or contains a non-finite value.
+            If two columns share a name, or a column is non-numeric or
+            contains a non-finite value.
         """
         import pandas as pd
 
+        names = [str(c) for c in df.columns]
+        _check_unique_names(names)
         for col in df.columns:
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise ValueError(
                     f"column {col!r} is not numeric; ContinuousDataset requires real-valued columns"
                 )
-        return cls(df.to_numpy(dtype=np.float64), [str(c) for c in df.columns])
+        return cls(df.to_numpy(dtype=np.float64), names)
 
     @classmethod
     def from_csv(cls, path: str | Path) -> ContinuousDataset:

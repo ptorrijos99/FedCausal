@@ -190,3 +190,11 @@ def test_subset_with_boolean_mask() -> None:
     sub = ds.subset(mask)
     assert sub.n_rows == 6
     assert np.array_equal(sub.cardinalities, ds.cardinalities)
+
+
+def test_repeated_names_are_rejected() -> None:
+    with pytest.raises(ValueError, match=r"repeated: \['a'\]"):
+        DiscreteDataset(np.zeros((2, 2)), [1, 1], ["a", "a"], [["x"], ["x"]])
+    # 1 and "1" are one name once read as strings.
+    with pytest.raises(ValueError, match=r"repeated: \['1'\]"):
+        DiscreteDataset.from_pandas(pd.DataFrame([["x", "y"]], columns=[1, "1"]))
