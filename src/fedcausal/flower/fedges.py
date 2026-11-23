@@ -166,15 +166,14 @@ def build_client_app(
 
 def run_server_loop(
     grid: Grid,
-    context: Context,
     *,
     n_clients: int,
-    n_vars: int,
     n_rounds: int = 10,
     global_fusion: FusionOperator | None = None,
     convergence: Convergence | None = None,
     min_clients: int | None = None,
     on_model: RoundCallback | None = None,
+    context: Context | None = None,
 ) -> DAG | None:
     """Run the FedGES rounds over `grid` and return the final global DAG.
 
@@ -182,13 +181,8 @@ def run_server_loop(
     ----------
     grid : Grid
         Anything that can send and receive Flower messages.
-    context : Context
-        The server's context. The final global DAG is also stored on
-        ``context.state["global_dag"]``.
     n_clients : int
         Supernodes to wait for before the first round.
-    n_vars : int
-        Number of variables.
     n_rounds : int, default=10
         Most rounds to run.
     global_fusion : FusionOperator, optional
@@ -201,6 +195,9 @@ def run_server_loop(
     on_model : callable, optional
         Receives every local and global model; see
         :data:`~fedcausal.fedges.rounds.RoundCallback`.
+    context : Context, optional
+        The server's context. If given, the final global DAG is also stored on
+        ``context.state["global_dag"]``.
 
     Returns
     -------
@@ -224,7 +221,7 @@ def run_server_loop(
         replies = grid.send_and_receive(
             broadcast(node_ids, RecordDict({CTRL_KEY: control_config(phase="build")}))
         )
-        models, round_schema = _collect_models(replies, n_vars, required)
+        models, round_schema = _collect_models(replies, required)
         if schema and round_schema != schema[0]:
             raise SchemaMismatchError("a site's schema changed between rounds")
         schema[:] = [round_schema]
@@ -244,7 +241,7 @@ def run_server_loop(
         n_rounds,
         on_model,
     )
-    if global_dag is not None:
+    if global_dag is not None and context is not None:
         context.state[_GLOBAL_STATE_KEY] = dag_to_record(global_dag)
     return global_dag
 
@@ -252,29 +249,34 @@ def run_server_loop(
 def build_server_app(
     *,
     n_clients: int,
-    n_vars: int,
     n_rounds: int = 10,
     global_fusion: FusionOperator | None = None,
     convergence: Convergence | None = None,
     min_clients: int | None = None,
     on_model: RoundCallback | None = None,
+    results: list[DAG | None] | None = None,
 ) -> ServerApp:
-    """Register :func:`run_server_loop` as a ``ServerApp``; takes the same arguments."""
+    """Register :func:`run_server_loop` as a ``ServerApp``; takes the same arguments.
+
+    `results`, if given, receives the final global DAG (``None`` if the rounds
+    stopped before the first fusion), since a ``ServerApp`` cannot return it.
+    """
     app = ServerApp()
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
-        run_server_loop(
+        result = run_server_loop(
             grid,
-            context,
             n_clients=n_clients,
-            n_vars=n_vars,
             n_rounds=n_rounds,
             global_fusion=global_fusion,
             convergence=convergence,
             min_clients=min_clients,
             on_model=on_model,
+            context=context,
         )
+        if results is not None:
+            results.append(result)
 
     return app
 
@@ -291,7 +293,7 @@ def run_flower_fedges(
     """Run FedGES on Flower's simulation engine and return the final global DAG.
 
     The Flower counterpart of :class:`fedcausal.FedGES`. Needs
-    ``fedcausal[flower-simulation]``; a deployment across machines does not,
+    ``fedcausal[federated-simulation]``; a deployment across machines does not,
     see the deployment guide.
 
     Parameters
@@ -311,30 +313,23 @@ def run_flower_fedges(
     from fedcausal.flower.loaders import InMemoryPartitions
 
     run_simulation = simulation_runner()
-    globals_: list[DAG] = []
-
-    def collect(stage: str, round_: int, site: int, model: BNModel) -> None:
-        if stage == "global":
-            globals_.append(model.dag)
-        if on_model is not None:
-            on_model(stage, round_, site, model)
-
+    results: list[DAG | None] = []
     client_app = build_client_app(InMemoryPartitions(list(sites)), make_site)
     server_app = build_server_app(
         n_clients=len(sites),
-        n_vars=sites[0].n_vars,
         n_rounds=n_rounds,
         global_fusion=global_fusion,
         convergence=convergence,
-        on_model=collect,
+        on_model=on_model,
+        results=results,
     )
     run_simulation(server_app=server_app, client_app=client_app, num_supernodes=len(sites))
-    return globals_[-1] if globals_ else None
+    if not results:
+        raise ClientFailureError("the Flower simulation completed without producing a result")
+    return results[0]
 
 
-def _collect_models(
-    replies: Iterable[Message], n_vars: int, required: int
-) -> tuple[list[BNModel], str]:
+def _collect_models(replies: Iterable[Message], required: int) -> tuple[list[BNModel], str]:
     """Rebuild the sites' models, ordered by partition id and then node id.
 
     In simulation that is the order the in-process loop uses; in a deployment,
@@ -351,6 +346,7 @@ def _collect_models(
     schema = check_schemas(good)
     keyed = []
     for reply in good:
+        n_vars = ctrl_int(reply, "n_vars")
         dag = record_to_dag(cast(ArrayRecord, reply.content[_LOCAL_KEY]), n_vars)
         key = (ctrl_int(reply, "node_index"), reply.metadata.src_node_id)
         keyed.append((key, BNModel(dag, ctrl_float(reply, "score"))))

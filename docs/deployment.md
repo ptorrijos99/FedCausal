@@ -35,7 +35,7 @@ def train(msg, context):
     return handle_train_message(msg, context, NodeConfigLoader(DiscreteDataset))
 ```
 
-A site's options go through `make_site`, for instance `handle_train_message(msg, context, loader, functools.partial(Site, refinement="both"))`. For the continuous family, swap `handle_train_message` for `fedcausal.flower.lingam.handle_stats_message` and `DiscreteDataset` for `ContinuousDataset`. Nothing else changes.
+A site's options go through `make_site`, for instance `handle_train_message(msg, context, loader, functools.partial(Site, refinement="both"))`. For the continuous family, import `handle_train_message` from `fedcausal.flower.lingam` instead and swap `DiscreteDataset` for `ContinuousDataset`; the same handler serves every FedRCD method. Nothing else changes.
 
 The server side is one call, which runs the same round loop as `FedGES` does in one process:
 
@@ -52,12 +52,13 @@ def main(grid, context):
     config = context.run_config
     run_server_loop(
         grid,
-        context,
         n_clients=int(config["num-clients"]),
-        n_vars=int(config["num-variables"]),
         n_rounds=int(config["num-server-rounds"]),
+        context=context,
     )
 ```
+
+The server learns the number of variables from the sites' replies. `fedcausal.flower.lingam.run_server_loop(grid, n_clients=..., method=..., order=...)` is the continuous family's counterpart, with the options of `FedRCD`.
 
 `NodeConfigLoader` is what makes this a deployment rather than a simulation. It reads a path out of the supernode's own `node_config`, so each process opens one file and has no way of reaching anyone else's. Anything callable that takes a Flower `Context` and returns a dataset works in its place, so loading from a database or an institutional extract means writing one function:
 
@@ -87,7 +88,7 @@ flower-supernode --insecure \
 Then start the run:
 
 ```bash
-flwr run . remote --run-config "num-variables=12 num-server-rounds=30"
+flwr run . remote --run-config "num-server-rounds=30"
 ```
 
 `--insecure` is for a trusted network. Anywhere else, give the SuperLink TLS certificates and drop the flag.
@@ -96,7 +97,7 @@ flwr run . remote --run-config "num-variables=12 num-server-rounds=30"
 
 FedGES needs two message round trips per round. In the build phase every client rebuilds its local model with GES, warm-started from the model in its own `context.state`, and replies with its DAG and the score that DAG achieves on its own data. The server never sees the data behind that number. In the fuse phase the server combines the local DAGs into a global one and broadcasts it; each client fuses that into its own model, optionally refines, and updates its state. Convergence is checked between the two, on the local models the server just received.
 
-The FedRCD family is cheaper. Every solver but `fedrcd_exact` needs exactly one round trip: each client sends its mean and four matrices of moment sums, and the server aggregates them into cumulants and solves. `fedrcd_exact` repeats that `p - 1` times, deflating each client's own rows between rounds. See [FedRCD](fedrcd.md).
+The FedRCD family is cheaper. Every method but `"exact"` needs exactly one round trip: each client sends its mean and four matrices of moment sums, and the server aggregates them into cumulants and solves. `"exact"` repeats that `p - 1` times, deflating each client's own rows between rounds. See [FedRCD](fedrcd.md).
 
 ## When a site drops out
 
@@ -104,10 +105,10 @@ A round needs every site by default, and one that fails stops the run with a `Cl
 
 ## Getting the result out
 
-The server writes the final structure to `context.state`, which is process-local. Persist it yourself at the end of `main`:
+Given `context`, the FedGES server also writes the final structure to `context.state`, which is process-local. Persist it yourself at the end of `main`:
 
 ```python
-final = run_server_loop(grid, context, ...)
+final = run_server_loop(grid, n_clients=3, context=context)
 if final is not None:
     Path("global_dag.json").write_text(json.dumps(final.edges()))
 ```

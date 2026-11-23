@@ -63,20 +63,13 @@ def _loader(context: Context, algorithm: str) -> Any:
 
 @app_client.train()
 def train(msg: Message, context: Context) -> Message:
-    """Do this site's share of a round, on its own data.
-
-    FedRCD-Exact is stateful across rounds (each client deflates its working
-    matrix in place); every other method answers a single stateless message.
-    """
+    """Do this site's share of a round, on its own data."""
     algorithm = str(_config(context, "algorithm", "fedges"))
-    method = str(_config(context, "method", "deflation"))
     loader = _loader(context, algorithm)
 
     if algorithm == "fedges":
         return fedges.handle_train_message(msg, context, loader)
-    if method == "exact":
-        return lingam.handle_deflate_message(msg, context, loader)
-    return lingam.handle_stats_message(msg, context, loader)
+    return lingam.handle_train_message(msg, context, loader)
 
 
 @app_server.main()
@@ -95,14 +88,12 @@ def main(grid: Grid, context: Context) -> None:
 
 def _run_fedges(grid: Grid, context: Context, n_clients: int, min_clients: int | None) -> None:
     """Run the FedGES loop and write the global DAG's edges to `result-path`."""
-    n_vars = int(_config(context, "num-variables", 0)) or synthetic_discrete().n_vars
     final = fedges.run_server_loop(
         grid,
-        context,
         n_clients=n_clients,
-        n_vars=n_vars,
         n_rounds=int(_config(context, "num-server-rounds", 10)),
         min_clients=min_clients,
+        context=context,
     )
     if final is None:
         raise RuntimeError("the run converged before producing a global model")
@@ -112,16 +103,16 @@ def _run_fedges(grid: Grid, context: Context, n_clients: int, min_clients: int |
 
 def _run_fedrcd(grid: Grid, context: Context, n_clients: int, min_clients: int | None) -> None:
     """Run the selected FedRCD method and write its result to `result-path`."""
-    method = str(_config(context, "method", "deflation"))
-    order = int(_config(context, "order", 4))
-    if method == "exact":
-        result = lingam.run_exact_server_loop(grid, n_clients, order=order, min_clients=min_clients)
-    else:
-        result = lingam.run_server_loop(
-            grid, n_clients, method, order=order, min_clients=min_clients
-        )
-
-    _write_result(context, {"causal_order": list(result.causal_order), "b": result.b.tolist()})
+    result = lingam.run_server_loop(
+        grid,
+        n_clients=n_clients,
+        method=str(_config(context, "method", "deflation")),
+        order=int(_config(context, "order", 4)),
+        min_clients=min_clients,
+    )
+    _write_result(
+        context, {"causal_order": list(result.causal_order), "coef": result.coef.tolist()}
+    )
     print(f"causal order {result.causal_order}")
 
 

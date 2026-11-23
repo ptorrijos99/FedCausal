@@ -45,12 +45,10 @@ def _partition_grid(data: DiscreteDataset, n: int, **kwargs: object) -> StubGrid
     return _grid([InMemoryPartitions(parts) for _ in range(n)], **kwargs)  # type: ignore[arg-type]
 
 
-def _run(grid: object, n_clients: int, n_vars: int = 3, **kwargs: object) -> DAG | None:
+def _run(grid: object, n_clients: int, **kwargs: object) -> DAG | None:
     return run_server_loop(
         grid,  # type: ignore[arg-type]
-        server_context(),
         n_clients=n_clients,
-        n_vars=n_vars,
         **kwargs,  # type: ignore[arg-type]
     )
 
@@ -97,10 +95,9 @@ def test_the_final_model_lands_on_the_server_state() -> None:
     context = server_context()
     run_server_loop(
         _partition_grid(discrete_chain(), 3),  # type: ignore[arg-type]
-        context,
         n_clients=3,
-        n_vars=3,
         n_rounds=4,
+        context=context,
     )
     assert "global_dag" in context.state.array_records
 
@@ -154,7 +151,6 @@ def test_flower_gives_the_in_process_models_round_by_round() -> None:
     final = _run(
         _partition_grid(data, 3),
         3,
-        n_vars=5,
         n_rounds=8,
         on_model=lambda stage, r, s, m: seen.append(m.dag) if stage == "global" else None,
     )

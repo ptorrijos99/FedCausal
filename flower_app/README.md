@@ -38,7 +38,7 @@ flower-supernode --insecure \
 Repeat with a different `--clientappio-api-address` and `data-path` per site, then start the run:
 
 ```bash
-flwr run . remote --run-config "num-clients=3 num-variables=12"
+flwr run . remote --run-config "num-clients=3"
 ```
 
 `--insecure` is for a trusted network. Anywhere else, give the SuperLink TLS certificates and drop the flag.

@@ -7,7 +7,7 @@ name = "fedcausal-site"
 version = "1.0.0"
 description = "A fedcausal federation, in simulation or across real machines"
 requires-python = ">=3.10"
-dependencies = ["fedcausal[flower]>=1.0"]
+dependencies = ["fedcausal[federated]>=1.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["fedcausal_site"]
@@ -27,10 +27,8 @@ num-clients = 3
 # Where the server writes the result, as JSON: the global DAG's edges for FedGES,
 # the causal order and coefficient matrix for FedRCD.
 result-path = "result.json"
-# FedGES only. How many build/fuse rounds, and how many variables the sites
-# hold -- the server needs the count to rebuild the graphs it is sent.
+# FedGES only. How many build/fuse rounds.
 num-server-rounds = 5
-num-variables = 4
 # FedRCD only, as in fedcausal.FedRCD. "deflation", "ratio" and "sort" need one
 # round of communication; "exact" runs p - 1 rounds instead. With order = 3,
 # "ratio" is FedISHC and "sort" FedHC.
