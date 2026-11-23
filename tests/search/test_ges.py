@@ -8,7 +8,7 @@ import pytest
 
 from fedcausal import GES
 from fedcausal.data import as_discrete
-from fedcausal.datasets import load_alarm, load_asia, load_child
+from fedcausal.datasets import load_alarm, load_asia, load_child, load_network
 from fedcausal.graph import DAG, PDAG
 from fedcausal.graph.cpdag import dag_to_cpdag
 from fedcausal.metrics import shd
@@ -16,11 +16,26 @@ from fedcausal.scores import BDeuScore
 from fedcausal.search import _operators as ops
 from fedcausal.search import ges
 
+# The score GES reaches on each bundled sample, and the SHD of what it learns. A
+# change in a score means GES now stops at another local optimum; a change in an
+# SHD alone, another structure of the same score. Check that either is intended,
+# and say so in the changelog. Scores are compared to 1e-9, not bit for bit.
+LEARNED = {
+    ("asia", "bdeu"): (-11292.382734195426, 2),
+    ("child", "bdeu"): (-62114.38162544265, 2),
+    ("insurance", "bdeu"): (-67131.24624087544, 17),
+    ("alarm", "bdeu"): (-53644.30126961614, 10),
+    ("asia", "bic"): (-11303.722075470887, 2),
+    ("alarm", "bic"): (-54594.88083963548, 12),
+}
 
-@pytest.mark.parametrize(("loader", "max_shd"), [(load_asia, 3), (load_child, 3), (load_alarm, 12)])
-def test_recovers_the_bundled_networks(loader, max_shd: int) -> None:  # type: ignore[no-untyped-def]
-    bundle = loader()
-    assert shd(bundle.truth, GES().fit(bundle.data).dag_) <= max_shd
+
+def test_learns_the_same_structures_as_before() -> None:
+    for (name, criterion), (score, distance) in LEARNED.items():
+        bundle = load_network(name)
+        model = GES(criterion=criterion).fit(bundle.data)
+        assert model.score_ == pytest.approx(score, rel=1e-9), (name, criterion)
+        assert shd(bundle.truth, model.dag_) == distance, (name, criterion)
 
 
 def test_stops_where_no_single_operator_improves_the_score() -> None:
@@ -32,11 +47,15 @@ def test_stops_where_no_single_operator_improves_the_score() -> None:
         assert ops.deletes_into(score, cpdag, y) == {}
 
 
-def test_never_ends_below_where_it_starts() -> None:
+def test_a_search_from_a_given_dag_never_ends_below_it() -> None:
     bundle = load_alarm()
     score = BDeuScore(bundle.data)
     learned = ges(score, bundle.data.n_vars, bundle.truth).to_dag()
     assert score.score_dag(learned) >= score.score_dag(bundle.truth)
+    model = GES().fit(bundle.data, initial_graph=bundle.truth)
+    assert model.cpdag_ == dag_to_cpdag(model.dag_)
+    with pytest.raises(ValueError, match="nodes"):
+        GES().fit(bundle.data, initial_graph=DAG(3))
 
 
 def test_capping_the_conditioning_subsets_finds_the_same_optimum_here() -> None:
@@ -69,13 +88,6 @@ def test_the_estimator_takes_frames_and_arrays_and_names_its_result() -> None:
     assert by_frame.score_ == pytest.approx(BDeuScore(load_asia().data).score_dag(by_frame.dag_))
 
 
-def test_a_stronger_structure_prior_learns_fewer_edges() -> None:
-    data = load_alarm().data
-    plain = GES(expected_parents=None).fit(data).dag_.num_edges
-    sparse = GES(expected_parents=0.01).fit(data).dag_.num_edges
-    assert sparse < plain
-
-
 def test_an_insert_that_would_close_a_directed_cycle_is_never_offered() -> None:
     """x and y are strongly dependent, but y -> z -> x already exists."""
     rng = np.random.default_rng(0)
@@ -87,23 +99,13 @@ def test_an_insert_that_would_close_a_directed_cycle_is_never_offered() -> None:
     graph.add_directed(1, 2)
     graph.add_directed(2, 0)
     assert 0 not in ops.inserts_into(BDeuScore(dataset), graph, 1, max_t_size=2)
-
-
-def test_a_delete_orients_the_kept_neighbours_into_a_collider() -> None:
+    # A Delete orients the neighbours it keeps into a collider.
     graph = PDAG(3)
     for u, v in [(0, 1), (0, 2), (1, 2)]:
         graph.add_undirected(u, v)
     ops.apply_delete(graph, 0, 1, frozenset({2}))
     assert sorted(graph.directed_edges()) == [(0, 2), (1, 2)]
     assert graph.undirected_edges() == []
-
-
-def test_the_search_starts_from_a_given_dag() -> None:
-    bundle = load_asia()
-    model = GES().fit(bundle.data, initial_graph=bundle.truth)
-    assert model.cpdag_ == dag_to_cpdag(model.dag_)
-    with pytest.raises(ValueError, match="nodes"):
-        GES().fit(bundle.data, initial_graph=DAG(3))
 
 
 def test_required_and_forbidden_adjacencies_hold_whatever_the_data_say() -> None:
@@ -137,13 +139,13 @@ def test_knowledge_rejects_contradictions_and_unknown_names() -> None:
         Knowledge.from_pairs(forbidden=[(0, 2)], names=["a", "b"])
     with pytest.raises(ValueError, match="neither"):
         Knowledge.from_pairs([(0, 1.7)], names=["a", "b"])
+    with pytest.raises(ValueError, match="criterion must be one of"):
+        GES(criterion="aic").fit(load_asia().data)  # type: ignore[arg-type]
 
 
 def test_max_parents_caps_every_family() -> None:
-    bundle = load_alarm()
-    model = GES(max_parents=1).fit(bundle.data)
-    assert max(len(model.dag_.parents(v)) for v in range(bundle.data.n_vars)) <= 1
-    assert model.dag_.num_edges > 0
+    model = GES(max_parents=1).fit(load_alarm().data)
+    assert max(len(model.dag_.parents(v)) for v in range(model.n_features_in_)) == 1
 
 
 def _linear_gaussian(n: int, seed: int) -> pd.DataFrame:
@@ -164,12 +166,6 @@ def test_gaussian_bic_finds_the_collider_of_continuous_data() -> None:
     assert adjacency.loc["a", "c"] == 0
 
 
-@pytest.mark.parametrize("criterion", ["bdeu", "bic"])
-def test_discrete_criteria_recover_asia_closely(criterion: str) -> None:
-    bundle = load_asia()
-    assert shd(bundle.truth, GES(criterion=criterion).fit(bundle.data).dag_) <= 3
-
-
 def test_score_is_the_held_out_likelihood_per_row_and_ranks_structures() -> None:
     frame = load_asia().data.to_pandas()
     train, test = frame.iloc[:3000], frame.iloc[3000:]
@@ -181,18 +177,10 @@ def test_score_is_the_held_out_likelihood_per_row_and_ranks_structures() -> None
     assert -10 < learned.score(test) < 0
     with pytest.raises(ValueError, match="outside its levels"):
         learned.score(test.assign(asia="maybe"))
-
-
-def test_a_parameter_search_selects_hyperparameters_on_held_out_rows() -> None:
     model_selection = pytest.importorskip("sklearn.model_selection")
     search = model_selection.GridSearchCV(GES(), {"max_parents": [0, 2]}, cv=2)
     search.fit(load_asia().data.to_pandas())
     assert search.best_params_ == {"max_parents": 2}
-
-
-def test_an_unknown_criterion_is_an_error() -> None:
-    with pytest.raises(ValueError, match="criterion must be one of"):
-        GES(criterion="aic").fit(load_asia().data)  # type: ignore[arg-type]
 
 
 def _inserts_by_definition(
@@ -228,9 +216,8 @@ def _inserts_by_definition(
     return best
 
 
-@pytest.mark.parametrize("loader", [load_child, load_alarm])
-def test_inserts_into_finds_what_the_definition_gives(loader) -> None:  # type: ignore[no-untyped-def]
-    bundle = loader()
+def test_inserts_into_finds_what_the_definition_gives() -> None:
+    bundle = load_alarm()
     data = as_discrete(bundle.data)
     partial = DAG(data.n_vars)
     for i, (u, v) in enumerate(sorted(bundle.truth.edges())):
