@@ -14,12 +14,10 @@ import numpy as np
 from numba import njit
 
 __all__ = [
-    "changed_pairs",
     "complete_marks",
     "consistent_extension",
     "cpdag_of_dag",
     "link",
-    "semidirected_reach",
     "semidirected_reach_lists",
     "unlink",
 ]
@@ -211,69 +209,6 @@ def cpdag_of_dag(dag: np.ndarray) -> np.ndarray:
             if label[u, v] == 2:
                 out[v, u] = 1
     return out
-
-
-@njit(cache=True)
-def changed_pairs(old: np.ndarray, new: np.ndarray) -> np.ndarray:
-    """Return the pairs ``(u, v)``, ``u < v``, whose marks differ between two adjacency matrices.
-
-    One contiguous pass over the rows; the differing entries are then sorted
-    and deduplicated, which gives the pairs in increasing ``(u, v)`` order.
-    """
-    n = old.shape[0]
-    count = 0
-    for u in range(n):
-        for v in range(n):
-            if old[u, v] != new[u, v]:
-                count += 1
-    codes = np.empty(count, dtype=np.int64)
-    k = 0
-    for u in range(n):
-        for v in range(n):
-            if old[u, v] != new[u, v]:
-                codes[k] = min(u, v) * n + max(u, v)
-                k += 1
-    codes.sort()
-    m = 0
-    for i in range(count):
-        if i == 0 or codes[i] != codes[i - 1]:
-            codes[m] = codes[i]
-            m += 1
-    pairs = np.empty((m, 2), dtype=np.int64)
-    for i in range(m):
-        pairs[i, 0] = codes[i] // n
-        pairs[i, 1] = codes[i] % n
-    return pairs
-
-
-@njit(cache=True)
-def semidirected_reach(
-    indptr: np.ndarray, indices: np.ndarray, source: int, avoid: np.ndarray
-) -> np.ndarray:
-    """Return which nodes a semi-directed path from `source` reaches over CSR successors.
-
-    Nodes flagged in `avoid` are reached but not passed through.
-    """
-    n = indptr.shape[0] - 1
-    blocked = np.zeros(n, dtype=np.bool_)
-    for v in avoid:
-        blocked[v] = True
-    reached = np.zeros(n, dtype=np.bool_)
-    stack = np.empty(n, dtype=np.int32)
-    stack[0] = source
-    top = 1
-    reached[source] = True
-    while top > 0:
-        top -= 1
-        v = stack[top]
-        for k in range(indptr[v], indptr[v + 1]):
-            w = indices[k]
-            if not reached[w]:
-                reached[w] = True
-                if not blocked[w]:
-                    stack[top] = w
-                    top += 1
-    return reached
 
 
 @njit(cache=True)
