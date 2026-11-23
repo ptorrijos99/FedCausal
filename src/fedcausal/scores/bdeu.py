@@ -28,6 +28,9 @@ class _DiscreteScore(FamilyScore):
     """Counts families of a discrete dataset with the compiled kernels."""
 
     def __init__(self, data: DiscreteDataset, expected_parents: float | None) -> None:
+        empty = [name for name, r in zip(data.names, data.cardinalities, strict=True) if r < 1]
+        if empty:
+            raise ValueError(f"variables with no levels cannot be scored: {empty}")
         super().__init__(data.n_vars, expected_parents)
         self.data = data
         self._values = np.asfortranarray(data.values)
@@ -92,6 +95,13 @@ class BDeuScore(_DiscreteScore):
         structures, the plain BDeu score. One expected parent recovers
         markedly better structures than the uniform prior once networks reach
         a few dozen variables, and about the same below that.
+
+    Notes
+    -----
+    Not safe to share between threads: the score keeps per-thread work
+    buffers for its parallel kernel and a cache of families, and two threads
+    calling it at once would overwrite each other's. Use one score per thread,
+    or processes.
     """
 
     def __init__(
@@ -100,8 +110,8 @@ class BDeuScore(_DiscreteScore):
         ess: float = 1.0,
         expected_parents: float | None = 1.0,
     ) -> None:
-        if ess <= 0:
-            raise ValueError(f"ess must be positive, got {ess}")
+        if not 0 < ess < math.inf:
+            raise ValueError(f"ess must be positive and finite, got {ess}")
         super().__init__(data, expected_parents)
         self.ess = float(ess)
 
@@ -131,6 +141,11 @@ class BICScore(_DiscreteScore):
     expected_parents : float or None, default=None
         Expected number of parents per node under the structure prior.
         ``None``, the default, is the plain BIC.
+
+    Notes
+    -----
+    Not safe to share between threads, for the reasons given in
+    :class:`BDeuScore`.
     """
 
     def __init__(
@@ -139,8 +154,10 @@ class BICScore(_DiscreteScore):
         penalty_discount: float = 1.0,
         expected_parents: float | None = None,
     ) -> None:
-        if penalty_discount <= 0:
-            raise ValueError(f"penalty_discount must be positive, got {penalty_discount}")
+        if not 0 < penalty_discount < math.inf:
+            raise ValueError(
+                f"penalty_discount must be positive and finite, got {penalty_discount}"
+            )
         super().__init__(data, expected_parents)
         self.penalty_discount = float(penalty_discount)
         self._per_parameter = penalty_discount * math.log(max(data.n_rows, 1)) / 2

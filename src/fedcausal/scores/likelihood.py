@@ -9,6 +9,7 @@ import numpy as np
 
 from fedcausal.data import ContinuousDataset, DiscreteDataset
 from fedcausal.scores._kernels import family_score
+from fedcausal.scores.gaussian import _covariance
 
 if TYPE_CHECKING:
     from fedcausal.graph import DAG
@@ -76,8 +77,10 @@ def _discrete(dag: DAG, train: DiscreteDataset, test: DiscreteDataset, ess: floa
 
 
 def _gaussian(dag: DAG, train: ContinuousDataset, test: ContinuousDataset) -> float:
+    if train.n_rows == 0:
+        raise ValueError("the training data has no rows")
     mean = train.values.mean(axis=0)
-    cov = np.atleast_2d(np.cov(train.values, rowvar=False, bias=True))
+    cov = _covariance(train.values)
     centred = test.values - mean
     total = 0.0
     for v in range(dag.num_nodes):

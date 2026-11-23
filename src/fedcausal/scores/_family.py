@@ -40,10 +40,17 @@ class FamilyScore:
     expected_parents : float or None
         Expected in-degree under the structure prior; ``None`` is a uniform
         prior over structures.
+
+    Notes
+    -----
+    A score caches every family it computes and keeps work buffers between
+    calls, so it is not safe to use one score object from several threads at
+    once: give each thread its own. Several processes are fine, each with its
+    own copy, which is how ``FedGES(n_jobs=...)`` runs its sites.
     """
 
     def __init__(self, n_vars: int, expected_parents: float | None) -> None:
-        if expected_parents is not None and expected_parents <= 0:
+        if expected_parents is not None and not expected_parents > 0:
             raise ValueError(f"expected_parents must be positive, got {expected_parents}")
         self.n_vars = n_vars
         self.expected_parents = expected_parents

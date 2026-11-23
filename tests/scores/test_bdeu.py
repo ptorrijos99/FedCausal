@@ -156,3 +156,23 @@ def test_a_batch_mixing_bitset_and_grouped_counting_equals_one_at_a_time() -> No
             for x in extra
         ]
         assert list(together) == alone
+
+
+def test_a_variable_without_levels_cannot_be_scored() -> None:
+    data = DiscreteDataset(np.zeros((0, 2)), [0, 2], ["a", "b"], [[], ["x", "y"]])
+    with pytest.raises(ValueError, match=r"no levels.*'a'"):
+        BDeuScore(data)
+
+
+@pytest.mark.parametrize("bad", [0.0, -1.0, float("nan"), float("inf")])
+def test_ess_must_be_positive_and_finite(bad: float) -> None:
+    data = DiscreteDataset(np.zeros((2, 1)), [1], ["a"], [["x"]])
+    with pytest.raises(ValueError, match="ess"):
+        BDeuScore(data, ess=bad)
+
+
+@pytest.mark.parametrize("bad", [0.0, -1.0, float("nan")])
+def test_expected_parents_must_be_positive(bad: float) -> None:
+    data = DiscreteDataset(np.zeros((2, 1)), [1], ["a"], [["x"]])
+    with pytest.raises(ValueError, match="expected_parents"):
+        BDeuScore(data, expected_parents=bad)

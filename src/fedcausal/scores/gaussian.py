@@ -21,6 +21,19 @@ __all__ = ["GaussianBICScore"]
 _MIN_VARIANCE = 1e-12
 
 
+def _covariance(values: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    """Return the maximum likelihood covariance of the columns of `values`.
+
+    ``np.cov(values, rowvar=False)`` reads a single row as a single variable,
+    and no rows as NaN; both are all zeros here.
+    """
+    n_rows, n_vars = values.shape
+    if n_rows <= 1 or n_vars == 0:
+        return np.zeros((n_vars, n_vars))
+    cov: npt.NDArray[np.float64] = np.atleast_2d(np.cov(values, rowvar=False, bias=True))
+    return cov
+
+
 class GaussianBICScore(FamilyScore):
     """BIC local score of a linear Gaussian model, memoised per family.
 
@@ -40,6 +53,11 @@ class GaussianBICScore(FamilyScore):
     expected_parents : float or None, default=None
         Expected number of parents per node under the structure prior.
         ``None``, the default, is the plain BIC.
+
+    Notes
+    -----
+    Not safe to share between threads, since it caches every family it
+    computes; use one score per thread.
     """
 
     def __init__(
@@ -48,13 +66,15 @@ class GaussianBICScore(FamilyScore):
         penalty_discount: float = 1.0,
         expected_parents: float | None = None,
     ) -> None:
-        if penalty_discount <= 0:
-            raise ValueError(f"penalty_discount must be positive, got {penalty_discount}")
+        if not 0 < penalty_discount < math.inf:
+            raise ValueError(
+                f"penalty_discount must be positive and finite, got {penalty_discount}"
+            )
         super().__init__(data.n_vars, expected_parents)
         self.data = data
         self.penalty_discount = float(penalty_discount)
         self.n_rows = data.n_rows
-        self.covariance = np.atleast_2d(np.cov(data.values, rowvar=False, bias=True))
+        self.covariance = _covariance(data.values)
         self._per_parameter = penalty_discount * math.log(max(data.n_rows, 1)) / 2
 
     def _likelihood(

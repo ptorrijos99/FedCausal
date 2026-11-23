@@ -93,3 +93,19 @@ def test_discrete_held_out_likelihood_is_the_same_across_an_equivalence_class() 
     assert log_likelihood(forward, train, test) == pytest.approx(
         log_likelihood(backward, train, test), rel=1e-10
     )
+
+
+def test_gaussian_bic_takes_one_row_or_none() -> None:
+    # np.cov reads a lone row as one variable; the score must not.
+    for n_rows in (0, 1):
+        score = GaussianBICScore(ContinuousDataset(np.ones((n_rows, 3)), ["a", "b", "c"]))
+        assert score.covariance.shape == (3, 3)
+        assert np.isfinite(score.local_scores_with(0, frozenset(), [1, 2])).all()
+
+
+@pytest.mark.parametrize("bad", [0.0, -1.0, float("nan"), float("inf")])
+def test_penalty_discount_must_be_positive_and_finite(bad: float) -> None:
+    with pytest.raises(ValueError, match="penalty_discount"):
+        BICScore(_discrete(10, 2, 0), penalty_discount=bad)
+    with pytest.raises(ValueError, match="penalty_discount"):
+        GaussianBICScore(_continuous(10, 0), penalty_discount=bad)
