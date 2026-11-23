@@ -59,11 +59,20 @@ def make_score(
     ------
     ValueError
         If `name` is not one of the three.
+    TypeError
+        If `data` is not the kind of dataset the score takes.
     """
+    from fedcausal.data import ContinuousDataset, DiscreteDataset
+
+    if name not in SCORE_NAMES:
+        raise ValueError(f"score must be one of {SCORE_NAMES}, got {name!r}")
+    wanted = ContinuousDataset if name == "gaussian_bic" else DiscreteDataset
+    if not isinstance(data, wanted):
+        raise TypeError(f"the {name!r} score takes a {wanted.__name__}, got {type(data).__name__}")
+    if isinstance(data, ContinuousDataset):
+        return GaussianBICScore(
+            data, penalty_discount=penalty_discount, expected_parents=expected_parents
+        )
     if name == "bdeu":
-        return BDeuScore(data, ess, expected_parents)  # type: ignore[arg-type]
-    if name == "bic":
-        return BICScore(data, penalty_discount, expected_parents)  # type: ignore[arg-type]
-    if name == "gaussian_bic":
-        return GaussianBICScore(data, penalty_discount, expected_parents)  # type: ignore[arg-type]
-    raise ValueError(f"score must be one of {SCORE_NAMES}, got {name!r}")
+        return BDeuScore(data, ess=ess, expected_parents=expected_parents)
+    return BICScore(data, penalty_discount=penalty_discount, expected_parents=expected_parents)

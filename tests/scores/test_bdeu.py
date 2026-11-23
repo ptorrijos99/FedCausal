@@ -47,7 +47,7 @@ def _reference(data: DiscreteDataset, node: int, parents: tuple[int, ...], ess: 
 @pytest.mark.parametrize("ess", [1.0, 10.0])
 def test_matches_the_reference(parents: tuple[int, ...], ess: float) -> None:
     data = _dataset(300, 5, 3, seed=1)
-    assert BDeuScore(data, ess, expected_parents=None).local_score(0, parents) == pytest.approx(
+    assert BDeuScore(data, ess=ess, expected_parents=None).local_score(0, parents) == pytest.approx(
         _reference(data, 0, parents, ess), rel=1e-10
     )
 

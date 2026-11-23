@@ -13,7 +13,17 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class Score(Protocol):
-    """A decomposable score: a DAG scores the sum of its families' local scores."""
+    """A decomposable score: a DAG scores the sum of its families' local scores.
+
+    This is what :func:`fedcausal.search.ges` needs from a score, and the
+    extension point for new ones. Any object with these two methods works;
+    the easiest way to write one is to subclass
+    :class:`~fedcausal.scores.FamilyScore` and implement its
+    ``compute_family``, which adds caching, batching and the structure prior.
+
+    Higher is better, and both methods must give the same value for the same
+    family: the search compares their results directly.
+    """
 
     def local_score(self, node: int, parents: Collection[int]) -> float:
         """Return the local score of `node` given `parents`."""
@@ -22,5 +32,9 @@ class Score(Protocol):
     def local_scores_with(
         self, node: int, parents: frozenset[int], extra: Sequence[int] | npt.NDArray[np.intp]
     ) -> Sequence[float] | npt.NDArray[np.float64]:
-        """Return the local score of `node` given ``parents | {x}``, for each `x` in `extra`."""
+        """Return the local score of `node` given ``parents | {x}``, for each `x` in `extra`.
+
+        The families an Insert compares, all at once; a loop over
+        :meth:`local_score` is a correct implementation.
+        """
         ...

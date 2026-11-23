@@ -50,9 +50,9 @@ class GaussianBICScore(FamilyScore):
         The data to score against.
     penalty_discount : float, default=1.0
         Multiplies the penalty; larger values give sparser structures.
-    expected_parents : float or None, default=None
-        Expected number of parents per node under the structure prior.
-        ``None``, the default, is the plain BIC.
+    expected_parents : float or None, default=1.0
+        Expected number of parents per node under the structure prior, as in
+        :class:`~fedcausal.scores.BDeuScore`. ``None`` is the plain BIC.
 
     Notes
     -----
@@ -63,8 +63,9 @@ class GaussianBICScore(FamilyScore):
     def __init__(
         self,
         data: ContinuousDataset,
+        *,
         penalty_discount: float = 1.0,
-        expected_parents: float | None = None,
+        expected_parents: float | None = 1.0,
     ) -> None:
         if not 0 < penalty_discount < math.inf:
             raise ValueError(
@@ -85,7 +86,8 @@ class GaussianBICScore(FamilyScore):
         out: npt.NDArray[np.float64] = -self.n_rows / 2 * (np.log(2 * math.pi * s2) + 1)
         return out
 
-    def _family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+    def compute_family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+        """Return the BIC of regressing `node` on `parents`."""
         cov = self.covariance
         variance = float(cov[node, node])
         if parents.size:
@@ -94,9 +96,10 @@ class GaussianBICScore(FamilyScore):
         k = parents.size
         return float(self._likelihood(node, variance)) - self._per_parameter * (k + 2)
 
-    def _extensions(
+    def compute_extensions(
         self, node: int, parents: npt.NDArray[np.int64], extra: npt.NDArray[np.int64]
     ) -> npt.NDArray[np.float64]:
+        """Return the BIC of every extension, from partial covariances."""
         # Partial covariances given the parents, then one more regressor each:
         # s2(y | P, x) = s2(y | P) - cov(y, x | P)^2 / var(x | P).
         cov = self.covariance

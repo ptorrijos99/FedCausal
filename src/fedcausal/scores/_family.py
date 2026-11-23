@@ -20,9 +20,11 @@ __all__ = ["FamilyScore"]
 class FamilyScore:
     """A decomposable score whose families are computed once and cached.
 
-    Subclasses give the score of one family, :meth:`_family`, and may give a
-    faster :meth:`_extensions` for the families an Insert compares. The local
-    score adds a structure prior on the number of parents ``k``::
+    The base for a new score: a subclass implements :meth:`compute_family`,
+    the score of one family, and may override :meth:`compute_extensions`, the
+    families an Insert compares, with a faster batch. :meth:`local_score` and
+    :meth:`local_scores_with`, which the search calls, cache both and add a
+    structure prior on the number of parents ``k``::
 
         k * log(p) + (m - k) * log(1 - p),    p = min(expected_parents / m, 1/2)
 
@@ -40,6 +42,20 @@ class FamilyScore:
     expected_parents : float or None
         Expected in-degree under the structure prior; ``None`` is a uniform
         prior over structures.
+
+    Examples
+    --------
+    A score that rewards each parent by a fixed amount, which GES then adds
+    until the prior stops it:
+
+    >>> import numpy as np
+    >>> from fedcausal.scores import FamilyScore
+    >>> from fedcausal.search import ges
+    >>> class PerParent(FamilyScore):
+    ...     def compute_family(self, node, parents):
+    ...         return 0.5 * len(parents)
+    >>> ges(PerParent(3, expected_parents=None), 3)
+    PDAG(num_nodes=3, directed=0, undirected=3)
 
     Notes
     -----
@@ -68,15 +84,21 @@ class FamilyScore:
         # parent, an array per family indexed by the new parent.
         self._rows: dict[int, npt.NDArray[np.float64]] = {}
 
-    def _family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
-        """Return the score of `node` given the sorted `parents`, without the prior."""
+    def compute_family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+        """Return the score of `node` given the sorted `parents`, without the prior.
+
+        Called once per family; the result is cached. Subclasses must implement it.
+        """
         raise NotImplementedError
 
-    def _extensions(
+    def compute_extensions(
         self, node: int, parents: npt.NDArray[np.int64], extra: npt.NDArray[np.int64]
     ) -> npt.NDArray[np.float64]:
-        """Return :meth:`_family` of `node` given ``parents + [x]``, for each `x` in `extra`."""
-        return np.array([self._family(node, np.sort(np.append(parents, x))) for x in extra])
+        """Return :meth:`compute_family` of `node` given ``parents + [x]``, for each `x` in `extra`.
+
+        One call per family by default; override it to score the batch together.
+        """
+        return np.array([self.compute_family(node, np.sort(np.append(parents, x))) for x in extra])
 
     def _key(self, node: int, mask: int) -> int:
         return (mask << self._node_bits) | node
@@ -102,7 +124,7 @@ class FamilyScore:
         value = self._cache.get(key)
         if value is None:
             ordered = np.fromiter(sorted(parents), dtype=np.int64, count=len(parents))
-            value = float(self._family(node, ordered)) + len(parents) * self._log_odds
+            value = float(self.compute_family(node, ordered)) + len(parents) * self._log_odds
             self._cache[key] = value
         return value
 
@@ -129,7 +151,9 @@ class FamilyScore:
         if missing.any():
             ordered = np.fromiter(sorted(parents), dtype=np.int64, count=len(parents))
             todo = extra_array[missing]
-            row[todo] = self._extensions(node, ordered, todo) + (len(parents) + 1) * self._log_odds
+            row[todo] = (
+                self.compute_extensions(node, ordered, todo) + (len(parents) + 1) * self._log_odds
+            )
             scores = row[extra_array]
         return scores
 

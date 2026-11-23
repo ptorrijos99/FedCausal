@@ -107,6 +107,7 @@ class BDeuScore(_DiscreteScore):
     def __init__(
         self,
         data: DiscreteDataset,
+        *,
         ess: float = 1.0,
         expected_parents: float | None = 1.0,
     ) -> None:
@@ -115,12 +116,14 @@ class BDeuScore(_DiscreteScore):
         super().__init__(data, expected_parents)
         self.ess = float(ess)
 
-    def _family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+    def compute_family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+        """Return the BDeu log marginal likelihood of the family."""
         return self._count(node, parents, self.ess)
 
-    def _extensions(
+    def compute_extensions(
         self, node: int, parents: npt.NDArray[np.int64], extra: npt.NDArray[np.int64]
     ) -> npt.NDArray[np.float64]:
+        """Return the BDeu of every extension, counted together."""
         return self._count_extensions(node, parents, extra, self.ess)
 
 
@@ -138,9 +141,9 @@ class BICScore(_DiscreteScore):
         The data to score against.
     penalty_discount : float, default=1.0
         Multiplies the penalty; larger values give sparser structures.
-    expected_parents : float or None, default=None
-        Expected number of parents per node under the structure prior.
-        ``None``, the default, is the plain BIC.
+    expected_parents : float or None, default=1.0
+        Expected number of parents per node under the structure prior, as in
+        :class:`BDeuScore`. ``None`` is the plain BIC.
 
     Notes
     -----
@@ -151,8 +154,9 @@ class BICScore(_DiscreteScore):
     def __init__(
         self,
         data: DiscreteDataset,
+        *,
         penalty_discount: float = 1.0,
-        expected_parents: float | None = None,
+        expected_parents: float | None = 1.0,
     ) -> None:
         if not 0 < penalty_discount < math.inf:
             raise ValueError(
@@ -162,14 +166,16 @@ class BICScore(_DiscreteScore):
         self.penalty_discount = float(penalty_discount)
         self._per_parameter = penalty_discount * math.log(max(data.n_rows, 1)) / 2
 
-    def _family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+    def compute_family(self, node: int, parents: npt.NDArray[np.int64]) -> float:
+        """Return the maximised log likelihood less the BIC penalty."""
         q = float(np.prod(self._cards[parents].astype(np.float64)))
         free = q * (self._cards[node] - 1)
         return self._count(node, parents, 0.0) - self._per_parameter * float(free)
 
-    def _extensions(
+    def compute_extensions(
         self, node: int, parents: npt.NDArray[np.int64], extra: npt.NDArray[np.int64]
     ) -> npt.NDArray[np.float64]:
+        """Return the BIC of every extension, counted together."""
         q = float(np.prod(self._cards[parents].astype(np.float64)))
         free = q * self._cards[extra].astype(np.float64) * float(self._cards[node] - 1)
         out: npt.NDArray[np.float64] = (

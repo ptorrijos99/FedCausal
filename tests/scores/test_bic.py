@@ -40,7 +40,8 @@ def test_discrete_bic_is_the_maximised_likelihood_less_the_penalty(parents) -> N
         counts.setdefault(tuple(row[list(parents)]), np.zeros(r))[row[0]] += 1
     lik = sum(float(c @ np.log(np.where(c > 0, c / c.sum(), 1.0))) for c in counts.values())
     expected = lik - math.log(500) / 2 * q * (r - 1)
-    assert BICScore(data).local_score(0, parents) == pytest.approx(expected, rel=1e-10)
+    plain = BICScore(data, expected_parents=None)
+    assert plain.local_score(0, parents) == pytest.approx(expected, rel=1e-10)
 
 
 def test_gaussian_bic_is_the_regression_likelihood_less_the_penalty() -> None:
@@ -51,7 +52,8 @@ def test_gaussian_bic_is_the_regression_likelihood_less_the_penalty() -> None:
     s2 = residual @ residual / len(x)
     lik = -len(x) / 2 * (math.log(2 * math.pi * s2) + 1)
     expected = lik - math.log(len(x)) / 2 * 4
-    assert GaussianBICScore(data).local_score(2, {0, 1}) == pytest.approx(expected, rel=1e-10)
+    plain = GaussianBICScore(data, expected_parents=None)
+    assert plain.local_score(2, {0, 1}) == pytest.approx(expected, rel=1e-10)
 
 
 @pytest.mark.parametrize(
@@ -65,8 +67,8 @@ def test_extensions_scored_together_equal_one_at_a_time(make) -> None:
 
 def test_penalty_discount_and_prior_only_ever_penalise_more() -> None:
     data = _continuous(300, seed=4)
-    plain = GaussianBICScore(data)
-    harsher = GaussianBICScore(data, penalty_discount=2.0)
+    plain = GaussianBICScore(data, expected_parents=None)
+    harsher = GaussianBICScore(data, penalty_discount=2.0, expected_parents=None)
     prior = GaussianBICScore(data, expected_parents=1.0)
     for score in (harsher, prior):
         assert score.local_score(2, {0, 1}) < plain.local_score(2, {0, 1})
@@ -109,3 +111,16 @@ def test_penalty_discount_must_be_positive_and_finite(bad: float) -> None:
         BICScore(_discrete(10, 2, 0), penalty_discount=bad)
     with pytest.raises(ValueError, match="penalty_discount"):
         GaussianBICScore(_continuous(10, 0), penalty_discount=bad)
+
+
+def test_make_score_wants_the_dataset_its_score_takes() -> None:
+    with pytest.raises(TypeError, match="ContinuousDataset"):
+        make_score("gaussian_bic", _discrete(50, 3, 5))
+    with pytest.raises(TypeError, match="DiscreteDataset"):
+        make_score("bic", _continuous(50, 5))  # type: ignore[arg-type]
+
+
+def test_every_score_defaults_to_one_expected_parent() -> None:
+    data = _discrete(50, 3, 5)
+    for score in (BICScore(data), make_score("bdeu", data), GaussianBICScore(_continuous(50, 5))):
+        assert score.expected_parents == 1.0
