@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from fedcausal._base import Estimator, named_adjacency
+from fedcausal._base import Estimator, check_sites, named_adjacency
 from fedcausal.data import as_continuous_sites
 from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
 from fedcausal.lingam.rcd import fedrcd, fedrcd_exact
@@ -102,6 +102,14 @@ class FedRCD(Estimator):
         Returns
         -------
         self
+
+        Raises
+        ------
+        TypeError
+            If `X` is a single table rather than one per site.
+        ValueError
+            If the sites disagree on their variables, hold too few rows
+            between them, or a hyperparameter is out of range.
         """
         if self.method not in _METHODS:
             raise ValueError(f"method must be one of {_METHODS}, got {self.method!r}")
@@ -113,6 +121,7 @@ class FedRCD(Estimator):
             raise ValueError(
                 f"lambda_selection must be 'bic' or 'fixed', got {self.lambda_selection!r}"
             )
+        check_sites(X)
         sites = as_continuous_sites(X)
         result: RCDResult
         lasso, lmbda = self.pruning == "adaptive_lasso", self.lambda_selection

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from fedcausal._base import Estimator, named_adjacency
+from fedcausal._base import Estimator, check_sites, named_adjacency
 from fedcausal.data import as_continuous_sites, as_discrete_sites
 from fedcausal.exceptions import ConvergedBeforeFusionError
 from fedcausal.fedges.convergence import default_convergence
@@ -80,8 +80,9 @@ class FedGES(Estimator):
         must not be, in every site's model and in the global one. The
         direction of a required edge is still learned.
     n_jobs : int or None, default=None
-        Processes to spread the sites over. ``None`` runs them one after
-        another in this process; -1 uses every CPU.
+        Processes to spread the sites over. ``None`` or 1 runs them one after
+        another in this process; -1, or any negative value, uses one process
+        per site up to the number of CPUs.
 
     Attributes
     ----------
@@ -163,18 +164,28 @@ class FedGES(Estimator):
 
         Raises
         ------
+        TypeError
+            If `X` is a single table rather than one per site.
+        ValueError
+            If the sites hold no rows between them, disagree on their
+            variables, or a hyperparameter is out of range.
         ConvergedBeforeFusionError
             If the rounds stopped before the first fusion.
         """
         if self.n_rounds < 1:
             raise ValueError(f"n_rounds must be at least 1, got {self.n_rounds}")
+        if self.n_jobs == 0:
+            raise ValueError("n_jobs must be a positive or negative integer, or None; got 0")
         if self.criterion not in SCORE_NAMES:
             raise ValueError(f"criterion must be one of {SCORE_NAMES}, got {self.criterion!r}")
+        check_sites(X)
         datasets = (
             as_continuous_sites(X)  # type: ignore[arg-type]
             if self.criterion == "gaussian_bic"
             else as_discrete_sites(X)
         )
+        if sum(data.n_rows for data in datasets) == 0:
+            raise ValueError("the sites hold no rows")
         knowledge = Knowledge.from_pairs(
             self.required or (), self.forbidden or (), datasets[0].names
         )

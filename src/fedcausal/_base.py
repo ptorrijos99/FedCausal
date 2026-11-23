@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from fedcausal.graph import DAG, PDAG
 
-__all__ = ["Estimator", "NotFittedError", "is_frame", "named_adjacency"]
+__all__ = ["Estimator", "NotFittedError", "check_sites", "is_frame", "named_adjacency"]
 
 
 def is_frame(obj: object) -> bool:
@@ -25,6 +25,26 @@ def is_frame(obj: object) -> bool:
     """
     pandas = sys.modules.get("pandas")
     return pandas is not None and isinstance(obj, pandas.DataFrame)
+
+
+def check_sites(X: object) -> None:
+    """Raise a TypeError if `X` is one table rather than a sequence of tables, one per site.
+
+    Iterating a DataFrame yields its column names and a 2-D array its rows, so
+    without this check a single table fails later with a confusing message.
+    """
+    from fedcausal.data import ContinuousDataset, DiscreteDataset
+
+    single = (
+        is_frame(X)
+        or isinstance(X, (ContinuousDataset, DiscreteDataset))
+        or (getattr(X, "ndim", None) == 2 and not isinstance(X, (list, tuple)))
+    )
+    if single:
+        raise TypeError(
+            f"expected one table per site, got a single {type(X).__name__}; "
+            "wrap it in a list to learn from one site"
+        )
 
 
 class NotFittedError(AttributeError):

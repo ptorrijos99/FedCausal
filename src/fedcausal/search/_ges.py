@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from numbers import Integral
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,6 +26,14 @@ if TYPE_CHECKING:
     from fedcausal.scores import Score, ScoreName
 
 __all__ = ["GES", "ges"]
+
+
+def _check_limit(name: str, value: object) -> None:
+    """Raise unless `value` is None or a non-negative integer."""
+    if value is None:
+        return
+    if not isinstance(value, Integral) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{name} must be a non-negative integer or None, got {value!r}")
 
 
 def ges(
@@ -69,10 +78,8 @@ def ges(
     PDAG
         The CPDAG of the learned equivalence class.
     """
-    if max_t_size is not None and max_t_size < 0:
-        raise ValueError(f"max_t_size must be non-negative or None, got {max_t_size}")
-    if max_parents is not None and max_parents < 0:
-        raise ValueError(f"max_parents must be non-negative or None, got {max_parents}")
+    _check_limit("max_t_size", max_t_size)
+    _check_limit("max_parents", max_parents)
     if initial_graph is not None and initial_graph.num_nodes != n_vars:
         raise ValueError(f"initial_graph has {initial_graph.num_nodes} nodes, expected {n_vars}")
     if initial_graph is None:
@@ -192,8 +199,15 @@ class GES(Estimator):
         Returns
         -------
         self
+
+        Raises
+        ------
+        ValueError
+            If `X` has no rows, or a hyperparameter is out of range.
         """
         data = self._encode(X)
+        if data.n_rows == 0:
+            raise ValueError("X has no rows")
         local = make_score(
             self.criterion,
             data,
