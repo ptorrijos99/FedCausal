@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fedcausal-site"
-version = "0.1.0"
+version = "1.0.0"
 description = "A fedcausal federation, in simulation or across real machines"
 requires-python = ">=3.10"
-dependencies = ["fedcausal[flower]>=0.1.0"]
+dependencies = ["fedcausal[flower]>=1.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["fedcausal_site"]
@@ -31,10 +31,11 @@ result-path = "result.json"
 # hold -- the server needs the count to rebuild the graphs it is sent.
 num-server-rounds = 5
 num-variables = 4
-# FedRCD only. "fedrcd" is the default one-shot solver; "fedrcd_noniterative",
-# "ishc_beta", "fedishc" and "fedhc" are its one-shot siblings, and
-# "fedrcd_exact" runs p - 1 communication rounds instead of one.
-solver = "fedrcd"
+# FedRCD only, as in fedcausal.FedRCD. "deflation", "ratio" and "sort" need one
+# round of communication; "exact" runs p - 1 rounds instead. With order = 3,
+# "ratio" is FedISHC and "sort" FedHC.
+method = "deflation"
+order = 4
 # Leave unset to require every site each round. Set it to tolerate dropouts.
 # min-clients = 2
 

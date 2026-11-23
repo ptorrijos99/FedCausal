@@ -3,7 +3,8 @@
 The `algorithm` run-config key picks the family: `fedges` for discrete data,
 `fedrcd` for continuous. Everything else -- how many sites, how many rounds,
 which solver -- also comes from `run_config`, so the same app serves any
-federation without editing this file.
+federation without editing this file. For `fedrcd`, `method` and `order` are
+those of :class:`fedcausal.FedRCD`.
 
 Where a site's data comes from is the only difference between a simulation and
 a deployment. A supernode started with `--node-config "data-path='...'"` reads
@@ -65,15 +66,15 @@ def train(msg: Message, context: Context) -> Message:
     """Do this site's share of a round, on its own data.
 
     FedRCD-Exact is stateful across rounds (each client deflates its working
-    matrix in place); every other solver answers a single stateless message.
+    matrix in place); every other method answers a single stateless message.
     """
     algorithm = str(_config(context, "algorithm", "fedges"))
-    solver = str(_config(context, "solver", "fedrcd"))
+    method = str(_config(context, "method", "deflation"))
     loader = _loader(context, algorithm)
 
     if algorithm == "fedges":
         return fedges.handle_train_message(msg, context, loader)
-    if solver == "fedrcd_exact":
+    if method == "exact":
         return lingam.handle_deflate_message(msg, context, loader)
     return lingam.handle_stats_message(msg, context, loader)
 
@@ -110,12 +111,15 @@ def _run_fedges(grid: Grid, context: Context, n_clients: int, min_clients: int |
 
 
 def _run_fedrcd(grid: Grid, context: Context, n_clients: int, min_clients: int | None) -> None:
-    """Run the selected FedRCD solver and write its result to `result-path`."""
-    solver = str(_config(context, "solver", "fedrcd"))
-    if solver == "fedrcd_exact":
-        result = lingam.run_exact_server_loop(grid, n_clients, min_clients=min_clients)
+    """Run the selected FedRCD method and write its result to `result-path`."""
+    method = str(_config(context, "method", "deflation"))
+    order = int(_config(context, "order", 4))
+    if method == "exact":
+        result = lingam.run_exact_server_loop(grid, n_clients, order=order, min_clients=min_clients)
     else:
-        result = lingam.run_server_loop(grid, n_clients, solver, min_clients=min_clients)
+        result = lingam.run_server_loop(
+            grid, n_clients, method, order=order, min_clients=min_clients
+        )
 
     _write_result(context, {"causal_order": list(result.causal_order), "b": result.b.tolist()})
     print(f"causal order {result.causal_order}")
