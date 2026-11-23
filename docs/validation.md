@@ -18,6 +18,7 @@ No downloads and no environment variables: everything the tests need ships with 
 | FedGES | Sequential and parallel sites learn the same models; every refinement keeps the site's score; convergence rules |
 | FedRCD | The solvers against the original implementation's recorded output |
 | Flower transports | The same models as the in-process loop, round by round, over a stub grid that hands each message to the real site handler; failed sites and mismatched variables stop the run |
+| Estimators | Hyperparameters round-trip through `get_params`, `set_params` and `sklearn.base.clone`; `FedRCD` gives what its solver gives over the pooled statistics; a single table, an empty one or an out-of-range setting is refused with an error that names it |
 | Documentation | Every `from fedcausal... import ...` shown in the docs runs |
 
 Search results are compared through scores and equivalence classes rather than edge lists where it matters. A search returns one member of a Markov equivalence class, and the choice among its members is arbitrary; BDeu and the CPDAG are the same for every member.

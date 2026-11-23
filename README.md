@@ -11,7 +11,7 @@ Causal structure learning for data in one place or spread across sites that cann
 All three follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. `GES` scores categorical data by BDeu or BIC and continuous data by a Gaussian BIC, and its `score(X)`, the held-out log likelihood, lets scikit-learn's parameter searches tune it.
 
 ```bash
-pip install git+https://github.com/ptorrijos99/fedcausal
+pip install fedcausal
 ```
 
 ```python
@@ -38,7 +38,7 @@ model.causal_order_, model.coef_
 
 ## Speed
 
-GES runs in compiled code where it matters (counting, path checks, CPDAG completion, the consensus order of the fusion) and re-scores only the part of the graph each step changes. On a laptop it learns `andes` (223 variables, 5000 rows) in under a second and `munin` (1041 variables) in 21 s, twenty to forty times faster than 0.1.0; causal-learn does not finish `andes` in half an hour. The [benchmarks](docs/benchmarks.md) have the full ladder.
+GES runs in compiled code where it matters (counting, path checks, CPDAG completion, the consensus order of the fusion) and re-scores only the part of the graph each step changes. On a laptop it learns `andes` (223 variables, 5000 rows) in under half a second and `munin` (1041 variables) in about 4 s, where causal-learn does not finish `andes` in half an hour. The [benchmarks](docs/benchmarks.md) have the full ladder.
 
 ## Documentation
 

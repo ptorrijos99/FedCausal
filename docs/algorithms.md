@@ -40,7 +40,7 @@ GES(
 
 ### How it is made fast
 
-* **Scoring.** BDeu is computed by a compiled kernel that encodes each parent configuration as one integer and counts directly into a table, sorting instead when the table would be too large; configurations are relabelled when their number outgrows a 64-bit code, so any number of parents is exact. Families are cached, and the families an Insert compares share their parents, so they are counted together and in parallel.
+* **Scoring.** BDeu and BIC are computed by compiled kernels. The families an Insert compares share their parents, so the rows are grouped once by the configuration of those parents, labelled densely in order of first occurrence so that any number of parents is exact, and each candidate parent is then counted without sorting: with bitsets when the table is small, in one pass over the rows otherwise, the candidates in parallel. The score is summed over the distinct cell counts, so `log Gamma` is evaluated once per count value, and a family scores the same, bit for bit, whether it is counted in a batch or alone. Families are cached.
 * **Evaluating operators.** Operators are evaluated a child at a time. Every candidate parent with the same neighbours in common with the child shares its candidate subsets, so one traversal of the graph decides the path condition for all of them.
 * **Re-scoring.** After a step only the children whose neighbourhood changed, or one of whose undirected neighbours did, are re-scored. Validity also depends on paths elsewhere in the graph, so the best operator is re-checked before it is applied, and when nothing improves every child is re-scored once more before the phase stops. The result is a local optimum of the full neighbourhood.
 * **Completion.** After each step the graph is completed to its CPDAG with a compiled Dor-Tarsi extension and Chickering's (1995) edge labelling, both over neighbour and parent lists, and only the pairs whose marks changed are written back.
@@ -102,7 +102,7 @@ With `n_jobs`, the sites are spread over worker processes, each of which keeps i
 ## FedRCD
 
 ```python
-FedRCD(method="deflation", pruning="adaptive_lasso", lambda_selection="bic")
+FedRCD(method="deflation", order=4, pruning="adaptive_lasso", lambda_selection="bic")
 ```
 
 See [FedRCD](fedrcd.md).
