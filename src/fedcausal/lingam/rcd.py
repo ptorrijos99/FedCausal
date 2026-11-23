@@ -37,8 +37,8 @@ from fedcausal.graph import DAG
 from fedcausal.lingam.cumulants import (
     Cumulants,
     _n_samples,
-    aggregate_and_compute_cumulants,
-    compute_local_raw_stats,
+    cumulants_from_sums,
+    moment_sums,
 )
 from fedcausal.lingam.solvers import estimate_b_from_cov, estimate_b_lasso_from_cov
 from fedcausal.lingam.tau import tau_matrix_3rd, tau_matrix_4th
@@ -46,10 +46,16 @@ from fedcausal.lingam.tau import tau_matrix_3rd, tau_matrix_4th
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-__all__ = ["RCDResult", "exact_order", "fedrcd", "fedrcd_exact"]
+__all__ = ["LambdaSelection", "Pruning", "RCDResult", "exact_order", "fedrcd", "fedrcd_exact"]
 
 Method = Literal["deflation", "ratio", "sort"]
 _METHODS = ("deflation", "ratio", "sort")
+
+Pruning = Literal["adaptive_lasso"] | None
+"""How the coefficients are estimated on the order: adaptive lasso, or OLS (``None``)."""
+
+LambdaSelection = Literal["bic", "fixed"]
+"""How the adaptive lasso picks its penalty: by BIC over a grid, or a fixed fraction."""
 
 # Below this, a source's own cumulant is treated as zero and the ratio as 0.
 _RATIO_EPS = 1e-6
@@ -66,14 +72,15 @@ class RCDResult:
     causal_order : tuple of int
         Variable indices, source first. A topological order of the estimated
         structure.
-    b : numpy.ndarray
-        Shape ``(p, p)``. ``b[child, parent]`` is the linear coefficient of
+    coef : numpy.ndarray
+        Shape ``(p, p)``. ``coef[child, parent]`` is the linear coefficient of
         `parent` in `child`'s structural equation, and is zero whenever
-        `parent` does not precede `child` in `causal_order`.
+        `parent` does not precede `child` in `causal_order`. ``FedRCD.coef_``
+        is this matrix.
     """
 
     causal_order: tuple[int, ...]
-    b: npt.NDArray[np.float64]
+    coef: npt.NDArray[np.float64]
 
     def to_dag(self, threshold: float = 0.0) -> DAG:
         """Return the DAG of coefficients whose magnitude exceeds `threshold`.
@@ -81,19 +88,19 @@ class RCDResult:
         Parameters
         ----------
         threshold : float, optional
-            Keep an edge only when ``abs(b[child, parent]) > threshold``. The
+            Keep an edge only when ``abs(coef[child, parent]) > threshold``. The
             default keeps every non-zero coefficient.
 
         Returns
         -------
         DAG
-            Acyclic by construction: `b` is lower-triangular with respect to
+            Acyclic by construction: `coef` is lower-triangular with respect to
             `causal_order`, so every edge runs from an earlier variable to a
             later one.
         """
-        children, parents = np.nonzero(np.abs(self.b) > threshold)
+        children, parents = np.nonzero(np.abs(self.coef) > threshold)
         return DAG.from_edges(
-            self.b.shape[0], list(zip(parents.tolist(), children.tolist(), strict=True))
+            self.coef.shape[0], list(zip(parents.tolist(), children.tolist(), strict=True))
         )
 
 
@@ -121,16 +128,23 @@ def _tau_row_sums(
     return sums
 
 
+def _check_estimation(pruning: object, lambda_selection: object) -> None:
+    if pruning not in ("adaptive_lasso", None):
+        raise ValueError(f"pruning must be 'adaptive_lasso' or None, got {pruning!r}")
+    if lambda_selection not in ("bic", "fixed"):
+        raise ValueError(f"lambda_selection must be 'bic' or 'fixed', got {lambda_selection!r}")
+
+
 def _coefficients(
     causal_order: Sequence[int],
     cov: npt.NDArray[np.float64],
     n_samples: int,
-    use_lasso: bool,
-    lmbda_type: str,
+    pruning: Pruning,
+    lambda_selection: LambdaSelection,
 ) -> npt.NDArray[np.float64]:
-    if use_lasso:
+    if pruning == "adaptive_lasso":
         return estimate_b_lasso_from_cov(
-            causal_order, cov, n_samples=n_samples, lmbda_type=lmbda_type
+            causal_order, cov, n_samples=n_samples, lambda_selection=lambda_selection
         )
     return estimate_b_from_cov(causal_order, cov)
 
@@ -201,24 +215,25 @@ def fedrcd(
     *,
     method: Method = "deflation",
     order: Literal[3, 4] | None = None,
-    use_lasso: bool = False,
-    lmbda_type: str = "fixed",
+    pruning: Pruning = "adaptive_lasso",
+    lambda_selection: LambdaSelection = "bic",
 ) -> RCDResult:
-    """Find the causal order from aggregated cumulants, then estimate B.
+    """Find the causal order from aggregated cumulants, then estimate the coefficients.
 
     Parameters
     ----------
     stats : Cumulants
-        Output of :func:`~fedcausal.lingam.cumulants.aggregate_and_compute_cumulants`.
+        Output of :func:`~fedcausal.lingam.cumulants.cumulants_from_sums`.
     method : {"deflation", "ratio", "sort"}, optional
         What follows each source; see the module docstring.
     order : {3, 4} or None, optional
         Which tau discriminator to use. Defaults to 4 when `stats` has
         fourth-order cumulants, else 3.
-    use_lasso : bool, optional
-        If ``True``, estimate B with Adaptive Lasso; otherwise OLS.
-    lmbda_type : str, optional
-        Lambda selection for Lasso: ``"fixed"`` or ``"bic"``.
+    pruning : {"adaptive_lasso", None}, default="adaptive_lasso"
+        How the coefficients are estimated on the order; ``None`` is OLS,
+        which keeps every predecessor as a parent.
+    lambda_selection : {"bic", "fixed"}, default="bic"
+        Penalty selection for the adaptive lasso.
 
     Returns
     -------
@@ -228,9 +243,10 @@ def fedrcd(
     Raises
     ------
     ValueError
-        If `method` or `order` is not one of the allowed values, or ``order=4``
-        is asked of third-order statistics.
+        If `method`, `order`, `pruning` or `lambda_selection` is not one of the
+        allowed values, or ``order=4`` is asked of third-order statistics.
     """
+    _check_estimation(pruning, lambda_selection)
     if method not in _METHODS:
         raise ValueError(f"method must be one of {_METHODS}, got {method!r}")
     k = _resolve_order(stats, order)
@@ -243,8 +259,8 @@ def fedrcd(
         keys = ("c3", "c12", "c21") if k == 3 else ("c4", "c13", "c31", "c22")
         cur = {key: np.array(stats[key], dtype=np.float64) for key in ("cov", *keys)}
         causal_order = _deflated_order(cur, k, method)
-    b_est = _coefficients(causal_order, cov, _n_samples(stats), use_lasso, lmbda_type)
-    return RCDResult(tuple(causal_order), b_est)
+    coef = _coefficients(causal_order, cov, _n_samples(stats), pruning, lambda_selection)
+    return RCDResult(tuple(causal_order), coef)
 
 
 def exact_order(
@@ -290,8 +306,8 @@ def fedrcd_exact(
     sites: Sequence[npt.ArrayLike],
     *,
     order: Literal[3, 4] = 4,
-    use_lasso: bool = False,
-    lmbda_type: str = "fixed",
+    pruning: Pruning = "adaptive_lasso",
+    lambda_selection: LambdaSelection = "bic",
 ) -> RCDResult:
     """Find the causal order by deflating each site's data, one round per source.
 
@@ -299,7 +315,7 @@ def fedrcd_exact(
     server picks the source by tau and the OLS coefficients on it, and every
     site deflates its data by them (``x_j -= beta_j * x_s``) and drops the
     source column. Runs the whole protocol in one process;
-    :func:`fedcausal.flower.lingam.run_exact_server_loop` is the same over
+    :func:`fedcausal.flower.lingam.run_server_loop` with ``method="exact"`` is the same over
     Flower. With a single site this is HC (Chen et al., 2025).
 
     Parameters
@@ -308,10 +324,8 @@ def fedrcd_exact(
         Each site's data, shape ``(n_k, p)``.
     order : {3, 4}, optional
         Which tau discriminator to use, and so which moment sums the sites send.
-    use_lasso : bool, optional
-        If ``True``, estimate B with Adaptive Lasso; otherwise OLS.
-    lmbda_type : str, optional
-        Lambda selection for Lasso: ``"fixed"`` or ``"bic"``.
+    pruning, lambda_selection
+        As in :func:`fedrcd`.
 
     Returns
     -------
@@ -322,10 +336,11 @@ def fedrcd_exact(
     -----
     ``p - 1`` rounds of O(p^2) statistics each.
     """
+    _check_estimation(pruning, lambda_selection)
     local = [np.asarray(x, dtype=np.float64) for x in sites]
 
     def pooled() -> Cumulants:
-        return aggregate_and_compute_cumulants([compute_local_raw_stats(x, order) for x in local])
+        return cumulants_from_sums([moment_sums(x, order) for x in local])
 
     def deflate(src: int, betas: npt.NDArray[np.float64]) -> Cumulants:
         keep = np.arange(len(betas)) != src
@@ -335,7 +350,7 @@ def fedrcd_exact(
 
     first = pooled()
     causal_order = exact_order(first, deflate, order)
-    b_est = _coefficients(
-        causal_order, np.asarray(first["cov"]), int(first["n"]), use_lasso, lmbda_type
+    coef = _coefficients(
+        causal_order, np.asarray(first["cov"]), int(first["n"]), pruning, lambda_selection
     )
-    return RCDResult(tuple(causal_order), b_est)
+    return RCDResult(tuple(causal_order), coef)

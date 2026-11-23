@@ -1,9 +1,9 @@
 """Unbiased third- and fourth-order cumulants, computable across sites.
 
 Each site reduces its rows to moment sums about its own mean
-(:func:`compute_local_raw_stats`); the server merges them exactly into sums
+(:func:`moment_sums`); the server merges them exactly into sums
 about the pooled mean and applies the k-statistic bias corrections
-(:func:`aggregate_and_compute_cumulants`). The result equals what the pooled
+(:func:`cumulants_from_sums`). The result equals what the pooled
 data would give.
 
 References
@@ -31,15 +31,15 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Cumulants",
-    "RawStats",
-    "aggregate_and_compute_cumulants",
-    "compute_local_raw_stats",
+    "MomentSums",
+    "cumulants_from_sums",
+    "moment_sums",
 ]
 
-#: A site's centred moment sums, produced by :func:`compute_local_raw_stats`.
-RawStats = dict[str, Any]
+#: A site's centred moment sums, produced by :func:`moment_sums`.
+MomentSums = dict[str, Any]
 
-#: Unbiased cumulant estimates produced by :func:`aggregate_and_compute_cumulants`.
+#: Unbiased cumulant estimates produced by :func:`cumulants_from_sums`.
 Cumulants = dict[str, Any]
 
 _MIN_SAMPLES_3RD: int = 3
@@ -61,7 +61,7 @@ _KEYS_3RD = ("n", "mean", "m11", "m21")
 _KEYS_4TH = (*_KEYS_3RD, "m31", "m22")
 
 
-def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawStats:
+def moment_sums(x: npt.NDArray[np.float64], order: int = 4) -> MomentSums:
     """Return the moment sums of `x`, centred on its own mean.
 
     The server merges sums centred on each site's mean exactly, and they stay
@@ -100,7 +100,7 @@ def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawSt
     mean = x.mean(axis=0) if n else np.zeros(x.shape[1])
     c = x - mean
     c2 = c * c
-    stats: RawStats = {"n": n, "mean": mean, "m11": c.T @ c, "m21": c2.T @ c}
+    stats: MomentSums = {"n": n, "mean": mean, "m11": c.T @ c, "m21": c2.T @ c}
     if order == 4:
         stats["m31"] = (c2 * c).T @ c
         stats["m22"] = c2.T @ c2
@@ -112,7 +112,7 @@ def compute_local_raw_stats(x: npt.NDArray[np.float64], order: int = 4) -> RawSt
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _merge(client_stats: Sequence[RawStats]) -> RawStats:
+def _merge(client_stats: Sequence[MomentSums]) -> MomentSums:
     """Merge the sites' centred moment sums into sums about the pooled mean.
 
     A site's sums move from its own mean to the pooled one by the binomial
@@ -162,19 +162,19 @@ def _merge(client_stats: Sequence[RawStats]) -> RawStats:
             + 4 * di * dj * a11
             + k * di**2 * dj**2
         )
-    merged: RawStats = {"n": n, "mean": mean, "m11": m11, "m21": m21}
+    merged: MomentSums = {"n": n, "mean": mean, "m11": m11, "m21": m21}
     if fourth:
         merged.update({"m31": m31, "m22": m22})
     return merged
 
 
-def aggregate_and_compute_cumulants(client_stats: Sequence[RawStats]) -> Cumulants:
+def cumulants_from_sums(client_stats: Sequence[MomentSums]) -> Cumulants:
     """Merge the sites' moment sums and return the pooled covariance and cumulants.
 
     Parameters
     ----------
     client_stats : Sequence[dict]
-        :func:`compute_local_raw_stats` of each site, all of the same order and
+        :func:`moment_sums` of each site, all of the same order and
         over the same variables.
 
     Returns

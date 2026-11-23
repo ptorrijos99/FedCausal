@@ -20,16 +20,16 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised only without 
     ) from exc
 
 from fedcausal.flower.fedges import run_flower_fedges
-from fedcausal.flower.lingam import run_flower_rcd, run_flower_rcd_exact
+from fedcausal.flower.lingam import run_flower_rcd
 from fedcausal.flower.loaders import InMemoryPartitions, NodeConfigLoader, PartitionLoader
 from fedcausal.flower.serde import (
     control_config,
     dag_to_record,
     names_fingerprint,
     record_to_dag,
-    record_to_stats,
+    record_to_sums,
     schema_fingerprint,
-    stats_to_record,
+    sums_to_record,
 )
 
 __all__ = [
@@ -40,10 +40,9 @@ __all__ = [
     "dag_to_record",
     "names_fingerprint",
     "record_to_dag",
-    "record_to_stats",
+    "record_to_sums",
     "run_flower_fedges",
     "run_flower_rcd",
-    "run_flower_rcd_exact",
     "schema_fingerprint",
-    "stats_to_record",
+    "sums_to_record",
 ]

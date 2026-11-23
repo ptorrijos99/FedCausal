@@ -10,8 +10,8 @@ pytest.importorskip("flwr")
 from fedcausal.data import contiguous_split  # noqa: E402
 from fedcausal.exceptions import ClientFailureError, SchemaMismatchError  # noqa: E402
 from fedcausal.flower.lingam import (  # noqa: E402
-    handle_deflate_message,
-    run_exact_server_loop,
+    handle_train_message,
+    run_server_loop,
 )
 from fedcausal.flower.loaders import InMemoryPartitions  # noqa: E402
 
@@ -37,11 +37,11 @@ def test_exact_transport_matches_the_in_process_solver(make_dataset) -> None:
     expected = fedrcd_exact(list(np.array_split(data.values, 3, axis=0)))
 
     parts = contiguous_split(data, 3)
-    grid = StubGrid(handle_deflate_message, [InMemoryPartitions(parts) for _ in range(3)])
-    actual = run_exact_server_loop(grid, n_clients=3)  # type: ignore[arg-type]
+    grid = StubGrid(handle_train_message, [InMemoryPartitions(parts) for _ in range(3)])
+    actual = run_server_loop(grid, n_clients=3, method="exact")  # type: ignore[arg-type]
 
     assert actual.causal_order == expected.causal_order
-    np.testing.assert_allclose(actual.b, expected.b, rtol=1e-10, atol=1e-10)
+    np.testing.assert_allclose(actual.coef, expected.coef, rtol=1e-10, atol=1e-10)
     assert grid.call_count == data.n_vars - 1
 
 
@@ -49,10 +49,10 @@ def test_disagreeing_schemas_are_rejected_at_round_zero() -> None:
     """Round 0 still carries named variables, so a mismatch is caught before any deflation."""
     three = continuous_chain(0, n_vars=3)
     four = continuous_chain(0, n_vars=4)
-    grid = StubGrid(handle_deflate_message, [lambda _ctx: three, lambda _ctx: four])  # type: ignore[list-item]
+    grid = StubGrid(handle_train_message, [lambda _ctx: three, lambda _ctx: four])  # type: ignore[list-item]
 
     with pytest.raises(SchemaMismatchError, match="disagree on their variables"):
-        run_exact_server_loop(grid, n_clients=2)  # type: ignore[arg-type]
+        run_server_loop(grid, n_clients=2, method="exact")  # type: ignore[arg-type]
 
 
 def test_a_failed_client_stops_the_run() -> None:
@@ -60,25 +60,25 @@ def test_a_failed_client_stops_the_run() -> None:
     data = continuous_chain(0)
     parts = contiguous_split(data, 3)
     grid = StubGrid(
-        handle_deflate_message,
+        handle_train_message,
         [InMemoryPartitions(parts) for _ in range(3)],
         fail_nodes={1},
     )
 
     with pytest.raises(ClientFailureError, match="needs 3"):
-        run_exact_server_loop(grid, n_clients=3)  # type: ignore[arg-type]
+        run_server_loop(grid, n_clients=3, method="exact")  # type: ignore[arg-type]
 
 
 @pytest.mark.slow
 def test_run_flower_rcd_exact_matches_the_in_process_solver_via_simulation() -> None:
     """The same equivalence claim, once more through a genuine Ray simulation."""
     pytest.importorskip("ray", reason="Flower's simulation engine needs Ray")
-    from fedcausal.flower.lingam import run_flower_rcd_exact
+    from fedcausal.flower.lingam import run_flower_rcd
     from fedcausal.lingam import fedrcd_exact
 
     data = continuous_chain(1)
     expected = fedrcd_exact(list(np.array_split(data.values, 3, axis=0)))
-    actual = run_flower_rcd_exact(contiguous_split(data, 3))
+    actual = run_flower_rcd(contiguous_split(data, 3), method="exact")
 
     assert actual.causal_order == expected.causal_order
-    np.testing.assert_allclose(actual.b, expected.b, rtol=1e-10, atol=1e-10)
+    np.testing.assert_allclose(actual.coef, expected.coef, rtol=1e-10, atol=1e-10)

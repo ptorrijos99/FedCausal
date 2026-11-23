@@ -53,5 +53,5 @@ def test_lasso_shrinks_towards_zero_but_keeps_the_true_edges():
 
 def test_lasso_rejects_an_unknown_lambda_type():
     cov = np.eye(3)
-    with pytest.raises(ValueError, match="lmbda_type"):
-        estimate_b_lasso_from_cov([0, 1, 2], cov, n_samples=100, lmbda_type="nonsense")
+    with pytest.raises(ValueError, match="lambda_selection"):
+        estimate_b_lasso_from_cov([0, 1, 2], cov, n_samples=100, lambda_selection="nonsense")

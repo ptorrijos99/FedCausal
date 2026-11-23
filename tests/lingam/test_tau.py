@@ -1,6 +1,6 @@
 import numpy as np
 
-from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
+from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
 from fedcausal.lingam.tau import tau_matrix_3rd, tau_matrix_4th
 
 
@@ -15,7 +15,7 @@ def _chain(seed: int, n: int = 4000) -> np.ndarray:
 
 
 def test_tau_is_square_with_zero_diagonal():
-    cum = aggregate_and_compute_cumulants([compute_local_raw_stats(_chain(0), order=4)])
+    cum = cumulants_from_sums([moment_sums(_chain(0), order=4)])
     tau = tau_matrix_4th(cum["c4"], cum["c13"], cum["c31"], cum["c22"])
     assert tau.shape == (3, 3)
     np.testing.assert_array_equal(np.diagonal(tau), np.zeros(3))
@@ -24,7 +24,7 @@ def test_tau_is_square_with_zero_diagonal():
 
 def test_row_sum_ranks_the_source_lowest():
     """The exogenous variable has the smallest total tau. This is the whole method."""
-    cum = aggregate_and_compute_cumulants([compute_local_raw_stats(_chain(1), order=4)])
+    cum = cumulants_from_sums([moment_sums(_chain(1), order=4)])
     tau = tau_matrix_4th(cum["c4"], cum["c13"], cum["c31"], cum["c22"])
     assert int(np.argmin(tau.sum(axis=1))) == 0
 
@@ -40,6 +40,6 @@ def _skewed_chain(seed: int, n: int = 4000) -> np.ndarray:
 
 
 def test_third_order_also_ranks_the_source_lowest():
-    cum = aggregate_and_compute_cumulants([compute_local_raw_stats(_skewed_chain(2), order=3)])
+    cum = cumulants_from_sums([moment_sums(_skewed_chain(2), order=3)])
     tau = tau_matrix_3rd(cum["c3"], cum["c12"], cum["c21"])
     assert int(np.argmin(tau.sum(axis=1))) == 0

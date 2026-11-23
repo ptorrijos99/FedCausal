@@ -7,11 +7,11 @@ from fedcausal.flower.serde import (  # noqa: E402
     dag_to_record,
     names_fingerprint,
     record_to_dag,
-    record_to_stats,
-    stats_to_record,
+    record_to_sums,
+    sums_to_record,
 )
 from fedcausal.graph import DAG  # noqa: E402
-from fedcausal.lingam.cumulants import compute_local_raw_stats  # noqa: E402
+from fedcausal.lingam.cumulants import moment_sums  # noqa: E402
 
 
 def test_roundtrip_preserves_edges():
@@ -66,8 +66,8 @@ def test_schema_fingerprint_separates_different_variables():
 
 def test_stats_round_trip_is_exact():
     x = np.random.default_rng(0).laplace(0.0, 1.0, size=(500, 4))
-    stats = compute_local_raw_stats(x, order=4)
-    restored = record_to_stats(stats_to_record(stats), n=stats["n"])
+    stats = moment_sums(x, order=4)
+    restored = record_to_sums(sums_to_record(stats), n=stats["n"])
     assert restored["n"] == stats["n"]
     for key in ("mean", "m11", "m21", "m31", "m22"):
         np.testing.assert_array_equal(restored[key], stats[key])
@@ -75,8 +75,8 @@ def test_stats_round_trip_is_exact():
 
 def test_third_order_stats_travel_without_the_fourth_order_sums():
     x = np.random.default_rng(1).laplace(0.0, 1.0, size=(100, 3))
-    stats = compute_local_raw_stats(x, order=3)
-    restored = record_to_stats(stats_to_record(stats), n=stats["n"])
+    stats = moment_sums(x, order=3)
+    restored = record_to_sums(sums_to_record(stats), n=stats["n"])
     assert restored.keys() == stats.keys()
     for key in ("mean", "m11", "m21"):
         np.testing.assert_array_equal(restored[key], stats[key])

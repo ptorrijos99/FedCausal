@@ -24,7 +24,7 @@ The method assumes a linear, non-Gaussian structural equation model: `x = Bx + e
 
 ## What actually crosses the network
 
-Never a row of data. Each client computes `compute_local_raw_stats(x, order)` on its own matrix and sends the result; nothing else leaves. With `c = x - mean` the site's rows centred on their own mean, that is the row count `n`, the `(p,)` vector of column means `mean`, and four `(p, p)` matrices of centred moment sums, two with `order=3`:
+Never a row of data. Each client computes `moment_sums(x, order)` on its own matrix and sends the result; nothing else leaves. With `c = x - mean` the site's rows centred on their own mean, that is the row count `n`, the `(p,)` vector of column means `mean`, and four `(p, p)` matrices of centred moment sums, two with `order=3`:
 
 | Array | What it sums | Its diagonal |
 |---|---|---|
@@ -33,13 +33,13 @@ Never a row of data. Each client computes `compute_local_raw_stats(x, order)` on
 | `m31` | Σ cᵢ³cⱼ | Σ cᵢ⁴ |
 | `m22` | Σ cᵢ²cⱼ² | Σ cᵢ⁴ |
 
-The server moves each site's sums from the site's mean to the pooled mean, which the binomial expansion of the centred powers does exactly, adds them up (`aggregate_and_compute_cumulants`), and applies bias-corrected k-statistic formulas to get unbiased third- and fourth-order cumulants. Sums about each site's own mean keep their precision wherever the data are located; raw power sums centred only at the server lose every significant digit once the mean is about ten thousand standard deviations from zero. The sums are not a formal privacy guarantee: the fewer rows a site holds, the more they reveal about them, and with a single row they are the row.
+The server moves each site's sums from the site's mean to the pooled mean, which the binomial expansion of the centred powers does exactly, adds them up (`cumulants_from_sums`), and applies bias-corrected k-statistic formulas to get unbiased third- and fourth-order cumulants. Sums about each site's own mean keep their precision wherever the data are located; raw power sums centred only at the server lose every significant digit once the mean is about ten thousand standard deviations from zero. The sums are not a formal privacy guarantee: the fewer rows a site holds, the more they reveal about them, and with a single row they are the row.
 
-Over Flower (`fedcausal.flower.lingam`, needs the `flower` extra) that is one round trip for every method except `"exact"`. The server broadcasts a `train` message, each supernode replies with its mean and moment sums, its row count and a fingerprint of its variable names, and the server checks the fingerprints agree before aggregating.
+Over Flower (`fedcausal.flower.lingam`, needs the `federated` extra) that is one round trip for every method except `"exact"`. The server broadcasts a `train` message, each supernode replies with its mean and moment sums, its row count and a fingerprint of its variable names, and the server checks the fingerprints agree before aggregating.
 
 ## Deployment
 
-The client side loads its data through `NodeConfigLoader(ContinuousDataset)`: each supernode reads a CSV path out of its own `node_config` and that file and nothing else. `InMemoryPartitions` is the simulation counterpart, indexing a list of in-memory datasets by `partition-id`, which is what `run_flower_rcd` and `run_flower_rcd_exact` use internally.
+The client side loads its data through `NodeConfigLoader(ContinuousDataset)`: each supernode reads a CSV path out of its own `node_config` and that file and nothing else. `InMemoryPartitions` is the simulation counterpart, indexing a list of in-memory datasets by `partition-id`, which is what `run_flower_rcd` uses internally.
 
 Both are the same classes the discrete side uses, so [Deployment](deployment.md) covers this family too, and the runnable app in [`flower_app/`](https://github.com/ptorrijos99/fedcausal/tree/main/flower_app) serves both.
 
@@ -62,4 +62,4 @@ The methods FedRCD is usually compared against are settings of the same two func
 
 HC-LiNGAM and HC give the orders and coefficients of the original implementation, and FedHC its orders, which `tests/lingam/test_reference_implementation.py` checks. FedISHC's original divides `Cum(x_j, x_j, x_s)` by `Cum(x_s, x_s, x_s)`, which estimates the square of the coefficient of `x_s` in `x_j`; `method="ratio"` divides `Cum(x_s, x_s, x_j)` instead, which estimates the coefficient. The arXiv version of the FedISHC paper writes the ratio this way; the AAAI version swaps the arguments, as the original code does. The ratio is set to zero when the source's third cumulant is below 1e-6 and clipped to ±10, as in the original code. Every remaining variable is deflated, where the paper deflates only those it judges dependent on the source, and the coefficient matrix comes from the covariance like every other method's, not from the inverted mixing matrix of the original. FedHC sorts once by the tau row sums, as the original code does; the paper's description also allows recomputing the sums over the remaining variables at each step.
 
-Every call returns the same `RCDResult` (`causal_order`, `b`, `to_dag(threshold)`).
+Every call returns the same `RCDResult` (`causal_order`, `coef`, `to_dag(threshold)`), and takes the estimator's `pruning` and `lambda_selection` with the same defaults; the comparison with the original implementations uses `pruning=None`, the OLS they used.

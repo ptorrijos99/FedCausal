@@ -11,14 +11,15 @@ import numpy as np
 import pytest
 
 from fedcausal.lingam import fedrcd, fedrcd_exact
-from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
+from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "lingam" / "rcd_baseline.json"
 CASES = json.loads(FIXTURE.read_text(encoding="utf-8"))["cases"]
 # The cumulants belong to the problem, not the method, so one record per problem.
 PROBLEMS = list({case["name"]: case for case in CASES}.values())
 
-# Each recorded method as a setting of the unified solvers. FedISHC is left out:
+# Each recorded method as a setting of the unified solvers, all with OLS
+# coefficients (pruning=None), as the original estimated them. FedISHC is left out:
 # the original divides Cum(x_j, x_j, x_s) by Cum(x_s, x_s, x_s), which estimates
 # the square of the coefficient, and fedrcd(method="ratio") uses the coefficient.
 SETTINGS = {
@@ -59,17 +60,15 @@ CHECKED = [case for case in CASES if case["method"] != "fedishc"]
 def test_port_reproduces_the_original(case):
     method = case["method"]
     if method == "fedrcd_exact":
-        result = fedrcd_exact(_clients(case))
+        result = fedrcd_exact(_clients(case), pruning=None)
     elif method == "hc":
-        result = fedrcd_exact([_data(case)])
+        result = fedrcd_exact([_data(case)], pruning=None)
     elif method == "hc_lingam":
-        pooled = aggregate_and_compute_cumulants([compute_local_raw_stats(_data(case))])
-        result = fedrcd(pooled, method="sort")
+        pooled = cumulants_from_sums([moment_sums(_data(case))])
+        result = fedrcd(pooled, method="sort", pruning=None)
     else:
-        stats = aggregate_and_compute_cumulants(
-            [compute_local_raw_stats(c, order=4) for c in _clients(case)]
-        )
-        result = fedrcd(stats, **SETTINGS[method])
+        stats = cumulants_from_sums([moment_sums(c, order=4) for c in _clients(case)])
+        result = fedrcd(stats, pruning=None, **SETTINGS[method])
 
     assert list(result.causal_order) == case["causal_order"]
 
@@ -77,7 +76,7 @@ def test_port_reproduces_the_original(case):
         # The original returns no B for fedhc.
         return
 
-    np.testing.assert_allclose(result.b, np.array(case["B"]), rtol=1e-9, atol=1e-9)
+    np.testing.assert_allclose(result.coef, np.array(case["B"]), rtol=1e-9, atol=1e-9)
 
 
 @pytest.mark.parametrize("case", PROBLEMS, ids=lambda c: c["name"])
@@ -87,9 +86,7 @@ def test_cumulants_match_the_recording(case):
     B is estimated from the covariance alone, so a small error in the higher
     cumulants could pass the other test unless it flipped the order.
     """
-    stats = aggregate_and_compute_cumulants(
-        [compute_local_raw_stats(c, order=4) for c in _clients(case)]
-    )
+    stats = cumulants_from_sums([moment_sums(c, order=4) for c in _clients(case)])
     for key in ("cov", "c3", "c12", "c21", "c4", "c13", "c31", "c22"):
         np.testing.assert_allclose(
             stats[key], np.array(case["cumulants"][key]), rtol=1e-12, atol=1e-12

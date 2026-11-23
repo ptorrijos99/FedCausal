@@ -9,7 +9,7 @@ import pytest
 from fedcausal import GES, FedGES, FedRCD
 from fedcausal.data import ContinuousDataset
 from fedcausal.exceptions import FedCausalError, NotFittedError
-from fedcausal.lingam import aggregate_and_compute_cumulants, compute_local_raw_stats, fedrcd
+from fedcausal.lingam import cumulants_from_sums, fedrcd, moment_sums
 
 
 def _linear_sites(n_sites: int = 3, n_rows: int = 2000, seed: int = 0) -> list[np.ndarray]:
@@ -67,10 +67,10 @@ def test_fedrcd_recovers_a_chain_and_names_its_variables() -> None:
 def test_fedrcd_is_the_solver_over_the_pooled_statistics() -> None:
     sites = _linear_sites()
     model = FedRCD(pruning=None).fit(sites)
-    stats = aggregate_and_compute_cumulants([compute_local_raw_stats(x) for x in sites])
-    expected = fedrcd(stats)
+    stats = cumulants_from_sums([moment_sums(x) for x in sites])
+    expected = fedrcd(stats, pruning=None)
     assert tuple(int(v[1:]) for v in model.causal_order_) == expected.causal_order
-    np.testing.assert_array_equal(model.coef_, expected.b)
+    np.testing.assert_array_equal(model.coef_, expected.coef)
 
 
 @pytest.mark.parametrize("method", ["deflation", "exact", "ratio", "sort"])

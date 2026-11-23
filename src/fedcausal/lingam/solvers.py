@@ -69,7 +69,7 @@ def estimate_b_lasso_from_cov(
     causal_order: Sequence[int],
     cov: npt.NDArray[np.float64],
     n_samples: int = 1000,
-    lmbda_type: str = "fixed",
+    lambda_selection: str = "fixed",
     prune_thres: float = 0.05,
     gamma: float = 1.0,
 ) -> npt.NDArray[np.float64]:
@@ -83,7 +83,7 @@ def estimate_b_lasso_from_cov(
         Covariance matrix, shape ``(p, p)``.
     n_samples : int
         Total number of samples. Only ``"bic"`` uses it.
-    lmbda_type : {"fixed", "bic"}
+    lambda_selection : {"fixed", "bic"}
         ``"fixed"`` sets the penalty to 0.01 times the mean variance of the
         parents; ``"bic"`` picks it from a grid of 20 by BIC.
     prune_thres : float
@@ -99,7 +99,7 @@ def estimate_b_lasso_from_cov(
     Raises
     ------
     ValueError
-        If `lmbda_type` is not ``"fixed"`` or ``"bic"``.
+        If `lambda_selection` is not ``"fixed"`` or ``"bic"``.
     """
     p = cov.shape[0]
     b_est = np.zeros((p, p))
@@ -118,10 +118,10 @@ def estimate_b_lasso_from_cov(
 
         weights = 1.0 / (np.abs(beta_ols) ** gamma + 1e-10)
 
-        if lmbda_type == "fixed":
+        if lambda_selection == "fixed":
             lmbda = float(0.01 * np.mean(np.diag(sigma_pp)))
             beta = solve_lasso_cd(sigma_pp, sigma_pc, lmbda, weights, np.zeros(len(parents)))
-        elif lmbda_type == "bic":
+        elif lambda_selection == "bic":
             lmbda_max = np.max(np.abs(sigma_pc)) if len(sigma_pc) > 0 else 0
             if lmbda_max < 1e-12:
                 beta = np.zeros(len(parents))
@@ -148,7 +148,7 @@ def estimate_b_lasso_from_cov(
                         best_bic = bic
                         beta = curr_beta
         else:
-            raise ValueError(f"Unknown lmbda_type: {lmbda_type!r}; expected 'fixed' or 'bic'.")
+            raise ValueError(f"lambda_selection must be 'bic' or 'fixed', got {lambda_selection!r}")
 
         b_est[child, parents] = beta
 

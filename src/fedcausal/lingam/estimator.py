@@ -8,7 +8,7 @@ import numpy as np
 
 from fedcausal._base import Estimator, check_sites, named_adjacency
 from fedcausal.data import as_continuous_sites
-from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
+from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
 from fedcausal.lingam.rcd import fedrcd, fedrcd_exact
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from fedcausal.data import ContinuousDataset
-    from fedcausal.lingam.rcd import RCDResult
+    from fedcausal.lingam.rcd import LambdaSelection, Pruning, RCDResult
 
 __all__ = ["FedRCD"]
 
@@ -79,8 +79,8 @@ class FedRCD(Estimator):
         self,
         method: Literal["deflation", "exact", "ratio", "sort"] = "deflation",
         order: Literal[3, 4] = 4,
-        pruning: Literal["adaptive_lasso"] | None = "adaptive_lasso",
-        lambda_selection: Literal["bic", "fixed"] = "bic",
+        pruning: Pruning = "adaptive_lasso",
+        lambda_selection: LambdaSelection = "bic",
     ) -> None:
         self.method = method
         self.order = order
@@ -115,31 +115,29 @@ class FedRCD(Estimator):
             raise ValueError(f"method must be one of {_METHODS}, got {self.method!r}")
         if self.order not in (3, 4):
             raise ValueError(f"order must be 3 or 4, got {self.order!r}")
-        if self.pruning not in ("adaptive_lasso", None):
-            raise ValueError(f"pruning must be 'adaptive_lasso' or None, got {self.pruning!r}")
-        if self.lambda_selection not in ("bic", "fixed"):
-            raise ValueError(
-                f"lambda_selection must be 'bic' or 'fixed', got {self.lambda_selection!r}"
-            )
         check_sites(X)
         sites = as_continuous_sites(X)
+        pruning, selection = self.pruning, self.lambda_selection
         result: RCDResult
-        lasso, lmbda = self.pruning == "adaptive_lasso", self.lambda_selection
         if self.method == "exact":
             result = fedrcd_exact(
-                [s.values for s in sites], order=self.order, use_lasso=lasso, lmbda_type=lmbda
+                [s.values for s in sites],
+                order=self.order,
+                pruning=pruning,
+                lambda_selection=selection,
             )
         else:
-            stats = aggregate_and_compute_cumulants(
-                [compute_local_raw_stats(s.values, self.order) for s in sites]
-            )
             result = fedrcd(
-                stats, method=self.method, order=self.order, use_lasso=lasso, lmbda_type=lmbda
+                cumulants_from_sums([moment_sums(s.values, self.order) for s in sites]),
+                method=self.method,
+                order=self.order,
+                pruning=pruning,
+                lambda_selection=selection,
             )
 
         names = np.asarray(sites[0].names, dtype=object)
         self.causal_order_ = [str(names[i]) for i in result.causal_order]
-        self.coef_ = result.b
+        self.coef_ = result.coef
         self.dag_ = result.to_dag()
         self.n_features_in_ = len(names)
         self.feature_names_in_ = names

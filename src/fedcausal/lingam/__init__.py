@@ -26,18 +26,19 @@ References
 
 from __future__ import annotations
 
-from fedcausal.lingam.cumulants import (
-    aggregate_and_compute_cumulants,
-    compute_local_raw_stats,
-)
+from fedcausal.lingam.cumulants import Cumulants, MomentSums, cumulants_from_sums, moment_sums
 from fedcausal.lingam.estimator import FedRCD
-from fedcausal.lingam.rcd import RCDResult, fedrcd, fedrcd_exact
+from fedcausal.lingam.rcd import LambdaSelection, Pruning, RCDResult, fedrcd, fedrcd_exact
 
 __all__ = [
+    "Cumulants",
     "FedRCD",
+    "LambdaSelection",
+    "MomentSums",
+    "Pruning",
     "RCDResult",
-    "aggregate_and_compute_cumulants",
-    "compute_local_raw_stats",
+    "cumulants_from_sums",
     "fedrcd",
     "fedrcd_exact",
+    "moment_sums",
 ]

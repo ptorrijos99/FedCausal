@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from fedcausal.data import DiscreteDataset
-    from fedcausal.lingam.cumulants import RawStats
+    from fedcausal.lingam.cumulants import MomentSums
 
 __all__ = [
     "dag_to_record",
@@ -30,8 +30,8 @@ __all__ = [
     "control_config",
     "schema_fingerprint",
     "names_fingerprint",
-    "stats_to_record",
-    "record_to_stats",
+    "sums_to_record",
+    "record_to_sums",
 ]
 
 # The wire format: arrays are matched by position, so only ever append.
@@ -74,27 +74,27 @@ def control_config(**scalars: Any) -> ConfigRecord:
     return ConfigRecord(dict(scalars))
 
 
-def stats_to_record(stats: RawStats) -> ArrayRecord:
+def sums_to_record(stats: MomentSums) -> ArrayRecord:
     """Pack a site's moment sums into an ``ArrayRecord``.
 
     Parameters
     ----------
-    stats : RawStats
-        Output of :func:`fedcausal.lingam.cumulants.compute_local_raw_stats`.
+    stats : MomentSums
+        Output of :func:`fedcausal.lingam.cumulants.moment_sums`.
 
     Returns
     -------
     ArrayRecord
         The mean and the moment-sum matrices in a fixed order, three of them
-        for third-order sums and five for fourth-order; see :func:`record_to_stats`.
+        for third-order sums and five for fourth-order; see :func:`record_to_sums`.
     """
     keys = _STATS_KEYS if "m31" in stats else _STATS_KEYS[:3]
     return ArrayRecord([np.ascontiguousarray(stats[key], dtype=np.float64) for key in keys])
 
 
-def record_to_stats(rec: ArrayRecord, n: int) -> RawStats:
-    """Rebuild moment sums from a :func:`stats_to_record` record."""
+def record_to_sums(rec: ArrayRecord, n: int) -> MomentSums:
+    """Rebuild moment sums from a :func:`sums_to_record` record."""
     arrays = rec.to_numpy_ndarrays()
-    stats: RawStats = {"n": int(n)}
+    stats: MomentSums = {"n": int(n)}
     stats.update(dict(zip(_STATS_KEYS[: len(arrays)], arrays, strict=True)))
     return stats

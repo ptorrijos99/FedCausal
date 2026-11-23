@@ -3,7 +3,7 @@ import pytest
 
 from fedcausal.graph import DAG
 from fedcausal.lingam import RCDResult, fedrcd, fedrcd_exact
-from fedcausal.lingam.cumulants import aggregate_and_compute_cumulants, compute_local_raw_stats
+from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
 
 
 def _chain_clients(seed: int, n: int = 6000, n_clients: int = 3):
@@ -18,7 +18,7 @@ def _chain_clients(seed: int, n: int = 6000, n_clients: int = 3):
 
 
 def _stats(clients):
-    return aggregate_and_compute_cumulants([compute_local_raw_stats(c, order=4) for c in clients])
+    return cumulants_from_sums([moment_sums(c, order=4) for c in clients])
 
 
 @pytest.mark.parametrize("method", ["deflation", "ratio", "sort"])
@@ -38,7 +38,7 @@ def test_ratio_deflation_removes_the_source_with_its_coefficient():
     rng = np.random.default_rng(7)
     e = rng.exponential(1.0, size=(200_000, 2)) - 1.0
     x = np.column_stack([e[:, 0], 1.5 * e[:, 0] + e[:, 1]])
-    stats = aggregate_and_compute_cumulants([compute_local_raw_stats(x, 3)])
+    stats = cumulants_from_sums([moment_sums(x, 3)])
     cur = {k: np.array(stats[k]) for k in ("cov", "c3", "c12", "c21")}
     assert _deflated_order(cur, 3, "ratio") == [0, 1]
     assert cur["cov"][1, 1] == pytest.approx(1.0, abs=0.05)
@@ -47,7 +47,7 @@ def test_ratio_deflation_removes_the_source_with_its_coefficient():
 @pytest.mark.parametrize("method", ["deflation", "ratio", "sort"])
 def test_third_order_methods_need_only_third_order_sums(method):
     clients = _skewed_chain_clients(8)
-    stats = aggregate_and_compute_cumulants([compute_local_raw_stats(c, order=3) for c in clients])
+    stats = cumulants_from_sums([moment_sums(c, order=3) for c in clients])
     assert fedrcd(stats, method=method).causal_order == (0, 1, 2, 3)
     with pytest.raises(ValueError, match="fourth-order"):
         fedrcd(stats, order=4)
@@ -64,7 +64,7 @@ def test_bad_method_or_order_is_an_error():
 def test_result_is_a_frozen_dataclass_with_the_right_shapes():
     result = fedrcd(_stats(_chain_clients(2)))
     assert isinstance(result, RCDResult)
-    assert result.b.shape == (4, 4)
+    assert result.coef.shape == (4, 4)
     assert len(result.causal_order) == 4
     with pytest.raises(AttributeError):
         result.causal_order = (1, 0, 2, 3)
@@ -99,7 +99,7 @@ def _skewed_chain_clients(seed: int, n: int = 6000, n_clients: int = 3):
 
 def test_third_order_only_stats_still_work():
     clients = _skewed_chain_clients(5)
-    stats = aggregate_and_compute_cumulants([compute_local_raw_stats(c, order=3) for c in clients])
+    stats = cumulants_from_sums([moment_sums(c, order=3) for c in clients])
     assert fedrcd(stats).causal_order == (0, 1, 2, 3)
 
 
@@ -108,4 +108,4 @@ def test_missing_n_raises_key_error_in_the_lasso_path():
     stats = dict(_stats(_chain_clients(6)))
     del stats["n"]
     with pytest.raises(KeyError, match="stats is missing 'n'"):
-        fedrcd(stats, use_lasso=True)
+        fedrcd(stats, pruning="adaptive_lasso")
