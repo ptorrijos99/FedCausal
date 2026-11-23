@@ -38,11 +38,18 @@ class DAG:
     """
 
     def __init__(self, num_nodes: int) -> None:
+        if num_nodes < 0:
+            raise ValueError(f"num_nodes must be non-negative, got {num_nodes}")
         self.num_nodes = num_nodes
         self.num_edges = 0
         self._parents: list[set[int]] = [set() for _ in range(num_nodes)]
         self._children: list[set[int]] = [set() for _ in range(num_nodes)]
         self._amat: npt.NDArray[np.bool_] | None = None
+
+    def _check_node(self, v: int) -> None:
+        # A negative index would otherwise wrap around to the last nodes.
+        if not 0 <= v < self.num_nodes:
+            raise IndexError(f"node {v} is not in 0..{self.num_nodes - 1}")
 
     def parents(self, v: int) -> frozenset[int]:
         """Return the parents of node `v`."""
@@ -72,6 +79,8 @@ class DAG:
 
         Raises
         ------
+        IndexError
+            If `u` or `v` is not a node.
         CycleError
             If `u == v` (self-loop), or if a path `v -> ... -> u` already
             exists, which means adding `u -> v` would create a cycle. The
@@ -82,6 +91,8 @@ class DAG:
         Adding an edge that already exists is a no-op: it does not raise
         and does not affect `num_edges`.
         """
+        self._check_node(u)
+        self._check_node(v)
         if self.has_edge(u, v):
             return
         if u == v:
@@ -249,12 +260,16 @@ class DAG:
 
         Raises
         ------
+        IndexError
+            If an edge names a node outside ``0..num_nodes-1``.
         CycleError
             If adding the edges in order would create a cycle or a
             self-loop.
         """
         dag = cls(num_nodes)
         for u, v in edges:
+            dag._check_node(u)
+            dag._check_node(v)
             if u == v:
                 raise CycleError(f"self-loop rejected: {u} -> {v}")
             if v not in dag._children[u]:
@@ -282,10 +297,14 @@ class DAG:
 
         Raises
         ------
+        ValueError
+            If `A` is not a square matrix.
         CycleError
             If `A` encodes a self-loop or a cycle.
         """
         matrix = np.asarray(A)
+        if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+            raise ValueError(f"expected a square matrix, got shape {matrix.shape}")
         n = matrix.shape[0]
         edges = [(int(u), int(v)) for u, v in zip(*np.nonzero(matrix), strict=True)]
         return cls.from_edges(n, edges)

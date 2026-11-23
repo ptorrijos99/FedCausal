@@ -210,3 +210,20 @@ def test_random_edge_insertion_never_creates_cycle(n: int, data) -> None:
     order = dag.topological_order()
     pos = {x: i for i, x in enumerate(order)}
     assert all(pos[a] < pos[b] for a, b in dag.edges())
+
+
+def test_nodes_outside_the_graph_are_rejected():
+    # A negative index used to wrap round to the last node.
+    with pytest.raises(IndexError):
+        DAG.from_edges(3, [(-1, 0)])
+    with pytest.raises(IndexError):
+        DAG.from_edges(3, [(0, 3)])
+    with pytest.raises(IndexError):
+        DAG(3).add_edge(0, -1)
+    with pytest.raises(ValueError):
+        DAG(-1)
+
+
+def test_from_amat_wants_a_square_matrix():
+    with pytest.raises(ValueError, match="square"):
+        DAG.from_amat(np.zeros((2, 3)))

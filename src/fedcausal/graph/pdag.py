@@ -436,6 +436,8 @@ class PDAG:
     def from_adjacency(cls, adj: npt.ArrayLike) -> PDAG:
         """Build a PDAG from a square matrix: ``A[u, v]`` alone is ``u -> v``, both is ``u - v``."""
         a = np.asarray(adj, dtype=bool)
+        if a.ndim != 2 or a.shape[0] != a.shape[1]:
+            raise ValueError(f"expected a square matrix, got shape {a.shape}")
         pdag = cls(a.shape[0])
         for u, v in zip(*np.nonzero(a & ~a.T), strict=True):
             pdag._children[u].add(int(v))
