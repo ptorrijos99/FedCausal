@@ -8,8 +8,8 @@ The first stable release: the API of 0.2.0, faster, with stricter input checks a
 
 ### Speed
 
-- GES learns the same structures two to ten times faster: `link` (724 variables) takes 1.6 s against 17 s, `munin` (1041) 4.1 s against 41 s, and on one thread `diabetes` (413) takes 11.5 s against 60 s. With the default prior, `win95pts` and `munin` end at a different structure of the same score, up to rounding, because ties between equally good operators break differently; see [Benchmarks](docs/benchmarks.md).
-- BDeu groups the rows by the configuration of the shared parents once per batch and counts each added parent without sorting rows: with bitsets for small tables, in one pass for the rest. It sums over the distinct counts, so `log Gamma` is evaluated once per count value, and a family scores the same, bit for bit, in a batch or alone.
+- GES is two to ten times faster: `link` (724 variables) takes 1.6 s against 17 s, `munin` (1041) 4.1 s against 41 s, and on one thread `diabetes` (413) takes 11.5 s against 60 s, each learning the same CPDAG as 0.2.0 under 0.1.0's prior. With the default prior, `win95pts` and `munin` end at a different structure of the same score, up to rounding, because ties between equally good operators break differently; see [Benchmarks](docs/benchmarks.md).
+- The discrete scores group the rows by the configuration of the shared parents once per batch and counts each added parent without sorting rows: with bitsets for small tables, in one pass for the rest. It sums over the distinct counts, so `log Gamma` is evaluated once per count value, and a family scores the same, bit for bit, in a batch or alone.
 - The CPDAG is completed over neighbour lists kept up to date by every edit, so a step costs in the edges it touches rather than in the square of the number of variables.
 - The search keeps only the best operator per child and computes candidate improvements in compiled code.
 

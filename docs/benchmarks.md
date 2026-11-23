@@ -8,20 +8,20 @@ Measured on one laptop with the default settings, 5000 rows per network, from th
 |---|---:|---:|---:|---:|---:|---:|
 | cancer | 5 | 0.01 | 3 | 4 | 1 | 2 |
 | asia | 8 | 0.02 | 7 | 8 | 2 | 1 |
-| child | 20 | 0.07 | 25 | 25 | 2 | 0 |
-| insurance | 27 | 0.11 | 44 | 52 | 17 | 19 |
+| child | 20 | 0.08 | 25 | 25 | 2 | 0 |
+| insurance | 27 | 0.10 | 44 | 52 | 17 | 19 |
 | water | 32 | 0.07 | 31 | 66 | 50 | 88 |
 | mildew | 35 | 0.09 | 33 | 46 | 22 | 40 |
-| alarm | 37 | 0.18 | 47 | 46 | 10 | 11 |
-| hailfinder | 56 | 0.16 | 62 | 66 | 58 | 72 |
-| hepar2 | 70 | 0.13 | 71 | 123 | 64 | 73 |
-| win95pts | 76 | 0.18 | 109 | 112 | 38 | 50 |
-| pathfinder | 109 | 0.36 | 157 | 195 | 203 | 245 |
+| alarm | 37 | 0.10 | 47 | 46 | 10 | 11 |
+| hailfinder | 56 | 0.15 | 62 | 66 | 58 | 72 |
+| hepar2 | 70 | 0.12 | 71 | 123 | 64 | 73 |
+| win95pts | 76 | 0.16 | 109 | 112 | 38 | 50 |
+| pathfinder | 109 | 0.34 | 157 | 195 | 203 | 245 |
 | andes | 223 | 0.38 | 286 | 338 | 60 | 147 |
-| diabetes | 413 | 2.33 | 583 | 602 | 309 | 251 |
+| diabetes | 413 | 2.48 | 583 | 602 | 309 | 251 |
 | pigs | 441 | 0.88 | 592 | 592 | 0 | 0 |
-| link | 724 | 1.67 | 855 | 1125 | 679 | 987 |
-| munin | 1041 | 3.98 | 994 | 1397 | 1234 | 1603 |
+| link | 724 | 1.89 | 855 | 1125 | 679 | 987 |
+| munin | 1041 | 4.06 | 994 | 1397 | 1234 | 1603 |
 
 Runtime follows how dense and interconnected a network is more than its size: `pigs` has more variables than `diabetes` and finishes faster. For comparison, causal-learn's GES on the same data takes 53 s on `alarm` and does not finish `andes` in half an hour.
 
