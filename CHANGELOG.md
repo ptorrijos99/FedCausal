@@ -16,6 +16,7 @@ The first stable release: the API of 0.2.0, faster, with stricter input checks a
 ### Added
 
 - `fedcausal.graph.dag_to_cpdag`, previously reachable only through `fedcausal.graph.cpdag`.
+- `fedcausal.exceptions.NotFittedError`, raised when a result is read before `fit`; it was importable only from a private module. It is now a `FedCausalError` as well as an `AttributeError`, and the module's docstring says which errors are which instead of claiming every deliberate error is a `FedCausalError`.
 - The API reference says what 1.0 promises, documents `fedcausal.flower.fedges` and `fedcausal.flower.lingam`, and notes that score objects are not safe to share between threads.
 
 ### Changed

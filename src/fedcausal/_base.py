@@ -6,6 +6,8 @@ import inspect
 import sys
 from typing import TYPE_CHECKING, Any
 
+from fedcausal.exceptions import NotFittedError
+
 if TYPE_CHECKING:
     import numpy as np
     import numpy.typing as npt
@@ -45,10 +47,6 @@ def check_sites(X: object) -> None:
             f"expected one table per site, got a single {type(X).__name__}; "
             "wrap it in a list to learn from one site"
         )
-
-
-class NotFittedError(AttributeError):
-    """An estimator's result was read before :meth:`fit` was called."""
 
 
 class Estimator:

@@ -1,9 +1,11 @@
 """Exceptions raised by fedcausal.
 
-Everything the library raises deliberately derives from :class:`FedCausalError`,
-so callers can catch the whole family with one ``except``. Programming errors
-(a wrong type, an out-of-range index) still surface as the ordinary built-in
-exceptions.
+The errors of a federation, and reading an estimator's results before
+``fit``, derive from :class:`FedCausalError`, so callers can catch them with
+one ``except``. An invalid argument or input raises :class:`ValueError` (or
+:class:`ConfigurationError`, which is one), a wrong kind of input
+:class:`TypeError`, and a cycle in a :class:`~fedcausal.graph.DAG`
+:class:`~fedcausal.graph.CycleError`, also a :class:`ValueError`.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ __all__ = [
     "SchemaMismatchError",
     "ClientFailureError",
     "DenseFusionWarning",
+    "NotFittedError",
 ]
 
 
@@ -26,6 +29,14 @@ class ConfigurationError(FedCausalError, ValueError):
     """An argument or federation setting is invalid.
 
     Also a :class:`ValueError`, so ``except ValueError`` catches it too.
+    """
+
+
+class NotFittedError(FedCausalError, AttributeError):
+    """An estimator's result was read before ``fit`` was called.
+
+    Also an :class:`AttributeError`, so ``hasattr`` and scikit-learn's
+    checks treat an unfitted result as missing.
     """
 
 

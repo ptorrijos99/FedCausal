@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 from fedcausal import GES, FedGES, FedRCD
-from fedcausal._base import NotFittedError
 from fedcausal.data import ContinuousDataset
+from fedcausal.exceptions import FedCausalError, NotFittedError
 from fedcausal.lingam import aggregate_and_compute_cumulants, compute_local_raw_stats, fedrcd
 
 
@@ -48,6 +48,8 @@ def test_sklearn_clone_keeps_the_parameters() -> None:
 def test_results_before_fit_raise_not_fitted(cls: type) -> None:
     with pytest.raises(NotFittedError):
         _ = cls().adjacency_
+    assert issubclass(NotFittedError, FedCausalError)
+    assert not hasattr(cls(), "adjacency_")
 
 
 def test_fedrcd_recovers_a_chain_and_names_its_variables() -> None:
