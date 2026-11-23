@@ -10,6 +10,12 @@ import pytest
 from fedcausal.data import DiscreteDataset
 from fedcausal.graph import DAG
 from fedcausal.scores import BDeuScore
+from fedcausal.scores._kernels import (
+    extension_buffers,
+    family_extensions,
+    family_score,
+    value_bits,
+)
 
 
 def _dataset(n_rows: int, n_vars: int, levels: int, seed: int) -> DiscreteDataset:
@@ -90,3 +96,63 @@ def test_parent_order_does_not_matter_and_dags_sum_their_families() -> None:
 def test_invalid_priors_are_rejected(kwargs: dict[str, float], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         BDeuScore(_dataset(10, 4, 2, seed=6), **kwargs)
+
+
+def test_extensions_equal_one_at_a_time_bit_for_bit() -> None:
+    """Families too wide for the dense table and narrow ones alike: the batch and the
+    single-family kernels must count the same cells, so GES ties break the same way."""
+    rng = np.random.default_rng(7)
+    cards = [3, 21, 13, 8, 2, 21, 5, 17, 2, 11]
+    values = np.column_stack([rng.integers(0, c, size=250) for c in cards])
+    values[:, 4] = (values[:, 1] + values[:, 2]) % 2  # a deterministic column: many empty cells
+    data = DiscreteDataset(
+        values.astype(np.int32),
+        cards,
+        [f"x{i}" for i in range(len(cards))],
+        [[str(k) for k in range(c)] for c in cards],
+    )
+    for node, parents in [
+        (0, ()),
+        (0, (1,)),
+        (4, (1, 2)),
+        (3, (1, 5, 7)),
+        (8, (1, 2, 5)),
+        (9, (0, 1, 5, 7)),
+    ]:
+        extra = [x for x in range(len(cards)) if x != node and x not in parents]
+        together = BDeuScore(data, expected_parents=None).local_scores_with(
+            node, frozenset(parents), extra
+        )
+        alone = [
+            BDeuScore(data, expected_parents=None).local_score(node, set(parents) | {x})
+            for x in extra
+        ]
+        assert list(together) == alone
+        assert alone == pytest.approx(
+            [_reference(data, node, tuple(sorted(set(parents) | {x})), 1.0) for x in extra],
+            rel=1e-10,
+        )
+
+
+def test_a_batch_mixing_bitset_and_grouped_counting_equals_one_at_a_time() -> None:
+    """One set of buffers serves every family of a chunk, call after call: a family
+    counted by bitsets must leave nothing behind for one too wide for the dense table,
+    and terms cached for one family's priors must not reach a family with others."""
+    rng = np.random.default_rng(11)
+    cards = np.array([3, 2, 120, 2, 97], dtype=np.int64)
+    columns = [rng.integers(0, c, size=60) for c in cards]
+    values = np.asfortranarray(np.column_stack(columns).astype(np.int32))
+    bits, offsets = value_bits(values, cards)
+    none = np.zeros(0, dtype=np.int64)
+    scratch = np.empty(240, dtype=np.int64)
+    buffers = extension_buffers(60, cards, len(scratch), 1)
+    for node in (0, 1, 3, 0):  # the same buffers each time, for other children and priors
+        extra = np.array([x for x in range(5) if x != node], dtype=np.int64)
+        together = family_extensions(
+            values, cards, node, none, extra, 1.0, len(scratch), bits, offsets, *buffers
+        )
+        alone = [
+            family_score(values, cards, node, np.array([x], dtype=np.int64), 1.0, scratch)
+            for x in extra
+        ]
+        assert list(together) == alone

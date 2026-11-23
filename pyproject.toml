@@ -108,8 +108,8 @@ module = ["flwr.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# numba ships no type stubs; scikit-learn is optional and untyped.
-module = ["numba.*", "sklearn.*"]
+# numba and llvmlite ship no type stubs; scikit-learn is optional and untyped.
+module = ["llvmlite.*", "numba.*", "sklearn.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

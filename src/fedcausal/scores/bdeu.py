@@ -6,9 +6,15 @@ import math
 from typing import TYPE_CHECKING
 
 import numpy as np
+from numba import get_num_threads
 
 from fedcausal.scores._family import FamilyScore
-from fedcausal.scores._kernels import family_extensions, family_score
+from fedcausal.scores._kernels import (
+    extension_buffers,
+    family_extensions,
+    family_score,
+    value_bits,
+)
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -27,6 +33,17 @@ class _DiscreteScore(FamilyScore):
         self._values = np.asfortranarray(data.values)
         self._cards = data.cardinalities.astype(np.int64)
         self._scratch = np.empty(max(4 * data.n_rows, 64), dtype=np.int64)
+        # Work buffers of the batch kernel, one row per thread, made on first use.
+        self._buffers: tuple[npt.NDArray[np.int64], npt.NDArray[np.float64]] | None = None
+        # Row bitsets per value, for counting small tables by popcount; skipped when large.
+        bit_bytes = int(self._cards.sum()) * ((data.n_rows + 63) // 64) * 8
+        if bit_bytes <= 256 * 2**20:
+            self._bits, self._offsets = value_bits(self._values, self._cards)
+        else:
+            self._bits, self._offsets = (
+                np.zeros((0, 1), np.uint64),
+                np.zeros(data.n_vars + 1, np.int64),
+            )
 
     def _count(self, node: int, parents: npt.NDArray[np.int64], ess: float) -> float:
         return float(family_score(self._values, self._cards, node, parents, ess, self._scratch))
@@ -34,8 +51,24 @@ class _DiscreteScore(FamilyScore):
     def _count_extensions(
         self, node: int, parents: npt.NDArray[np.int64], extra: npt.NDArray[np.int64], ess: float
     ) -> npt.NDArray[np.float64]:
+        threads = get_num_threads()
+        if self._buffers is None or len(self._buffers[0]) < threads:
+            self._buffers = extension_buffers(
+                self._values.shape[0], self._cards, len(self._scratch), threads
+            )
+        ints, floats = self._buffers
         out: npt.NDArray[np.float64] = family_extensions(
-            self._values, self._cards, node, parents, extra, ess, len(self._scratch)
+            self._values,
+            self._cards,
+            node,
+            parents,
+            extra,
+            ess,
+            len(self._scratch),
+            self._bits,
+            self._offsets,
+            ints[:threads],
+            floats[:threads],
         )
         return out
 
