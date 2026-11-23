@@ -3,7 +3,7 @@
 What the test suite checks, so you can decide how much to trust it.
 
 ```bash
-pip install -e ".[dev,flower]"
+pip install -e ".[dev,federated]"
 pytest
 ```
 
@@ -19,6 +19,7 @@ No downloads and no environment variables: everything the tests need ships with 
 | FedRCD | The solvers against the original implementation's recorded output |
 | Flower transports | The same models as the in-process loop, round by round, over a stub grid that hands each message to the real site handler; failed sites and mismatched variables stop the run |
 | Estimators | Hyperparameters round-trip through `get_params`, `set_params` and `sklearn.base.clone`; `FedRCD` gives what its solver gives over the pooled statistics; a single table, an empty one or an out-of-range setting is refused with an error that names it |
+| Layout | The core never imports the federated part, and runs with it and Flower made unimportable; the transport names the extra it needs |
 | Documentation | Every `from fedcausal... import ...` shown in the docs runs |
 
 Search results are compared through scores and equivalence classes rather than edge lists where it matters. A search returns one member of a Markov equivalence class, and the choice among its members is arbitrary; BDeu and the CPDAG are the same for every member.
@@ -29,4 +30,4 @@ Search results are compared through scores and equivalence classes rather than e
 pytest -m "not slow"        # skip the long-running ones
 ```
 
-The slow tests drive a real Flower simulation and need Ray (`fedcausal[flower-simulation]`).
+The slow tests drive a real Flower simulation and need Ray (`fedcausal[federated-simulation]`).

@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/ptorrijos99/fedcausal
 cd fedcausal
-pip install -e ".[dev,flower]"
+pip install -e ".[dev,federated]"
 pytest
 ```
 
@@ -19,7 +19,7 @@ mypy src
 pytest
 ```
 
-CI runs the same three on Linux and Windows, on Python 3.10 and 3.13.
+CI runs the same three on Linux and Windows, on Python 3.10 and 3.13, and the suite once more with the oldest dependencies `pyproject.toml` allows and no extras.
 
 ## What the tests are for
 
@@ -31,7 +31,7 @@ A test states something a user could observe: a result, an error, a guarantee in
 - Do not add a strict xfail to record a known difference. Assert the property that makes the difference acceptable.
 - Prefer checking against an independent definition (a brute-force score, Verma and Pearl's characterisation of equivalence) over checking against recorded output.
 
-The whole suite runs in about half a minute. The three tests that drive Flower's Ray simulation engine carry the `slow` marker and are skipped by default: each takes a minute, and Ray now and then hangs when one process starts it twice. Run them with `pytest -m slow` after changing the transport; they need the `flower-simulation` extra.
+The whole suite runs in about half a minute. The three tests that drive Flower's Ray simulation engine carry the `slow` marker and are skipped by default: each takes a minute, and Ray now and then hangs when one process starts it twice. Run them with `pytest -m slow` after changing the transport; they need the `federated-simulation` extra.
 
 ## Performance changes
 
@@ -43,7 +43,7 @@ A change to the search must keep it at a local optimum of the full neighbourhood
 
 ## Adding a method
 
-`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`; `tests/test_import.py` checks that.
+`fedcausal.fedges` and `fedcausal.lingam` are the two method families, and a third one goes beside them: a package holding the algorithm and nothing about transport. If it federates, add one module to `fedcausal.flower` and reuse the plumbing in `_grid.py`, the loaders in `loaders.py`, and the wire format in `serde.py`. The algorithm packages must not import `flwr`, and the core (`data`, `graph`, `scores`, `search`, `metrics`, `io`, `datasets`) must not import anything federated, not even under `TYPE_CHECKING`; `tests/test_import.py` and `tests/test_layout.py` check both.
 
 ## Style
 

@@ -24,6 +24,11 @@ given structure on given data do not change beyond rounding.
 The score objects cache what they compute and are not safe to share between
 threads; use one per thread, or processes.
 
+The modules come in two layers. The core, from *Data* to *Graphs and
+metrics*, learns structures in one place and never imports the federated part
+below it, which runs the same methods across sites; only its transport,
+:mod:`fedcausal.flower`, needs the ``federated`` extra.
+
 Data
 ----
 

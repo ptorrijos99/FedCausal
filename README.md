@@ -40,6 +40,18 @@ model.causal_order_, model.coef_
 
 GES runs in compiled code where it matters (counting, path checks, CPDAG completion, the consensus order of the fusion) and re-scores only the part of the graph each step changes. On a laptop it learns `andes` (223 variables, 5000 rows) in under half a second and `munin` (1041 variables) in about 4 s, where causal-learn does not finish `andes` in half an hour. The [benchmarks](docs/benchmarks.md) have the full ladder.
 
+## How the package is organised
+
+One package in two layers, kept apart so that it could become two distributions without a rewrite:
+
+| Layer | Modules | Needs |
+|---|---|---|
+| Core: learning in one place | `fedcausal.data`, `graph`, `scores`, `search`, `metrics`, `io`, `datasets` | numpy, pandas, numba |
+| Federated: the methods | `fedcausal.fedges`, `fusion`, `lingam` | the same; they run in one process |
+| Federated: the transport | `fedcausal.flower` | `pip install "fedcausal[federated]"` |
+
+The core never imports the federated part, not even for type hints, and `tests/test_layout.py` checks that, along with a run of the core with the federated modules and Flower made unimportable. Importing `fedcausal.flower` without the extra fails with a message naming it.
+
 ## Documentation
 
 **[ptorrijos99.github.io/fedcausal](https://ptorrijos99.github.io/fedcausal/)**: the user guide, the API reference and a gallery of examples that run with no setup. To build it locally:
@@ -49,7 +61,7 @@ pip install -e ".[docs]"
 sphinx-build -b html docs docs/_build/html
 ```
 
-[Deployment](docs/deployment.md) explains how to run FedGES or FedRCD across real machines with [Flower](https://flower.ai) (`pip install "fedcausal[flower]"`).
+[Deployment](docs/deployment.md) explains how to run FedGES or FedRCD across real machines with [Flower](https://flower.ai) (`pip install "fedcausal[federated]"`).
 
 ## Citing
 
