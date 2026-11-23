@@ -23,7 +23,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from fedcausal.graph._kernels import semidirected_reach
+from fedcausal.graph._kernels import semidirected_reach_lists
+from fedcausal.search._kernels import keep_better
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -34,9 +35,12 @@ if TYPE_CHECKING:
     from fedcausal.scores import Score
 
 __all__ = [
+    "Best",
     "Candidate",
     "apply_delete",
     "apply_insert",
+    "best_deletes_into",
+    "best_inserts_into",
     "deletes_into",
     "inserts_into",
     "is_clique",
@@ -44,6 +48,13 @@ __all__ = [
 
 Candidate = tuple[float, frozenset[int]]
 """An operator's score improvement and its subset (`T` or `H`)."""
+
+Best = tuple[
+    "npt.NDArray[np.intp]", "npt.NDArray[np.float64]", "npt.NDArray[np.intp]", list[frozenset[int]]
+]
+"""The best operators into one child, as arrays: the nodes `x` in increasing
+order, each one's improvement, and each one's subset as an index into the list.
+"""
 
 _REL_TOL = 1e-10
 """Improvements smaller than this, relative to the scores involved, are rounding.
@@ -77,8 +88,10 @@ def semidirected_reachable(pdag: PDAG, source: int, avoid: frozenset[int]) -> np
     `avoid`.
     """
     avoid_array = np.fromiter(avoid, dtype=np.int32, count=len(avoid)) if avoid else _NO_NODES
-    indptr, indices = pdag.successor_csr()
-    reached: npt.NDArray[np.bool_] = semidirected_reach(indptr, indices, source, avoid_array)
+    nbr, deg = pdag.neighbour_lists()
+    reached: npt.NDArray[np.bool_] = semidirected_reach_lists(
+        pdag.adjacency_view().view(np.uint8), nbr, deg, source, avoid_array
+    )
     return reached
 
 
@@ -110,6 +123,14 @@ def _is_noise(delta: float, a: float, b: float) -> bool:
     return abs(delta) <= _REL_TOL * max(abs(a), abs(b), 1.0)
 
 
+def _as_dict(found: Best) -> dict[int, Candidate]:
+    xs, deltas, which, subsets = found
+    return {
+        x: (d, subsets[w])
+        for x, d, w in zip(xs.tolist(), deltas.tolist(), which.tolist(), strict=True)
+    }
+
+
 def inserts_into(
     score: Score, pdag: PDAG, y: int, max_t_size: int | None, max_parents: int | None = None
 ) -> dict[int, Candidate]:
@@ -120,26 +141,46 @@ def inserts_into(
     Inserts that would give `y` more than `max_parents` parents are skipped.
     Nodes with no improving Insert are left out.
     """
+    return _as_dict(best_inserts_into(score, pdag, y, max_t_size, max_parents))
+
+
+def best_inserts_into(
+    score: Score, pdag: PDAG, y: int, max_t_size: int | None, max_parents: int | None = None
+) -> Best:
+    """Return what :func:`inserts_into` does, as arrays."""
+    n = pdag.num_nodes
     undirected = pdag.undirected_set(y)
     parents = frozenset(pdag.parents_set(y))
-    skeleton = pdag.skeleton_view()
-    others = np.flatnonzero(~skeleton[y])
-    others = others[others != y]
-    # Group the candidate parents by NaYX, their neighbours among y's undirected ones.
-    groups: dict[frozenset[int], npt.NDArray[np.intp]]
+    amat = pdag.adjacency_view()
+    apart = ~(amat[y] | amat[:, y])
+    apart[y] = False
+    others = np.flatnonzero(apart)
+    # Group the candidate parents by NaYX, their neighbours among y's undirected
+    # ones. Most have none, so only the rest are compared row by row.
+    groups: list[tuple[frozenset[int], npt.NDArray[np.intp]]]
     if not undirected or others.size == 0:
-        groups = {_EMPTY: others}
+        groups = [(_EMPTY, others)]
     else:
         neighbours = np.array(sorted(undirected), dtype=np.int64)
-        shared = skeleton[np.ix_(others, neighbours)]
-        keys, inverse = np.unique(shared, axis=0, return_inverse=True)
-        inverse = inverse.reshape(-1)
-        groups = {
-            frozenset(neighbours[key].tolist()): others[inverse == g] for g, key in enumerate(keys)
-        }
+        shared = amat[np.ix_(others, neighbours)] | amat[np.ix_(neighbours, others)].T
+        some = shared.any(axis=1)
+        groups = [(_EMPTY, others[~some])]
+        if some.any():
+            others, shared = others[some], shared[some]
+            keys, inverse = np.unique(shared, axis=0, return_inverse=True)
+            inverse = inverse.reshape(-1)
+            groups += [
+                (frozenset(neighbours[key].tolist()), others[inverse == g])
+                for g, key in enumerate(keys)
+            ]
 
-    best: dict[int, Candidate] = {}
-    for na, xs in groups.items():
+    # Per node, the best improvement so far and the subset that gives it.
+    best = np.zeros(n)
+    which = np.full(n, -1, dtype=np.intp)
+    subsets: list[frozenset[int]] = []
+    for na, xs in groups:
+        if xs.size == 0:
+            continue
         for t in _subsets(sorted(undirected - na), max_t_size):
             cond = na | t
             if not is_clique(pdag, cond):
@@ -151,15 +192,12 @@ def inserts_into(
             base = parents | cond
             if max_parents is not None and len(base) >= max_parents:
                 continue
-            s_without = score.local_score(y, base)
+            s_without = float(score.local_score(y, base))
             s_with = np.asarray(score.local_scores_with(y, base, valid), dtype=np.float64)
-            delta = s_with - s_without
-            tol = _REL_TOL * np.maximum(np.maximum(np.abs(s_with), abs(s_without)), 1.0)
-            for k in np.flatnonzero((delta > 0) & (delta > tol)).tolist():
-                x, d = int(valid[k]), float(delta[k])
-                if x not in best or d > best[x][0]:
-                    best[x] = (d, t)
-    return best
+            if keep_better(valid, s_with, s_without, _REL_TOL, best, which, len(subsets)):
+                subsets.append(t)
+    found = np.flatnonzero(which >= 0)
+    return found, best[found], which[found], subsets
 
 
 def deletes_into(score: Score, pdag: PDAG, y: int) -> dict[int, Candidate]:
@@ -188,6 +226,18 @@ def deletes_into(score: Score, pdag: PDAG, y: int) -> dict[int, Candidate]:
             if x not in best or delta > best[x][0]:
                 best[x] = (delta, na - kept)
     return best
+
+
+def best_deletes_into(score: Score, pdag: PDAG, y: int) -> Best:
+    """Return what :func:`deletes_into` does, as arrays."""
+    found = deletes_into(score, pdag, y)
+    xs = sorted(found)
+    return (
+        np.array(xs, dtype=np.intp),
+        np.array([found[x][0] for x in xs], dtype=np.float64),
+        np.arange(len(xs), dtype=np.intp),
+        [found[x][1] for x in xs],
+    )
 
 
 def apply_insert(pdag: PDAG, x: int, y: int, t: frozenset[int]) -> None:

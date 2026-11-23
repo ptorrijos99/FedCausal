@@ -193,3 +193,53 @@ def test_a_parameter_search_selects_hyperparameters_on_held_out_rows() -> None:
 def test_an_unknown_criterion_is_an_error() -> None:
     with pytest.raises(ValueError, match="criterion must be one of"):
         GES(criterion="aic").fit(load_asia().data)  # type: ignore[arg-type]
+
+
+def _inserts_by_definition(
+    score: BDeuScore, pdag: PDAG, y: int, max_t_size: int
+) -> dict[int, ops.Candidate]:
+    """Every Insert into `y` checked one at a time, straight from the operator's definition."""
+    best: dict[int, ops.Candidate] = {}
+    undirected = pdag.undirected_neighbors(y)
+    for x in range(pdag.num_nodes):
+        if x == y or x in pdag.adjacent(y):
+            continue
+        na = undirected & pdag.adjacent(x)
+        for t in ops._subsets(sorted(undirected - na), max_t_size):
+            cond = na | t
+            if not ops.is_clique(pdag, cond):
+                continue
+            reached, stack = {y}, [y]
+            while stack:
+                v = stack.pop()
+                for w in (pdag.children(v) | pdag.undirected_neighbors(v)) - reached:
+                    reached.add(w)
+                    if w not in cond:
+                        stack.append(w)
+            if x in reached:
+                continue
+            base = pdag.parents(y) | cond
+            without, with_x = score.local_score(y, base), score.local_score(y, base | {x})
+            delta = with_x - without
+            if delta <= 0 or ops._is_noise(delta, with_x, without):
+                continue
+            if x not in best or delta > best[x][0]:
+                best[x] = (delta, t)
+    return best
+
+
+@pytest.mark.parametrize("loader", [load_child, load_alarm])
+def test_inserts_into_finds_what_the_definition_gives(loader) -> None:  # type: ignore[no-untyped-def]
+    bundle = loader()
+    data = as_discrete(bundle.data)
+    partial = DAG(data.n_vars)
+    for i, (u, v) in enumerate(sorted(bundle.truth.edges())):
+        if i % 3:
+            partial.add_edge(u, v)
+    cpdag = dag_to_cpdag(partial)
+    assert cpdag.undirected_edges()
+    score = BDeuScore(data)
+    for y in range(data.n_vars):
+        assert ops.inserts_into(score, cpdag, y, max_t_size=2) == _inserts_by_definition(
+            score, cpdag, y, 2
+        )

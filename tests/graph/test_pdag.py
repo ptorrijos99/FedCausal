@@ -1,6 +1,8 @@
+import numpy as np
 import pytest
 
 from fedcausal.graph import DAG, PDAG
+from fedcausal.graph.cpdag import dag_to_cpdag
 
 
 def test_empty_pdag() -> None:
@@ -166,3 +168,79 @@ def test_add_same_edge_twice_is_noop() -> None:
     p.add_directed(0, 1)
     p.add_directed(0, 1)
     assert p.directed_edges() == [(0, 1)]
+
+
+def _fresh(pdag: PDAG) -> PDAG:
+    """The same graph with no cached arrays."""
+    return pdag.copy()
+
+
+def _neighbours(pdag: PDAG) -> list[list[int]]:
+    nbr, deg = pdag.neighbour_lists()
+    return [sorted(nbr[v, : deg[v]].tolist()) for v in range(pdag.num_nodes)]
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_cached_arrays_follow_every_mutation(seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    n = 12
+    pdag = PDAG(n)
+    pdag.adjacency_view()
+    pdag.neighbour_lists()
+    for _ in range(300):
+        u, v = (int(i) for i in rng.choice(n, size=2, replace=False))
+        if v in pdag.adjacent(u):
+            if pdag.has_undirected(u, v) and rng.random() < 0.5:
+                pdag.orient(u, v)
+            else:
+                pdag.remove_edge(u, v)
+        elif rng.random() < 0.5:
+            pdag.add_directed(u, v)
+        else:
+            pdag.add_undirected(u, v)
+        fresh = _fresh(pdag)
+        assert np.array_equal(pdag.adjacency_view(), fresh.adjacency())
+        assert np.array_equal(pdag.skeleton_view(), fresh.skeleton_view())
+        assert _neighbours(pdag) == [sorted(fresh.adjacent(w)) for w in range(n)]
+
+
+def test_neighbour_lists_grow_past_their_first_width() -> None:
+    pdag = PDAG(30)
+    pdag.neighbour_lists()
+    for v in range(1, 30):
+        pdag.add_undirected(0, v)
+    assert _neighbours(pdag)[0] == list(range(1, 30))
+    assert _neighbours(pdag)[29] == [0]
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_complete_in_place_gives_the_cpdag_and_its_changes(seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    n = int(rng.integers(2, 25))
+    order = rng.permutation(n)
+    dag = DAG(n)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if rng.random() < 0.2:
+                dag.add_edge(int(order[i]), int(order[j]))
+    pdag = PDAG.from_dag(dag)
+    before = pdag.adjacency()
+    pairs = pdag.complete_in_place()
+    want = dag_to_cpdag(dag)
+    assert pdag == want
+    assert np.array_equal(pdag.adjacency_view(), want.adjacency())
+    changed = before != want.adjacency()
+    assert sorted(map(tuple, pairs.tolist())) == sorted(
+        {(min(u, v), max(u, v)) for u, v in zip(*np.nonzero(changed), strict=True)}
+    )
+    assert len(pdag.complete_in_place()) == 0
+
+
+def test_complete_in_place_without_extension_raises_and_keeps_the_graph() -> None:
+    pdag = PDAG(4)
+    for u, v in [(0, 1), (1, 2), (2, 3), (3, 0)]:
+        pdag.add_undirected(u, v)
+    before = pdag.copy()
+    with pytest.raises(ValueError, match="no consistent extension"):
+        pdag.complete_in_place()
+    assert pdag == before

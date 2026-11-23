@@ -1,10 +1,9 @@
 """The greedy hill climb that drives both phases of GES.
 
-Each phase caches the best operator for every pair, grouped by child. An
-operator into `y` depends on the neighbourhood of `y` and on which neighbours
-of `y` each `x` is adjacent to, so after a step only the children whose own
-neighbourhood changed, or one of whose undirected neighbours changed, are
-re-scored.
+Each phase caches the best operator into every child. An operator into `y`
+depends on the neighbourhood of `y` and on which neighbours of `y` each `x` is
+adjacent to, so after a step only the children whose own neighbourhood changed,
+or one of whose undirected neighbours changed, are re-scored.
 
 Whether a semi-directed path is blocked depends on the whole graph, though. The
 cached best is therefore re-checked before it is applied, and when the cache
@@ -15,7 +14,6 @@ is a local optimum of the full neighbourhood.
 from __future__ import annotations
 
 import heapq
-import itertools
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -34,7 +32,7 @@ if TYPE_CHECKING:
 __all__ = ["backward_phase", "complete", "forward_phase"]
 
 Pair = tuple[int, int]
-_Finder = Callable[["PDAG", int], "dict[int, ops.Candidate]"]
+_Finder = Callable[["PDAG", int], "ops.Best"]
 _Applier = Callable[["PDAG", int, int, frozenset[int]], None]
 
 
@@ -52,13 +50,6 @@ def complete(pdag: PDAG) -> PDAG:
     return PDAG.from_adjacency(cpdag_of_dag(dag))
 
 
-def _complete_in_place(pdag: PDAG) -> None:
-    dag, ok = consistent_extension(pdag._adjacency().view(np.uint8))
-    if not ok:
-        raise ValueError("the graph has no consistent extension")
-    pdag.update_to(cpdag_of_dag(dag))
-
-
 def _climb(
     pdag: PDAG,
     find: _Finder,
@@ -68,37 +59,50 @@ def _climb(
 ) -> PDAG:
     current = pdag.copy()
     n = current.num_nodes
-    cache: list[dict[int, ops.Candidate]] = [{} for _ in range(n)]
-    # Max-heap by improvement, then smallest pair. An entry is stale, and
-    # skipped, once its pair's cached improvement no longer matches it.
+    # The best operator into each child: its parent, improvement and subset.
+    cache: list[tuple[int, float, frozenset[int]] | None] = [None] * n
+    # Max-heap of those by improvement, then smallest pair. Each scoring of a
+    # child stamps its entry; an entry with an older stamp is stale, and skipped.
     heap: list[tuple[float, int, int, int]] = []
-    tiebreak = itertools.count()
+    stamp = [0] * n
+
+    def score_child(y: int) -> ops.Best:
+        """Score the operators into `y`, cache the best one and return them all."""
+        xs, deltas, which, subsets = find(current, y)
+        if candidates is not None or allowed is not None:
+            keep = [
+                i
+                for i, x in enumerate(xs.tolist())
+                if (candidates is None or (x, y) in candidates)
+                and (allowed is None or allowed(x, y))
+            ]
+            xs, deltas, which = xs[keep], deltas[keep], which[keep]
+        stamp[y] += 1
+        if xs.size:
+            i = int(np.argmax(deltas))  # the first of the largest: the smallest parent
+            best = (int(xs[i]), float(deltas[i]), subsets[which[i]])
+            cache[y] = best
+            heapq.heappush(heap, (-best[1], best[0], y, stamp[y]))
+        else:
+            cache[y] = None
+        return xs, deltas, which, subsets
 
     def rescore(children: Iterable[int]) -> None:
         for y in children:
-            found = find(current, y)
-            if candidates is not None:
-                found = {x: c for x, c in found.items() if (x, y) in candidates}
-            if allowed is not None:
-                found = {x: c for x, c in found.items() if allowed(x, y)}
-            previous = cache[y]
-            cache[y] = found
-            for x, (delta, _) in found.items():
-                old = previous.get(x)
-                if old is None or old[0] != delta:
-                    heapq.heappush(heap, (-delta, x, y, next(tiebreak)))
+            score_child(y)
 
     def pop_best() -> tuple[int, int, frozenset[int]] | None:
         while heap:
-            neg_delta, x, y, _ = heap[0]
-            cached = cache[y].get(x)
-            if cached is None or cached[0] != -neg_delta:
+            _, x, y, stamped = heap[0]
+            cached = cache[y]
+            if stamped != stamp[y] or cached is None:
                 heapq.heappop(heap)
                 continue
-            rescore([y])
-            if cache[y].get(x) == cached:
-                heapq.heappop(heap)
-                return x, y, cached[1]
+            # Apply it only if scoring `y` again still gives this operator for `x`.
+            xs, deltas, which, subsets = score_child(y)
+            i = int(np.searchsorted(xs, x))
+            if i < xs.size and xs[i] == x and (deltas[i], subsets[which[i]]) == cached[1:]:
+                return x, y, cached[2]
         return None
 
     rescore(range(n))
@@ -110,11 +114,11 @@ def _climb(
             if best is None:
                 return current
         x, y, subset = best
-        before = current.adjacency()
         apply(current, x, y, subset)
-        _complete_in_place(current)
-        differ = before != current.adjacency()
-        changed = np.flatnonzero(differ.any(axis=0) | differ.any(axis=1)).tolist()
+        # Every node whose marks may differ from before the step: those the operator
+        # edited and those the completion changed. A node edited and then restored is
+        # re-scored for nothing, which leaves its cached operators as they were.
+        changed = {x, y, *subset, *current.complete_in_place().ravel().tolist()}
         affected = set(changed)
         for v in changed:
             affected |= current.undirected_set(v)
@@ -148,8 +152,8 @@ def forward_phase(
         No Insert gives its child more parents than this.
     """
 
-    def find(g: PDAG, y: int) -> dict[int, ops.Candidate]:
-        return ops.inserts_into(score, g, y, max_t_size, max_parents)
+    def find(g: PDAG, y: int) -> ops.Best:
+        return ops.best_inserts_into(score, g, y, max_t_size, max_parents)
 
     allowed = knowledge.may_add if knowledge else None
     return _climb(pdag, find, ops.apply_insert, candidates, allowed)
@@ -176,8 +180,8 @@ def backward_phase(
         Required adjacencies are never deleted.
     """
 
-    def find(g: PDAG, y: int) -> dict[int, ops.Candidate]:
-        return ops.deletes_into(score, g, y)
+    def find(g: PDAG, y: int) -> ops.Best:
+        return ops.best_deletes_into(score, g, y)
 
     allowed = knowledge.may_remove if knowledge else None
     return _climb(pdag, find, ops.apply_delete, candidates, allowed)

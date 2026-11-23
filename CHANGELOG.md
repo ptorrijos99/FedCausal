@@ -2,6 +2,15 @@
 
 This project follows [Semantic Versioning](https://semver.org/). While the version is below 1.0, the public API may change between minor releases.
 
+## Unreleased
+
+### Speed
+
+- GES learns the same structures two to ten times faster: `link` (724 variables) takes 1.6 s against 17 s, `munin` (1041) 4.1 s against 41 s, and on one thread `diabetes` (413) takes 11.5 s against 60 s.
+- BDeu groups the rows by the configuration of the shared parents once per batch and counts each added parent without sorting rows: with bitsets for small tables, in one pass for the rest. It sums over the distinct counts, so `log Gamma` is evaluated once per count value, and a family scores the same, bit for bit, in a batch or alone.
+- The CPDAG is completed over neighbour lists kept up to date by every edit, so a step costs in the edges it touches rather than in the square of the number of variables.
+- The search keeps only the best operator per child and computes candidate improvements in compiled code.
+
 ## 0.2.0
 
 A high-level API, a much faster search, and none of the original Java implementation's quirks. Results are not bit-for-bit those of 0.1.0.
