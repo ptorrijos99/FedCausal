@@ -7,16 +7,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from fedcausal.exceptions import CycleError
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     import numpy.typing as npt
 
 __all__ = ["DAG", "CycleError"]
-
-
-class CycleError(ValueError):
-    """Raised when an operation would introduce a cycle into a DAG."""
 
 
 class DAG:

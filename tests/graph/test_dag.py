@@ -227,3 +227,11 @@ def test_nodes_outside_the_graph_are_rejected():
 def test_from_amat_wants_a_square_matrix():
     with pytest.raises(ValueError, match="square"):
         DAG.from_amat(np.zeros((2, 3)))
+
+
+def test_cycle_error_is_a_fedcausal_error_and_a_value_error():
+    from fedcausal.exceptions import FedCausalError
+
+    with pytest.raises(FedCausalError):
+        DAG.from_edges(2, [(0, 1), (1, 0)])
+    assert issubclass(CycleError, ValueError)

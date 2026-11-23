@@ -1,11 +1,11 @@
 """Exceptions raised by fedcausal.
 
-The errors of a federation, and reading an estimator's results before
-``fit``, derive from :class:`FedCausalError`, so callers can catch them with
-one ``except``. An invalid argument or input raises :class:`ValueError` (or
-:class:`ConfigurationError`, which is one), a wrong kind of input
-:class:`TypeError`, and a cycle in a :class:`~fedcausal.graph.DAG`
-:class:`~fedcausal.graph.CycleError`, also a :class:`ValueError`.
+The errors of a federation, a cycle in a :class:`~fedcausal.graph.DAG` and
+reading an estimator's results before ``fit`` derive from
+:class:`FedCausalError`, so callers can catch them with one ``except``. An
+invalid argument or input raises :class:`ValueError` (or
+:class:`ConfigurationError`, which is one), and a wrong kind of input
+:class:`TypeError`.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ __all__ = [
     "FedCausalError",
     "ConfigurationError",
     "ConvergedBeforeFusionError",
+    "CycleError",
     "SchemaMismatchError",
     "ClientFailureError",
     "DenseFusionWarning",
@@ -29,6 +30,13 @@ class ConfigurationError(FedCausalError, ValueError):
     """An argument or federation setting is invalid.
 
     Also a :class:`ValueError`, so ``except ValueError`` catches it too.
+    """
+
+
+class CycleError(FedCausalError, ValueError):
+    """An edge would close a directed cycle, or a graph that must be acyclic is not.
+
+    Also a :class:`ValueError`. Importable from :mod:`fedcausal.graph` too.
     """
 
 
