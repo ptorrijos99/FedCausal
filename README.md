@@ -5,10 +5,11 @@ Causal structure learning for data in one place or spread across sites that cann
 | Estimator | Data | What crosses the network |
 |---|---|---|
 | `GES` | Discrete or continuous, in one place | Nothing |
+| `XGES` | Discrete or continuous, in one place | Nothing |
 | `FedGES` | Discrete or continuous, across sites | Structures and scores |
 | `FedRCD` | Continuous, linear non-Gaussian, across sites | Additive moment sums |
 
-All three follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. `GES` scores categorical data by BDeu or BIC and continuous data by a Gaussian BIC, and its `score(X)`, the held-out log likelihood, lets scikit-learn's parameter searches tune it.
+All of them follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. `GES` scores categorical data by BDeu or BIC and continuous data by a Gaussian BIC, and its `score(X)`, the held-out log likelihood, lets scikit-learn's parameter searches tune it.
 
 ```bash
 pip install fedcausal

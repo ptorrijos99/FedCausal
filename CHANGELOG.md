@@ -2,6 +2,24 @@
 
 This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, what the [API reference](docs/api.rst) lists changes incompatibly only in a major release; the exact structure learned when several score the same, up to rounding, may still change in a minor one.
 
+## Unreleased
+
+### Added
+
+- `XGES` and `fedcausal.search.xges`, Extremely Greedy Equivalence Search (Nazaret and Blei, 2024): the moves of GES plus a Reverse, applied Delete first, then Reverse, then Insert, and then a search that forces out each edge in turn and keeps what scores higher. `extended=False` is XGES-0. On linear Gaussian data it recovers far more of the true graph than GES; on the discrete benchmark networks XGES-0 learns a better structure on `alarm`, `win95pts` and `munin` and much the same one elsewhere. See [Algorithms](docs/algorithms.md) and [Benchmarks](docs/benchmarks.md).
+- `FedGES(search=...)` and `Site(search=...)`: the sites learn with `"ges"` (the default), `"xges0"` or `"xges"`. `fedcausal.fedges.Search` names the choices.
+- `one_edge_faithfulness` in `GES`, `XGES`, `ges` and `xges`: fGES's screen (Ramsey et al., 2017), which never joins two variables the score finds independent on their own. Several times faster on large sparse continuous problems; off by default because on the discrete networks it saves nothing and loses edges.
+
+### Removed
+
+- The benchmark scripts are no longer in the repository; [Benchmarks](docs/benchmarks.md) keeps their results.
+
+### Changed
+
+- `max_t_size` defaults to `None` in `GES`, `FedGES`, `Site` and `ges`, so an Insert tries every set it may orient, as Chickering defines the operator. The sets are now grown as cliques, which skips every one that cannot be valid, and the uncapped search costs what the cap of two did; it learns the same structures on every benchmark network, and the recorded results of the tests do not change.
+- A restriction to candidate pairs, which FedGES's refinement uses, now removes the other parents before they are scored instead of after.
+- `PDAG.copy` copies the adjacency matrix and neighbour lists it has built instead of rebuilding them, and `PDAG.__eq__` compares parent and neighbour sets instead of sorted edge lists; both matter in XGES, which copies and compares a graph per forced deletion.
+
 ## 1.0.0
 
 The first stable release: the API of 0.2.0, faster, with stricter input checks, one naming scheme across the methods, and a smaller surface to keep stable. The library is split in two layers, a core that learns structures in one place and a federated part built on it.

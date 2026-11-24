@@ -5,6 +5,7 @@ Causal structure learning for data in one place or spread across sites that cann
 | Estimator | Data | What crosses the network |
 |---|---|---|
 | {class}`~fedcausal.search.GES` | Discrete or continuous, in one place | Nothing |
+| {class}`~fedcausal.search.XGES` | Discrete or continuous, in one place | Nothing |
 | {class}`~fedcausal.fedges.FedGES` | Discrete or continuous, across sites | Structures and scores |
 | {class}`~fedcausal.lingam.FedRCD` | Continuous, linear non-Gaussian, across sites | Additive moment sums |
 

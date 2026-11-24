@@ -14,6 +14,7 @@ from fedcausal.fusion import ConsensusUnion
 from fedcausal.graph import DAG
 from fedcausal.metrics import shd
 from fedcausal.scores import BDeuScore
+from fedcausal.search import ges, xges
 
 # The pooled BDeu score of the global model FedGES learns from the bundled
 # samples, split in contiguous blocks, and its SHD. A change means FedGES learns
@@ -53,6 +54,26 @@ def test_every_refinement_runs_and_none_lowers_a_sites_score() -> None:
             assert merged.score >= own.score - 1e-6
     with pytest.raises(RuntimeError, match="learn"):
         Site(parts[0]).merge(other)
+
+
+def test_sites_learn_with_the_search_they_are_given() -> None:
+    # On this third of insurance, GES, XGES-0 and XGES learn three different DAGs.
+    sites = contiguous_split(load_network("insurance").data, 3)
+    learned = set()
+    for search in ("ges", "xges0", "xges"):
+        own = Site(sites[0], search=search).learn()  # type: ignore[arg-type]
+        expected = (
+            ges(own_score := Site(sites[0]).score, sites[0].n_vars)
+            if search == "ges"
+            else xges(own_score, sites[0].n_vars, extended=search == "xges")
+        )
+        assert own.dag == expected.to_dag()
+        learned.add(tuple(sorted(own.dag.edges())))
+        history = FedGES(n_rounds=1, search=search).fit(sites).history_  # type: ignore[arg-type]
+        assert history.loc[history["site"] == 0, "score"].iloc[0] == pytest.approx(own.score)
+    assert len(learned) == 3
+    with pytest.raises(ValueError, match="search must be one of"):
+        FedGES(search="pc").fit(sites)  # type: ignore[arg-type]
 
 
 def test_history_pooled_levels_and_knowledge() -> None:

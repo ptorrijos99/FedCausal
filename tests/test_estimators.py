@@ -1,4 +1,4 @@
-"""The three estimators' shared contract: parameters, input checks, fitted attributes."""
+"""The estimators' shared contract: parameters, input checks, fitted attributes."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fedcausal import GES, FedGES, FedRCD
+from fedcausal import GES, XGES, FedGES, FedRCD
 from fedcausal.data import ContinuousDataset
 from fedcausal.exceptions import FedCausalError, NotFittedError
 from fedcausal.lingam import cumulants_from_sums, fedrcd, moment_sums
@@ -29,7 +29,7 @@ def _discrete(n_rows: int = 300, seed: int = 0) -> np.ndarray:
 
 def test_the_scikit_learn_parameter_protocol() -> None:
     sklearn_base = pytest.importorskip("sklearn.base")
-    for cls in (GES, FedGES, FedRCD):
+    for cls in (GES, XGES, FedGES, FedRCD):
         model = cls()
         assert repr(model) == f"{cls.__name__}()"
         assert model.set_params(**model.get_params()) is model
@@ -40,7 +40,12 @@ def test_the_scikit_learn_parameter_protocol() -> None:
             _ = model.adjacency_
         assert not hasattr(model, "adjacency_")
     assert issubclass(NotFittedError, FedCausalError)
-    for model in (GES(ess=5.0), FedGES(n_rounds=3, n_jobs=-1), FedRCD(order=3)):
+    for model in (
+        GES(ess=5.0),
+        XGES(extended=False),
+        FedGES(n_rounds=3, n_jobs=-1),
+        FedRCD(order=3),
+    ):
         assert sklearn_base.clone(model).get_params() == model.get_params()
     assert repr(FedGES(n_rounds=3, n_jobs=-1)) == "FedGES(n_rounds=3, n_jobs=-1)"
 

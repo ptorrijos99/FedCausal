@@ -18,7 +18,7 @@ from fedcausal.fedges.convergence import (
 from fedcausal.fedges.estimator import FedGES
 from fedcausal.fedges.model import BNModel
 from fedcausal.fedges.rounds import SitePool, run_rounds
-from fedcausal.fedges.site import Refinement, Site
+from fedcausal.fedges.site import Refinement, Search, Site
 
 __all__ = [
     "AnyOf",
@@ -28,6 +28,7 @@ __all__ = [
     "ModelEquality",
     "Refinement",
     "ScoreImprovement",
+    "Search",
     "Site",
     "SitePool",
     "default_convergence",

@@ -53,10 +53,10 @@ model.causal_order_, model.coef_
 
 ```python
 model = GES(expected_parents=0.5, ess=10)
-model.set_params(max_t_size=None).get_params()
+model.set_params(max_t_size=2).get_params()
 ```
 
-`sklearn.base.clone` works on all three estimators. `GES.score(X)` is the mean log likelihood of held-out rows, so a parameter search can choose the hyperparameters:
+`sklearn.base.clone` works on every estimator. `GES.score(X)` is the mean log likelihood of held-out rows, so a parameter search can choose the hyperparameters:
 
 ```python
 from sklearn.model_selection import GridSearchCV

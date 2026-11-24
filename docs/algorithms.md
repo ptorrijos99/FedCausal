@@ -13,9 +13,10 @@ GES(
     expected_parents=1.0,
     penalty_discount=1.0,
     max_parents=None,
-    max_t_size=2,
+    max_t_size=None,
     required=None,
     forbidden=None,
+    one_edge_faithfulness=False,
 )
 ```
 
@@ -26,11 +27,14 @@ GES(
 | `expected_parents` | `1.0` | Structure prior, added to any criterion: each of the `m = n_vars - 1` possible parents of a node is present with probability `expected_parents / m`, capped at one half. `None` is the uniform prior, plain BDeu or plain BIC. |
 | `penalty_discount` | `1.0` | Multiplier of the BIC penalty, `log(n) / 2` per free parameter. |
 | `max_parents` | `None` | Most parents an Insert may give a node. |
-| `max_t_size` | `2` | Largest set of neighbours an Insert orients into its head. `None` tries all of them, as Chickering defines it, which is exponential in the degree. |
+| `max_t_size` | `None` | Largest set of neighbours an Insert orients into its head. `None` tries every set that can be valid, as Chickering defines the operator. |
+| `one_edge_faithfulness` | `False` | Join two variables only if the score finds them dependent on their own, as fGES does (Ramsey et al., 2017). |
 
 **The structure prior.** Over twelve networks from 5 to 223 variables, three samples each, one expected parent lowers the summed SHD against the true networks from 659 to 523. The gain grows with the network: `win95pts` drops from 80 to 40, `andes` from 104 to 60. Below about 30 variables the two priors give the same structures.
 
-**The subset cap.** Every Insert considers subsets of the head's undirected neighbours. Capping their size at two has returned the same CPDAG as the exhaustive scan on every network compared, `alarm`, `hailfinder`, `win95pts`, `pathfinder` and `andes` among them, while the exhaustive scan took up to three times longer (on `hailfinder`) and grows exponentially with the degree. A cap forfeits Chickering's optimality guarantee in theory, so state which you used in published results.
+**The subsets of an Insert.** An Insert orients into its head a set `T` of the head's undirected neighbours, and it is valid only if `T`, together with the neighbours the new parent already shares with the head, forms a clique. The search therefore grows `T` one node at a time and drops any set that stops being a clique, together with all its supersets, so the uncapped scan, which is the operator as Chickering defines it, costs about what a cap of two costs on every benchmark network and learns the same structures. A cap still bounds the work when the neighbours of a node form a large clique.
+
+**One-edge faithfulness.** fGES speeds GES up by never joining two variables that the score finds independent on their own, a check made once, before the search. On continuous data from sparse graphs this pays: over 1000 variables with one edge per variable on average it is five times faster and closer to the truth. On the discrete benchmark networks it saves no time and loses edges whose dependence only shows given other parents (`link` goes from an SHD of 679 to 816), so it is off by default.
 
 `fit(X, initial_graph=dag)` starts the search from a DAG instead of the empty graph.
 
@@ -41,9 +45,34 @@ GES(
 ### How it is made fast
 
 * **Scoring.** BDeu and BIC are computed by compiled kernels. The families an Insert compares share their parents, so the rows are grouped once by the configuration of those parents, labelled densely in order of first occurrence so that any number of parents is exact, and each candidate parent is then counted without sorting: with bitsets when the table is small, in one pass over the rows otherwise, the candidates in parallel. The score is summed over the distinct cell counts, so `log Gamma` is evaluated once per count value, and a family scores the same, bit for bit, whether it is counted in a batch or alone. Families are cached.
-* **Evaluating operators.** Operators are evaluated a child at a time. Every candidate parent with the same neighbours in common with the child shares its candidate subsets, so one traversal of the graph decides the path condition for all of them.
-* **Re-scoring.** After a step only the children whose neighbourhood changed, or one of whose undirected neighbours did, are re-scored. Validity also depends on paths elsewhere in the graph, so the best operator is re-checked before it is applied, and when nothing improves every child is re-scored once more before the phase stops. The result is a local optimum of the full neighbourhood.
+* **Evaluating operators.** Operators are evaluated a child at a time. Every candidate parent with the same neighbours in common with the child shares its candidate subsets, so one traversal of the graph decides the path condition for all of them. The subsets are grown as cliques, so the ones that cannot be valid are never visited, and a restriction to candidate pairs (the refinement of FedGES, or the screen of `one_edge_faithfulness`) removes the other parents before anything is counted.
+* **Re-scoring.** After a step only the children whose neighbourhood changed, or one of whose undirected neighbours did, are re-scored. Validity also depends on paths elsewhere in the graph, so the best operator is re-checked before it is applied, and when nothing improves every child is re-scored once more before the phase stops. Each phase therefore ends where no operator of its own kind improves the score: no Insert after the forward phase, no Delete after the backward one. An Insert may improve again once the backward phase has removed edges; XGES, below, is the search that ends where no operator of any kind does.
 * **Completion.** After each step the graph is completed to its CPDAG with a compiled Dor-Tarsi extension and Chickering's (1995) edge labelling, both over neighbour and parent lists, and only the pairs whose marks changed are written back.
+
+## XGES
+
+Extremely Greedy Equivalence Search (Nazaret and Blei, 2024) moves through the same space as GES with the same score and the same operators, plus a Reverse, which turns a directed edge round. What changes is the order. GES adds edges until none helps and only then removes them, so an edge added early, when the graph was still empty, can keep out the edges that would have explained the data better, and the backward phase cannot undo that. XGES-0 applies at every step the best Delete that improves the score; if there is none, the best Reverse; and only then the best Insert. XGES then forces out each edge of that result in turn, bars the search from putting it back in the same direction, runs XGES-0 again from there, and keeps the result if it scores higher, until no forced deletion pays.
+
+```python
+XGES(
+    criterion="bdeu",
+    ess=1.0,
+    expected_parents=1.0,
+    penalty_discount=1.0,
+    max_parents=None,
+    max_t_size=None,
+    required=None,
+    forbidden=None,
+    one_edge_faithfulness=False,
+    extended=True,
+)
+```
+
+The options are those of `GES`; `extended=False` runs XGES-0 alone. Both keep GES's guarantee: with a consistent score and enough data, they return the true equivalence class.
+
+XGES-0 takes up to two thirds more time than GES on the discrete networks and up to twice as long on continuous data, since every step re-scores the Deletes and Reverses of the children it touches as well as the Inserts; XGES takes from a few times to some forty times GES's time on the discrete networks, and more on dense continuous graphs. On continuous data from random graphs both are much closer to the truth than GES, and XGES recovers the true class almost exactly up to three edges per variable. On the discrete networks XGES-0 gains on `alarm`, `win95pts` and `munin` and stays within a few edges of GES elsewhere, and XGES gains most on `insurance` and `win95pts` but loses on `pathfinder`, where a higher BDeu score goes with a structure further from the true one. The figures are in [Benchmarks](benchmarks.md).
+
+A forced deletion starts from what it changed, since the rest of the graph is already at XGES-0's optimum, and an Insert or Reverse can only become valid where the deletion cut a path, so each trial re-scores the children from which a changed node can be reached instead of every child. An accepted trial is followed by a full XGES-0 pass. As in the authors' code, a bar stays once its deletion is accepted (their paper lifts it after the trial); because a bar can then hold back an improving operator, the search ends with XGES-0 free of bars and starts over if that improves, so the result is a local optimum for Delete, Reverse and Insert alike.
 
 ## FedGES
 
@@ -55,20 +84,21 @@ FedGES(
     expected_parents=1.0,
     penalty_discount=1.0,
     max_parents=None,
-    max_t_size=2,
+    max_t_size=None,
     global_fusion=None,
     local_fusion=None,
     refinement=None,
     convergence=None,
     required=None,
     forbidden=None,
+    search="ges",
     n_jobs=None,
 )
 ```
 
 The score options are GES's, applied at every site; with `criterion="gaussian_bic"` the sites hold continuous data.
 
-Each round every site runs GES on its own data, starting from its current model; the server fuses the sites' DAGs into a global one (`global_fusion`, by default `Consensus(50)`); each site fuses the global DAG into its own (`local_fusion`, by default `ConsensusUnion()`). The rounds stop at `n_rounds` or when `convergence` says so.
+Each round every site runs GES on its own data, starting from its current model (XGES-0 or XGES with `search="xges0"` or `"xges"`); the server fuses the sites' DAGs into a global one (`global_fusion`, by default `Consensus(50)`); each site fuses the global DAG into its own (`local_fusion`, by default `ConsensusUnion()`). The rounds stop at `n_rounds` or when `convergence` says so.
 
 ### Fusion operators
 

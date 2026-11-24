@@ -6,9 +6,10 @@ detail and may change without notice: modules, functions, methods and
 attributes whose names start with an underscore, and names a module does not
 list in its ``__all__``.
 
-The three estimators, :class:`~fedcausal.search.GES`,
-:class:`~fedcausal.fedges.FedGES` and :class:`~fedcausal.lingam.FedRCD`, are
-also importable from ``fedcausal`` itself.
+The estimators, :class:`~fedcausal.search.GES`,
+:class:`~fedcausal.search.XGES`, :class:`~fedcausal.fedges.FedGES` and
+:class:`~fedcausal.lingam.FedRCD`, are also importable from ``fedcausal``
+itself.
 
 Stability
 ---------

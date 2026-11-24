@@ -328,15 +328,21 @@ class PDAG:
         clone._parents = [set(p) for p in self._parents]
         clone._children = [set(c) for c in self._children]
         clone._undirected = [set(u) for u in self._undirected]
+        # The derived arrays, when built, are copied rather than rebuilt in Python.
+        if self._amat is not None:
+            clone._amat = self._amat.copy()
+        if self._nbr is not None and self._deg is not None:
+            clone._nbr, clone._deg = self._nbr.copy(), self._deg.copy()
         return clone
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, PDAG):
             return NotImplemented
+        # The parent and undirected sets fix every edge, and compare without sorting.
         return (
             self.num_nodes == other.num_nodes
-            and self.directed_edges() == other.directed_edges()
-            and self.undirected_edges() == other.undirected_edges()
+            and self._parents == other._parents
+            and self._undirected == other._undirected
         )
 
     def __hash__(self) -> int:

@@ -25,6 +25,38 @@ Measured on one laptop with the default settings, 5000 rows per network, from th
 
 Runtime follows how dense and interconnected a network is more than its size: `pigs` has more variables than `diabetes` and finishes faster. For comparison, causal-learn's GES on the same data takes 53 s on `alarm` and does not finish `andes` in half an hour.
 
+## GES, XGES-0 and XGES
+
+The same data, the mean over three samples of each network (one for `munin` and `link`), with the SHD between the learned and the true DAG:
+
+| Network | Variables | GES SHD | XGES-0 SHD | XGES SHD | GES (s) | XGES-0 (s) | XGES (s) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| child | 20 | 2.0 | 2.0 | 2.0 | 0.02 | 0.03 | 0.18 |
+| insurance | 27 | 21.7 | 21.7 | 12.0 | 0.03 | 0.04 | 0.60 |
+| water | 32 | 45.0 | 45.0 | 41.3 | 0.02 | 0.03 | 0.22 |
+| mildew | 35 | 22.0 | 22.0 | 22.0 | 0.03 | 0.04 | 0.10 |
+| alarm | 37 | 10.0 | 4.0 | 4.0 | 0.03 | 0.04 | 0.18 |
+| hailfinder | 56 | 55.3 | 55.3 | 58.3 | 0.05 | 0.06 | 0.33 |
+| hepar2 | 70 | 62.7 | 62.7 | 61.3 | 0.04 | 0.05 | 0.42 |
+| win95pts | 76 | 37.7 | 26.7 | 19.3 | 0.06 | 0.08 | 0.77 |
+| pathfinder | 109 | 202.0 | 202.7 | 245.0 | 0.12 | 0.15 | 4.74 |
+| andes | 223 | 59.7 | 59.7 | 61.0 | 0.14 | 0.16 | 4.31 |
+| link | 724 | 679 | 689 | | 0.67 | 1.10 | |
+| munin | 1041 | 1234 | 1219 | | 1.60 | 1.91 | |
+
+XGES-0 moves clearly closer to the truth on `alarm` and `win95pts`, and stays within a few edges of GES elsewhere, for up to two thirds more time. XGES gains most on `insurance` and `win95pts`; on `pathfinder` it reaches a higher score with a structure further from the true one, whose near-deterministic tables the BDeu score rewards with extra parents.
+
+On linear Gaussian data from random graphs (the setting of Nazaret and Blei: Erdős–Rényi DAGs with `rho` edges per variable on average, weights L1-normalised per child, BIC with a penalty of 2, 10,000 rows, five graphs per row), GES adds far more edges than the true graph has and does not remove them, and XGES recovers the true equivalence class almost exactly up to three edges per variable. The SHD here is between CPDAGs:
+
+| Variables | rho | True edges | GES SHD | XGES-0 SHD | XGES SHD | GES (s) | XGES-0 (s) | XGES (s) |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 25 | 2 | 46 | 17.0 | 7.8 | 1.6 | 0.02 | 0.03 | 0.36 |
+| 25 | 3 | 73 | 43.8 | 34.6 | 1.8 | 0.02 | 0.04 | 1.16 |
+| 25 | 4 | 99 | 61.2 | 43.6 | 18.2 | 0.03 | 0.06 | 1.40 |
+| 50 | 2 | 96 | 34.8 | 13.0 | 2.4 | 0.04 | 0.05 | 1.28 |
+| 50 | 3 | 148 | 57.6 | 41.0 | 2.2 | 0.05 | 0.10 | 3.30 |
+| 50 | 4 | 205 | 80.2 | 39.8 | 13.6 | 0.06 | 0.12 | 5.06 |
+
 ## Against earlier releases
 
 The same data and the same structure prior through 0.1.0 and 0.2.0, on the same machine:
@@ -65,13 +97,3 @@ Mean SHD against the true network over three samples. The first column learns fr
 | hepar2 | 70 | 62.7 | 76.7 | 96.7 | 109.7 |
 
 Each site sees less data the more sites there are, and on most networks the error grows with the number of sites; `hepar2` goes from 63 learning centrally to 110 across twenty sites. `alarm` is the exception: the fused structure is closer to the truth than the one learned from all the data at once, as it already was with 0.1.0.
-
-## Running them
-
-```bash
-export FEDCAUSAL_NETWORKS=/path/to/networks   # holds xbif/<net>.xbif and BBDD/<net>/<net>.<seed>.csv.gz
-python benchmarks/scale_ges.py
-python benchmarks/fedges_sites.py --seeds 3
-```
-
-Both print the Markdown tables above. Compare timings within one run rather than across runs: a synced folder or a busy machine moves them by tens of percent.

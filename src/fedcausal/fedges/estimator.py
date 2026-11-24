@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from fedcausal.data.dataset import DiscreteLike
     from fedcausal.fedges.convergence import Convergence
     from fedcausal.fedges.model import BNModel
-    from fedcausal.fedges.site import Refinement
+    from fedcausal.fedges.site import Refinement, Search
     from fedcausal.fusion import FusionOperator
     from fedcausal.scores import ScoreName
     from fedcausal.search._knowledge import PairLike
@@ -38,10 +38,10 @@ __all__ = ["FedGES"]
 class FedGES(Estimator):
     """Learn one causal structure from data held by several sites.
 
-    Each round every site runs GES on its own data, starting from its current
-    model; a server fuses the sites' structures into a global one and sends it
-    back; each site fuses that into its own model. Only structures and scores
-    leave the sites.
+    Each round every site runs GES (or XGES, see `search`) on its own data,
+    starting from its current model; a server fuses the sites' structures
+    into a global one and sends it back; each site fuses that into its own
+    model. Only structures and scores leave the sites.
 
     Torrijos, Gámez & Puerta, "FedGES: A Federated Learning Approach for
     Bayesian Network Structure Learning", *Machine Learning* 115, 9 (2026).
@@ -62,7 +62,7 @@ class FedGES(Estimator):
         Multiplier of the BIC penalty.
     max_parents : int or None, default=None
         Most parents an Insert may give a node at a site.
-    max_t_size : int or None, default=2
+    max_t_size : int or None, default=None
         Largest conditioning subset tried by an Insert.
     global_fusion : FusionOperator, optional
         How the server combines the sites' structures. Default
@@ -79,6 +79,9 @@ class FedGES(Estimator):
         Pairs of variables, by name or column index, that must be adjacent or
         must not be, in every site's model and in the global one. The
         direction of a required edge is still learned.
+    search : {"ges", "xges0", "xges"}, default="ges"
+        The search each site learns with: GES, XGES-0, or XGES; see
+        :class:`~fedcausal.XGES`.
     n_jobs : int or None, default=None
         Processes to spread the sites over. ``None`` or 1 runs them one after
         another in this process; -1, or any negative value, uses one process
@@ -122,13 +125,14 @@ class FedGES(Estimator):
         expected_parents: float | None = 1.0,
         penalty_discount: float = 1.0,
         max_parents: int | None = None,
-        max_t_size: int | None = 2,
+        max_t_size: int | None = None,
         global_fusion: FusionOperator | None = None,
         local_fusion: FusionOperator | None = None,
         refinement: Refinement | None = None,
         convergence: Convergence | None = None,
         required: Sequence[PairLike] | None = None,
         forbidden: Sequence[PairLike] | None = None,
+        search: Search = "ges",
         n_jobs: int | None = None,
     ) -> None:
         self.n_rounds = n_rounds
@@ -144,6 +148,7 @@ class FedGES(Estimator):
         self.convergence = convergence
         self.required = required
         self.forbidden = forbidden
+        self.search = search
         self.n_jobs = n_jobs
 
     def fit(self, X: Sequence[DiscreteLike], y: None = None) -> Self:
@@ -201,6 +206,7 @@ class FedGES(Estimator):
                 local_fusion=self.local_fusion,
                 refinement=self.refinement,
                 knowledge=knowledge,
+                search=self.search,
             )
             for data in datasets
         ]

@@ -12,7 +12,7 @@ from fedcausal.data import ContinuousDataset, DiscreteDataset, as_continuous, as
 from fedcausal.graph import DAG, PDAG
 from fedcausal.graph.cpdag import dag_to_cpdag
 from fedcausal.scores import SCORE_NAMES, log_likelihood, make_score
-from fedcausal.search._engine import backward_phase, forward_phase
+from fedcausal.search._engine import backward_phase, forward_phase, marginal_sources
 from fedcausal.search._knowledge import Knowledge, PairLike
 
 if TYPE_CHECKING:
@@ -36,17 +36,31 @@ def _check_limit(name: str, value: object) -> None:
         raise ValueError(f"{name} must be a non-negative integer or None, got {value!r}")
 
 
+def _start(n_vars: int, initial_graph: DAG | PDAG | None, knowledge: Knowledge | None) -> PDAG:
+    """Return the CPDAG a search starts from, with `knowledge` imposed."""
+    if initial_graph is not None and initial_graph.num_nodes != n_vars:
+        raise ValueError(f"initial_graph has {initial_graph.num_nodes} nodes, expected {n_vars}")
+    if initial_graph is None:
+        start = DAG(n_vars)
+    elif isinstance(initial_graph, DAG):
+        start = initial_graph
+    else:
+        start = initial_graph.to_dag()
+    return dag_to_cpdag(knowledge.impose(start) if knowledge else start)
+
+
 def ges(
     score: Score,
     n_vars: int,
     initial_graph: DAG | PDAG | None = None,
     *,
     candidates: frozenset[tuple[int, int]] | None = None,
-    max_t_size: int | None = 2,
+    max_t_size: int | None = None,
     knowledge: Knowledge | None = None,
     max_parents: int | None = None,
     forward: bool = True,
     backward: bool = True,
+    one_edge_faithfulness: bool = False,
 ) -> PDAG:
     """Run GES with `score` and return the learned CPDAG.
 
@@ -61,10 +75,11 @@ def ges(
         consistent extension of a PDAG. The empty graph by default.
     candidates : frozenset of (int, int), optional
         Restrict both phases to these ordered pairs ``(x, y)``.
-    max_t_size : int or None, default=2
-        Largest conditioning subset tried by an Insert. ``None`` tries all of
-        them, which is exact but exponential in the degree; 2 has given the
-        same structures on every benchmark network.
+    max_t_size : int or None, default=None
+        Largest conditioning subset tried by an Insert. ``None`` tries every
+        one that can be valid, as Chickering defines the operator; only the
+        subsets that keep a clique are visited, so this costs little more than
+        a cap unless the neighbours of a node form a large clique.
     knowledge : Knowledge, optional
         Adjacencies the result must have or must not have. The search starts
         from `initial_graph` with them imposed.
@@ -72,6 +87,10 @@ def ges(
         No Insert gives its child more parents than this. ``None`` is no limit.
     forward, backward : bool, default=True
         Which phases to run.
+    one_edge_faithfulness : bool, default=False
+        Insert an edge only between variables that the score finds dependent
+        on their own, as fGES does (Ramsey et al., 2017). Much faster on many
+        variables; it misses an edge whose paths cancel exactly.
 
     Returns
     -------
@@ -80,17 +99,12 @@ def ges(
     """
     _check_limit("max_t_size", max_t_size)
     _check_limit("max_parents", max_parents)
-    if initial_graph is not None and initial_graph.num_nodes != n_vars:
-        raise ValueError(f"initial_graph has {initial_graph.num_nodes} nodes, expected {n_vars}")
-    if initial_graph is None:
-        start = DAG(n_vars)
-    elif isinstance(initial_graph, DAG):
-        start = initial_graph
-    else:
-        start = initial_graph.to_dag()
-    cpdag = dag_to_cpdag(knowledge.impose(start) if knowledge else start)
+    cpdag = _start(n_vars, initial_graph, knowledge)
     if forward:
-        cpdag = forward_phase(score, cpdag, candidates, max_t_size, knowledge, max_parents)
+        screen = marginal_sources(score, n_vars) if one_edge_faithfulness else None
+        cpdag = forward_phase(
+            score, cpdag, candidates, max_t_size, knowledge, max_parents, sources=screen
+        )
     if backward:
         cpdag = backward_phase(score, cpdag, candidates, knowledge)
     return cpdag
@@ -117,11 +131,15 @@ class GES(Estimator):
         Multiplier of the BIC penalty; larger values give sparser structures.
     max_parents : int or None, default=None
         Most parents an Insert may give a node. ``None`` is no limit.
-    max_t_size : int or None, default=2
+    max_t_size : int or None, default=None
         Largest conditioning subset tried by an Insert; ``None`` tries all.
     required, forbidden : sequence of pairs, optional
         Pairs of variables, by name or column index, that must be adjacent or
         must not be. The direction of a required edge is still learned.
+    one_edge_faithfulness : bool, default=False
+        Insert an edge only between variables that the score finds dependent
+        on their own, as fGES does (Ramsey et al., 2017): faster on many
+        variables, at the cost of edges whose paths cancel exactly.
 
     Attributes
     ----------
@@ -155,9 +173,10 @@ class GES(Estimator):
         expected_parents: float | None = 1.0,
         penalty_discount: float = 1.0,
         max_parents: int | None = None,
-        max_t_size: int | None = 2,
+        max_t_size: int | None = None,
         required: Sequence[PairLike] | None = None,
         forbidden: Sequence[PairLike] | None = None,
+        one_edge_faithfulness: bool = False,
     ) -> None:
         self.criterion = criterion
         self.ess = ess
@@ -167,6 +186,7 @@ class GES(Estimator):
         self.max_t_size = max_t_size
         self.required = required
         self.forbidden = forbidden
+        self.one_edge_faithfulness = one_edge_faithfulness
 
     def _encode(
         self, X: DiscreteLike | ContinuousDataset | npt.ArrayLike
@@ -176,6 +196,19 @@ class GES(Estimator):
         if self.criterion == "gaussian_bic":
             return as_continuous(X)  # type: ignore[arg-type]
         return as_discrete(X)  # type: ignore[arg-type]
+
+    def _search(
+        self, score: Score, n_vars: int, initial_graph: DAG | None, knowledge: Knowledge
+    ) -> PDAG:
+        return ges(
+            score,
+            n_vars,
+            initial_graph,
+            max_t_size=self.max_t_size,
+            knowledge=knowledge,
+            max_parents=self.max_parents,
+            one_edge_faithfulness=self.one_edge_faithfulness,
+        )
 
     def fit(
         self,
@@ -216,14 +249,7 @@ class GES(Estimator):
             penalty_discount=self.penalty_discount,
         )
         knowledge = Knowledge.from_pairs(self.required or (), self.forbidden or (), data.names)
-        self.cpdag_ = ges(
-            local,
-            data.n_vars,
-            initial_graph,
-            max_t_size=self.max_t_size,
-            knowledge=knowledge,
-            max_parents=self.max_parents,
-        )
+        self.cpdag_ = self._search(local, data.n_vars, initial_graph, knowledge)
         self.dag_ = self.cpdag_.to_dag()
         self.score_ = local.score_dag(self.dag_)
         self.n_features_in_ = data.n_vars

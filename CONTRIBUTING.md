@@ -38,9 +38,9 @@ The whole suite, about a hundred tests, runs in under a minute. The two tests th
 
 Two things make a performance claim believable here, and wall-clock is neither of them on its own.
 
-Compare timings within one process, back to back, after a warm-up fit so that numba's compilation is not counted, and take the minimum of several runs. A synced folder or a busy machine moves wall-clock by tens of percent, which swamps most optimisations worth making. `benchmarks/scale_ges.py` runs the network ladder in [Benchmarks](docs/benchmarks.md).
+Compare timings within one process, back to back, after a warm-up fit so that numba's compilation is not counted, and take the minimum of several runs. A synced folder or a busy machine moves wall-clock by tens of percent, which swamps most optimisations worth making.
 
-A change to the search must keep it at a local optimum of the full neighbourhood; `tests/search/test_ges.py` checks that.
+A change to the search must keep each phase of GES at a local optimum of its operator, and XGES at one of Insert, Delete and Reverse together; `tests/search/test_ges.py` checks both on random problems.
 
 ## Adding a method
 
