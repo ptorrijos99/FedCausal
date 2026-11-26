@@ -11,7 +11,7 @@ from fedcausal.fusion._kernels import alpha_order_kernel
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fedcausal.graph import DAG
+    from causalbase.graph import DAG
 
 __all__ = ["alpha_order"]
 

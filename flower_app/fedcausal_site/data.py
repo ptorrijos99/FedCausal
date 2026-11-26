@@ -8,8 +8,7 @@ own loader for anything real -- see the README.
 from __future__ import annotations
 
 import numpy as np
-
-from fedcausal.data import ContinuousDataset, DiscreteDataset
+from causalbase.data import ContinuousDataset, DiscreteDataset
 
 N_VARS = 4
 N_ROWS = 4000

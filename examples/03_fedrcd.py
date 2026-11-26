@@ -9,10 +9,10 @@ causal order is identified and ``B`` estimated. No row leaves a site.
 """
 
 import numpy as np
+from causalbase.graph import DAG
+from causalbase.metrics import shd
 
 from fedcausal import FedRCD
-from fedcausal.graph import DAG
-from fedcausal.metrics import shd
 
 rng = np.random.default_rng(0)
 n_vars, n_rows = 6, 8000

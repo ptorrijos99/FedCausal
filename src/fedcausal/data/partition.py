@@ -9,8 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
-
-from fedcausal.data.dataset import DiscreteDataset
+from causalbase.data.dataset import DiscreteDataset
 
 if TYPE_CHECKING:
     import numpy.typing as npt

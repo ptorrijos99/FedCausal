@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from causalbase.graph import DAG
 
 from fedcausal.fusion._kernels import beta_to_alpha_kernel
-from fedcausal.graph import DAG
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

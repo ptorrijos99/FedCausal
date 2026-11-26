@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
+from causalbase.data import as_continuous_sites
 
 from fedcausal._base import Estimator, check_sites, named_adjacency
-from fedcausal.data import as_continuous_sites
 from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
 from fedcausal.lingam.rcd import fedrcd, fedrcd_exact
 
@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
     import pandas as pd
+    from causalbase.data import ContinuousDataset
     from typing_extensions import Self
 
-    from fedcausal.data import ContinuousDataset
     from fedcausal.lingam.rcd import LambdaSelection, Pruning, RCDResult
 
 __all__ = ["FedRCD"]

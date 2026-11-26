@@ -73,7 +73,6 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -e ".[federated]"
-      - run: python examples/01_learn_structure.py
       - run: python examples/02_federated_structure.py
       - run: python examples/03_fedrcd.py
       # The README points people at this app, so a wiring mistake in it should

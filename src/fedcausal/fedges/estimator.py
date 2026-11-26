@@ -6,31 +6,31 @@ import copy
 from typing import TYPE_CHECKING
 
 import numpy as np
+from causalbase.data import as_continuous_sites, as_discrete_sites
+from causalbase.graph.cpdag import dag_to_cpdag
+from causalbase.scores import SCORE_NAMES
+from causalbase.search import Knowledge
 
 from fedcausal._base import Estimator, check_sites, named_adjacency
-from fedcausal.data import as_continuous_sites, as_discrete_sites
 from fedcausal.exceptions import ConvergedBeforeFusionError
 from fedcausal.fedges.convergence import default_convergence
 from fedcausal.fedges.rounds import SitePool, run_rounds
 from fedcausal.fedges.site import Site
 from fedcausal.fusion import Consensus
-from fedcausal.graph.cpdag import dag_to_cpdag
-from fedcausal.scores import SCORE_NAMES
-from fedcausal.search import Knowledge
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import pandas as pd
+    from causalbase.data.dataset import DiscreteLike
+    from causalbase.scores import ScoreName
+    from causalbase.search._knowledge import PairLike
     from typing_extensions import Self
 
-    from fedcausal.data.dataset import DiscreteLike
     from fedcausal.fedges.convergence import Convergence
     from fedcausal.fedges.model import BNModel
     from fedcausal.fedges.site import Refinement, Search
     from fedcausal.fusion import FusionOperator
-    from fedcausal.scores import ScoreName
-    from fedcausal.search._knowledge import PairLike
 
 __all__ = ["FedGES"]
 
@@ -57,7 +57,7 @@ class FedGES(Estimator):
         Equivalent sample size of the BDeu score.
     expected_parents : float or None, default=1.0
         Structure prior of each site's score; see
-        :class:`~fedcausal.scores.FamilyScore`.
+        :class:`~causalbase.scores.FamilyScore`.
     penalty_discount : float, default=1.0
         Multiplier of the BIC penalty.
     max_parents : int or None, default=None
@@ -110,7 +110,7 @@ class FedGES(Estimator):
     --------
     >>> from fedcausal import FedGES
     >>> from fedcausal.data import contiguous_split
-    >>> from fedcausal.datasets import load_alarm
+    >>> from causalbase.datasets import load_alarm
     >>> sites = contiguous_split(load_alarm().data, 4)
     >>> model = FedGES(n_rounds=5).fit(sites)
     >>> model.dag_

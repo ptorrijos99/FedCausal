@@ -19,11 +19,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+from causalbase.data import ContinuousDataset
 from flwr.client import ClientApp
 from flwr.common import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid, ServerApp
 
-from fedcausal.data import ContinuousDataset
 from fedcausal.exceptions import ClientFailureError, ConfigurationError
 from fedcausal.flower._grid import (
     CTRL_KEY,

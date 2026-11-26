@@ -7,7 +7,9 @@ import pytest
 
 pytest.importorskip("flwr")
 
-from fedcausal.data import ContinuousDataset, contiguous_split  # noqa: E402
+from causalbase.data import ContinuousDataset  # noqa: E402
+
+from fedcausal.data import contiguous_split  # noqa: E402
 from fedcausal.exceptions import (  # noqa: E402
     ClientFailureError,
     ConfigurationError,

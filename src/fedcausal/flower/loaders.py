@@ -14,7 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, Protocol, TypeVar, runtime_checkable
 
-from fedcausal.data import ContinuousDataset, DiscreteDataset
+from causalbase.data import ContinuousDataset, DiscreteDataset
+
 from fedcausal.exceptions import ConfigurationError
 
 if TYPE_CHECKING:

@@ -5,9 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from causalbase import GES, XGES
+from causalbase.data import ContinuousDataset
 
-from fedcausal import GES, XGES, FedGES, FedRCD
-from fedcausal.data import ContinuousDataset
+from fedcausal import FedGES, FedRCD
 from fedcausal.exceptions import FedCausalError, NotFittedError
 from fedcausal.lingam import cumulants_from_sums, fedrcd, moment_sums
 

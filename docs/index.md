@@ -1,18 +1,18 @@
 # fedcausal
 
-Causal structure learning for data in one place or spread across sites that cannot share it.
+Causal structure learning from data spread across sites that cannot share it.
 
 | Estimator | Data | What crosses the network |
 |---|---|---|
-| {class}`~fedcausal.search.GES` | Discrete or continuous, in one place | Nothing |
-| {class}`~fedcausal.search.XGES` | Discrete or continuous, in one place | Nothing |
 | {class}`~fedcausal.fedges.FedGES` | Discrete or continuous, across sites | Structures and scores |
 | {class}`~fedcausal.lingam.FedRCD` | Continuous, linear non-Gaussian, across sites | Additive moment sums |
+
+Learning from data in one place (GES, XGES, the scores and graphs these methods build on) is [causalbase](https://github.com/ptorrijos99/causalbase)'s job.
 
 ```python
 from fedcausal import FedGES
 from fedcausal.data import contiguous_split
-from fedcausal.datasets import load_alarm
+from causalbase.datasets import load_alarm
 
 sites = contiguous_split(load_alarm().data, 5)
 model = FedGES(n_jobs=-1).fit(sites)

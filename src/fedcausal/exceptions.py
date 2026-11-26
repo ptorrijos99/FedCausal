@@ -1,14 +1,17 @@
 """Exceptions raised by fedcausal.
 
-The errors of a federation, a cycle in a :class:`~fedcausal.graph.DAG` and
-reading an estimator's results before ``fit`` derive from
-:class:`FedCausalError`, so callers can catch them with one ``except``. An
+The errors of a federation derive from causalbase's base error, as do a cycle
+in a :class:`~causalbase.graph.DAG` and reading an estimator's results before
+``fit``, so callers can catch all of them with one ``except``:
+:class:`FedCausalError` is that base error under its fedcausal 0.x name. An
 invalid argument or input raises :class:`ValueError` (or
 :class:`ConfigurationError`, which is one), and a wrong kind of input
 :class:`TypeError`.
 """
 
 from __future__ import annotations
+
+from causalbase.exceptions import CausalBaseError, ConfigurationError, CycleError, NotFittedError
 
 __all__ = [
     "FedCausalError",
@@ -21,31 +24,8 @@ __all__ = [
     "NotFittedError",
 ]
 
-
-class FedCausalError(Exception):
-    """Base class for every error fedcausal raises deliberately."""
-
-
-class ConfigurationError(FedCausalError, ValueError):
-    """An argument or federation setting is invalid.
-
-    Also a :class:`ValueError`, so ``except ValueError`` catches it too.
-    """
-
-
-class CycleError(FedCausalError, ValueError):
-    """An edge would close a directed cycle, or a graph that must be acyclic is not.
-
-    Also a :class:`ValueError`. Importable from :mod:`fedcausal.graph` too.
-    """
-
-
-class NotFittedError(FedCausalError, AttributeError):
-    """An estimator's result was read before ``fit`` was called.
-
-    Also an :class:`AttributeError`, so ``hasattr`` and scikit-learn's
-    checks treat an unfitted result as missing.
-    """
+FedCausalError = CausalBaseError
+"""Base class for every error fedcausal and causalbase raise deliberately."""
 
 
 class ConvergedBeforeFusionError(FedCausalError):

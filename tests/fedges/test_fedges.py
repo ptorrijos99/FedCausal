@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from causalbase.datasets import load_alarm, load_asia, load_network
+from causalbase.graph import DAG
+from causalbase.metrics import shd
+from causalbase.scores import BDeuScore
+from causalbase.search import ges, xges
 
 from fedcausal import FedGES
 from fedcausal.data import contiguous_split
-from fedcausal.datasets import load_alarm, load_asia, load_network
 from fedcausal.exceptions import ConvergedBeforeFusionError, DenseFusionWarning
 from fedcausal.fedges import BNModel, ModelEquality, ScoreImprovement, Site, run_rounds
 from fedcausal.fusion import ConsensusUnion
-from fedcausal.graph import DAG
-from fedcausal.metrics import shd
-from fedcausal.scores import BDeuScore
-from fedcausal.search import ges, xges
 
 # The pooled BDeu score of the global model FedGES learns from the bundled
 # samples, split in contiguous blocks, and its SHD. A change means FedGES learns
@@ -63,9 +63,9 @@ def test_sites_learn_with_the_search_they_are_given() -> None:
     for search in ("ges", "xges0", "xges"):
         own = Site(sites[0], search=search).learn()  # type: ignore[arg-type]
         expected = (
-            ges(own_score := Site(sites[0]).score, sites[0].n_vars)
+            ges(own_score := Site(sites[0]).score)
             if search == "ges"
-            else xges(own_score, sites[0].n_vars, extended=search == "xges")
+            else xges(own_score, extended=search == "xges")
         )
         assert own.dag == expected.to_dag()
         learned.add(tuple(sorted(own.dag.edges())))

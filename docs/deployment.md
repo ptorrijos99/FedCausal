@@ -23,7 +23,7 @@ The client side of a round is one function call, whichever family you are runnin
 ```python
 from flwr.client import ClientApp
 
-from fedcausal.data import DiscreteDataset
+from causalbase.data import DiscreteDataset
 from fedcausal.flower.fedges import handle_train_message
 from fedcausal.flower.loaders import NodeConfigLoader
 

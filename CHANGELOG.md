@@ -2,7 +2,16 @@
 
 This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, what the [API reference](docs/api.rst) lists changes incompatibly only in a major release; the exact structure learned when several score the same, up to rounding, may still change in a minor one.
 
-## Unreleased
+## 1.0.0 (unreleased)
+
+### Changed (breaking)
+
+- Learning from data in one place moved to its own package, [causalbase](https://github.com/ptorrijos99/causalbase), which fedcausal now depends on: `fedcausal.data` (the datasets and their encoding), `graph`, `scores`, `search`, `metrics`, `io` and `datasets`, with `GES` and `XGES`. fedcausal keeps the federated methods (`fedges`, `fusion`, `lingam`), their transport (`flower`) and the site splitters (`fedcausal.data.contiguous_split`, `dirichlet_split`).
+- The old paths still work: `fedcausal.graph`, `fedcausal.scores.bdeu`, ... (every submodule) are aliases of the causalbase modules, and `fedcausal.GES`, `fedcausal.DAG`, `fedcausal.data.DiscreteDataset`, ... the causalbase objects themselves, so `isinstance` and `except` work across both names. Each warns with a `DeprecationWarning` naming the new path; they go in 2.0.
+- `FedCausalError` is causalbase's `CausalBaseError`, so one `except` still catches every error either package raises; `ConfigurationError`, `CycleError` and `NotFittedError` are causalbase's too.
+
+The additions below (XGES, the fGES screen) shipped in causalbase 0.1.0 with the rest of the core; `FedGES(search=...)` is fedcausal's.
+
 
 ### Added
 
@@ -20,9 +29,9 @@ This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, wha
 - A restriction to candidate pairs, which FedGES's refinement uses, now removes the other parents before they are scored instead of after.
 - `PDAG.copy` copies the adjacency matrix and neighbour lists it has built instead of rebuilding them, and `PDAG.__eq__` compares parent and neighbour sets instead of sorted edge lists; both matter in XGES, which copies and compares a graph per forced deletion.
 
-## 1.0.0
+## 0.3.0
 
-The first stable release: the API of 0.2.0, faster, with stricter input checks, one naming scheme across the methods, and a smaller surface to keep stable. The library is split in two layers, a core that learns structures in one place and a federated part built on it.
+The API of 0.2.0, faster, with stricter input checks, one naming scheme across the methods, and a smaller surface to keep stable. The library is split in two layers, a core that learns structures in one place and a federated part built on it.
 
 ### Speed
 
@@ -35,7 +44,7 @@ The first stable release: the API of 0.2.0, faster, with stricter input checks, 
 
 - `fedcausal.graph.dag_to_cpdag`, previously reachable only through `fedcausal.graph.cpdag`.
 - `fedcausal.exceptions.NotFittedError`, raised when a result is read before `fit`; it was importable only from a private module. It is now a `FedCausalError` as well as an `AttributeError`, and the module's docstring says which errors are which instead of claiming every deliberate error is a `FedCausalError`.
-- The API reference says what 1.0 promises, documents `fedcausal.flower.fedges` and `fedcausal.flower.lingam`, and notes that score objects are not safe to share between threads.
+- The API reference says what a stable release promises, documents `fedcausal.flower.fedges` and `fedcausal.flower.lingam`, and notes that score objects are not safe to share between threads.
 - `Score` is documented as the extension point for new scores, and `FamilyScore`'s hooks are public: a subclass implements `compute_family` (and may override `compute_extensions`) and gets the cache, the batching and the structure prior.
 - `fedcausal.fusion.EdgeBudget`, and `fedcausal.lingam.Pruning`, `LambdaSelection`, `MomentSums` and `Cumulants`, for type hints.
 - Tests that the core imports nothing federated and runs without it or Flower, that every docstring example runs, and a CI job on the oldest dependencies with no extras.

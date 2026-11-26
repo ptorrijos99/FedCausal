@@ -10,9 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from causalbase.data import ContinuousDataset, DiscreteDataset
 from flwr.common import Context, Error, Message, RecordDict
-
-from fedcausal.data import ContinuousDataset, DiscreteDataset
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

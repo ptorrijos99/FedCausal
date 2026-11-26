@@ -14,14 +14,14 @@ import hashlib
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from causalbase.graph import DAG
 from flwr.common import ArrayRecord, ConfigRecord
-
-from fedcausal.graph import DAG
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fedcausal.data import DiscreteDataset
+    from causalbase.data import DiscreteDataset
+
     from fedcausal.lingam.cumulants import MomentSums
 
 __all__ = [

@@ -13,11 +13,11 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
+from causalbase.data import DiscreteDataset
 from flwr.client import ClientApp
 from flwr.common import ArrayRecord, Context, Message, RecordDict
 from flwr.server import Grid, ServerApp
 
-from fedcausal.data import DiscreteDataset
 from fedcausal.exceptions import ClientFailureError, SchemaMismatchError
 from fedcausal.fedges.convergence import default_convergence
 from fedcausal.fedges.model import BNModel
@@ -45,10 +45,11 @@ from fedcausal.fusion import Consensus
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from causalbase.graph import DAG
+
     from fedcausal.fedges.convergence import Convergence
     from fedcausal.flower.loaders import PartitionLoader
     from fedcausal.fusion import FusionOperator
-    from fedcausal.graph import DAG
 
 __all__ = [
     "build_client_app",

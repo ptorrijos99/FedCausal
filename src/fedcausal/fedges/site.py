@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from causalbase.graph.cpdag import dag_to_cpdag
+from causalbase.scores import make_score
+from causalbase.search import Knowledge, ges, xges
+
 from fedcausal.fedges.model import BNModel
 from fedcausal.fusion import ConsensusUnion
-from fedcausal.graph.cpdag import dag_to_cpdag
-from fedcausal.scores import make_score
-from fedcausal.search import Knowledge, ges, xges
 
 if TYPE_CHECKING:
-    from fedcausal.data import ContinuousDataset, DiscreteDataset
+    from causalbase.data import ContinuousDataset, DiscreteDataset
+    from causalbase.graph import DAG
+    from causalbase.scores import FamilyScore, ScoreName
+
     from fedcausal.fusion import FusionOperator
-    from fedcausal.graph import DAG
-    from fedcausal.scores import FamilyScore, ScoreName
 
 __all__ = ["Refinement", "Search", "Site"]
 
@@ -46,11 +48,11 @@ class Site:
     data : DiscreteDataset or ContinuousDataset
         The site's data. It never leaves the site.
     criterion : {"bdeu", "bic", "gaussian_bic"}, default="bdeu"
-        The scoring criterion; see :func:`~fedcausal.scores.make_score`.
+        The scoring criterion; see :func:`~causalbase.scores.make_score`.
     ess : float, default=1.0
         Equivalent sample size of the BDeu score.
     expected_parents : float or None, default=1.0
-        Structure prior; see :class:`~fedcausal.scores.FamilyScore`.
+        Structure prior; see :class:`~causalbase.scores.FamilyScore`.
     penalty_discount : float, default=1.0
         Multiplier of the BIC penalty.
     max_parents : int or None, default=None
@@ -136,7 +138,6 @@ class Site:
         if self.search == "ges":
             cpdag = ges(
                 self.score,
-                self.data.n_vars,
                 start,
                 max_t_size=self.max_t_size,
                 knowledge=self.knowledge,
@@ -145,7 +146,6 @@ class Site:
         else:
             cpdag = xges(
                 self.score,
-                self.data.n_vars,
                 start,
                 extended=self.search == "xges",
                 max_t_size=self.max_t_size,
@@ -172,11 +172,9 @@ class Site:
             return self.model
 
         cpdag = dag_to_cpdag(own)
-        n = self.data.n_vars
         if self.refinement in ("forward", "both"):
             cpdag = ges(
                 self.score,
-                n,
                 cpdag,
                 candidates=_new_adjacencies(fused, own),
                 max_t_size=self.max_t_size,
@@ -187,7 +185,6 @@ class Site:
         if self.refinement in ("backward", "both"):
             cpdag = ges(
                 self.score,
-                n,
                 cpdag,
                 candidates=_new_adjacencies(own, fused),
                 knowledge=self.knowledge,

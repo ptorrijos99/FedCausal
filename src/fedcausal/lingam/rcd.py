@@ -32,8 +32,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import numpy.typing as npt
+from causalbase.graph import DAG
 
-from fedcausal.graph import DAG
 from fedcausal.lingam.cumulants import (
     Cumulants,
     _n_samples,

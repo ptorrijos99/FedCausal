@@ -22,10 +22,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from multiprocessing.connection import Connection
 
+    from causalbase.graph import DAG
+
     from fedcausal.fedges.convergence import Convergence
     from fedcausal.fedges.site import Site
     from fedcausal.fusion import FusionOperator
-    from fedcausal.graph import DAG
 
 __all__ = ["SitePool", "run_rounds"]
 

@@ -22,11 +22,12 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from causalbase.data import ContinuousDataset, DiscreteDataset
 from flwr.client import ClientApp
 from flwr.common import Context
 from flwr.server import Grid, ServerApp
 
-from fedcausal.data import ContinuousDataset, DiscreteDataset, contiguous_split
+from fedcausal.data import contiguous_split
 from fedcausal.flower import fedges, lingam
 from fedcausal.flower.loaders import InMemoryPartitions, NodeConfigLoader
 

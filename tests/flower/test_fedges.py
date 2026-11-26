@@ -8,9 +8,11 @@ import pytest
 
 pytest.importorskip("flwr")
 
+from causalbase.data import DiscreteDataset  # noqa: E402
+from causalbase.graph import DAG  # noqa: E402
 from flwr.common import ConfigRecord, Context, Message, MessageType, RecordDict  # noqa: E402
 
-from fedcausal.data import DiscreteDataset, contiguous_split  # noqa: E402
+from fedcausal.data import contiguous_split  # noqa: E402
 from fedcausal.exceptions import (  # noqa: E402
     ClientFailureError,
     ConfigurationError,
@@ -21,7 +23,6 @@ from fedcausal.flower.fedges import handle_train_message, run_server_loop  # noq
 from fedcausal.flower.loaders import InMemoryPartitions, NodeConfigLoader  # noqa: E402
 from fedcausal.flower.serde import dag_to_record, record_to_dag  # noqa: E402
 from fedcausal.fusion import Consensus  # noqa: E402
-from fedcausal.graph import DAG  # noqa: E402
 
 from ._stubs import StubGrid, discrete_chain, node_context, server_context, single  # noqa: E402
 

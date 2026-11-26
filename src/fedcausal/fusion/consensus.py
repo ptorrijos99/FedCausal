@@ -12,9 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from causalbase.graph import DAG
+
 from fedcausal.fusion.alpha import alpha_order
 from fedcausal.fusion.beta import beta_to_alpha
-from fedcausal.graph import DAG
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

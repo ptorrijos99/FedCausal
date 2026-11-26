@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fedcausal.graph import DAG
+    from causalbase.graph import DAG
 
 __all__ = ["FusionOperator"]
 

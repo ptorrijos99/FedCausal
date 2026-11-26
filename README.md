@@ -1,29 +1,24 @@
 # fedcausal
 
-Causal structure learning for data in one place or spread across sites that cannot share it.
+Causal structure learning from data spread across sites that cannot share it.
 
 | Estimator | Data | What crosses the network |
 |---|---|---|
-| `GES` | Discrete or continuous, in one place | Nothing |
-| `XGES` | Discrete or continuous, in one place | Nothing |
 | `FedGES` | Discrete or continuous, across sites | Structures and scores |
 | `FedRCD` | Continuous, linear non-Gaussian, across sites | Additive moment sums |
 
-All of them follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. `GES` scores categorical data by BDeu or BIC and continuous data by a Gaussian BIC, and its `score(X)`, the held-out log likelihood, lets scikit-learn's parameter searches tune it.
+Both follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. Learning from data in one place (GES, XGES, the scores, graphs and metrics the federated methods build on) is the job of [causalbase](https://github.com/ptorrijos99/causalbase), which fedcausal depends on.
 
 ```bash
 pip install fedcausal
 ```
 
 ```python
-from fedcausal import GES, FedGES
+from causalbase.datasets import load_alarm
+from fedcausal import FedGES
 from fedcausal.data import contiguous_split
-from fedcausal.datasets import load_alarm
 
-data = load_alarm().data  # 37 variables, 5000 rows, bundled
-
-model = GES().fit(data)  # also takes a DataFrame or an array
-model.adjacency_  # the learned CPDAG, with variable names
+data = load_alarm().data  # 37 variables, 5000 rows, bundled with causalbase
 
 sites = contiguous_split(data, 5)  # or one DataFrame per site
 federated = FedGES(n_jobs=-1).fit(sites)  # the sites learn in parallel
@@ -37,25 +32,22 @@ model = FedRCD().fit([x_site1, x_site2, x_site3])  # one array or DataFrame per 
 model.causal_order_, model.coef_
 ```
 
-## Speed
-
-GES runs in compiled code where it matters (counting, path checks, CPDAG completion, the consensus order of the fusion) and re-scores only the part of the graph each step changes. On a laptop it learns `andes` (223 variables, 5000 rows) in under half a second and `munin` (1041 variables) in about 4 s, where causal-learn does not finish `andes` in half an hour. The [benchmarks](docs/benchmarks.md) have the full ladder.
-
 ## How the package is organised
-
-One package in two layers, kept apart so that it could become two distributions without a rewrite:
 
 | Layer | Modules | Needs |
 |---|---|---|
-| Core: learning in one place | `fedcausal.data`, `graph`, `scores`, `search`, `metrics`, `io`, `datasets` | numpy, pandas, numba |
-| Federated: the methods | `fedcausal.fedges`, `fusion`, `lingam` | the same; they run in one process |
-| Federated: the transport | `fedcausal.flower` | `pip install "fedcausal[federated]"` |
+| The methods | `fedcausal.fedges`, `fusion`, `lingam`, `data` (the site splitters) | causalbase; they run in one process |
+| The transport | `fedcausal.flower` | `pip install "fedcausal[federated]"` |
 
-The core never imports the federated part, not even for type hints, and `tests/test_layout.py` checks that, along with a run of the core with the federated modules and Flower made unimportable. Importing `fedcausal.flower` without the extra fails with a message naming it.
+The methods never import Flower, and `tests/test_layout.py` checks that, along with a run with Flower made unimportable. Importing `fedcausal.flower` without the extra fails with a message naming it.
+
+## Upgrading from 0.x
+
+fedcausal 0.x also held the core of structure learning, which is now causalbase. The old paths (`fedcausal.graph`, `fedcausal.GES`, `fedcausal.data.DiscreteDataset`, ...) still work, as aliases of the causalbase objects, and warn with the path to use instead; they go in 2.0. See the [changelog](CHANGELOG.md).
 
 ## Documentation
 
-**[ptorrijos99.github.io/fedcausal](https://ptorrijos99.github.io/fedcausal/)**: the user guide, the API reference and a gallery of examples that run with no setup. To build it locally:
+The user guide, the API reference and a gallery of examples that run with no setup build with Sphinx:
 
 ```bash
 pip install -e ".[docs]"

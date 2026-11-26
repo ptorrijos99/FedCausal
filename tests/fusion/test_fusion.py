@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hypothesis.strategies as st
 import pytest
+from causalbase.graph import DAG
 from hypothesis import given, settings
 
 from fedcausal.fusion import (
@@ -16,7 +17,6 @@ from fedcausal.fusion import (
     max_frequency,
     max_parents,
 )
-from fedcausal.graph import DAG
 
 
 @st.composite
@@ -94,9 +94,10 @@ def test_intersection_matches_pairs_and_keeps_the_first_orientation() -> None:
 
 
 def test_fuses_real_ges_output() -> None:
-    from fedcausal import GES
+    from causalbase import GES
+    from causalbase.datasets import load_asia
+
     from fedcausal.data import contiguous_split
-    from fedcausal.datasets import load_asia
 
     dags = [GES().fit(site).dag_ for site in contiguous_split(load_asia().data, 3)]
     fused = consensus_union(dags)

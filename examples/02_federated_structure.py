@@ -10,10 +10,12 @@ model. Only structures and scores leave a site.
 Here ``alarm``'s 5000 rows are split into five sites of 1000.
 """
 
-from fedcausal import GES, FedGES
+from causalbase import GES
+from causalbase.datasets import load_alarm
+from causalbase.metrics import shd
+
+from fedcausal import FedGES
 from fedcausal.data import contiguous_split
-from fedcausal.datasets import load_alarm
-from fedcausal.metrics import shd
 
 bundle = load_alarm()
 sites = contiguous_split(bundle.data, 5)

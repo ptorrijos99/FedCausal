@@ -2,8 +2,8 @@
 
 import numpy as np
 import pytest
+from causalbase.graph import DAG
 
-from fedcausal.graph import DAG
 from fedcausal.lingam import RCDResult, cumulants_from_sums, fedrcd, fedrcd_exact, moment_sums
 from fedcausal.lingam.solvers import estimate_b_from_cov, estimate_b_lasso_from_cov
 from fedcausal.lingam.tau import tau_matrix_3rd, tau_matrix_4th

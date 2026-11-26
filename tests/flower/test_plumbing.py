@@ -7,7 +7,8 @@ import pytest
 
 pytest.importorskip("flwr")
 
-from fedcausal.data import ContinuousDataset, DiscreteDataset  # noqa: E402
+from causalbase.data import ContinuousDataset, DiscreteDataset  # noqa: E402
+
 from fedcausal.exceptions import ConfigurationError  # noqa: E402
 from fedcausal.flower.loaders import InMemoryPartitions, NodeConfigLoader  # noqa: E402
 from fedcausal.flower.serde import names_fingerprint, schema_fingerprint  # noqa: E402

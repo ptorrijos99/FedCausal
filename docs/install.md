@@ -4,7 +4,7 @@
 pip install fedcausal
 ```
 
-Python 3.10 or newer. The install pulls in numpy, pandas and numba, and that is all the estimators, the fusion operators and the bundled networks need, federated runs in one process included. The compiled kernels are built on first use and cached next to the package, so the first fit in a fresh environment takes a few seconds longer than the rest.
+Python 3.10 or newer. The install pulls in numpy, pandas and numba, and causalbase, and that is all the estimators and the fusion operators need, federated runs in one process included. The compiled kernels are built on first use and cached next to the package, so the first fit in a fresh environment takes a few seconds longer than the rest.
 
 ## Extras
 
@@ -24,8 +24,9 @@ pip install git+https://github.com/ptorrijos99/fedcausal
 ## Check it worked
 
 ```python
-from fedcausal import GES
-from fedcausal.datasets import load_asia
+from causalbase.datasets import load_asia
+from fedcausal import FedGES
+from fedcausal.data import contiguous_split
 
-print(GES().fit(load_asia().data).adjacency_)
+print(FedGES(n_rounds=2).fit(contiguous_split(load_asia().data, 2)).adjacency_)
 ```

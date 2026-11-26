@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from fedcausal.graph import DAG
+from causalbase.graph import DAG
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
