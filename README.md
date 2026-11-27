@@ -5,6 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/fedcausal.svg)](https://pypi.org/project/fedcausal/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/ptorrijos99/fedcausal/blob/main/LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24603527.svg)](https://doi.org/10.5281/zenodo.24603527)
 
 fedcausal learns causal structure from data split across sites that cannot share them. The sites send only what each method needs, never their rows:
 
@@ -82,7 +83,7 @@ and for FedRCD:
 
 > Torrijos, P., Stella, F., Gámez, J.A. & Puerta, J.M. Federated Causal Discovery via Regression-Directed Cumulants. Probabilistic Graphical Models (PGM), 2026.
 
-[`CITATION.cff`](https://github.com/ptorrijos99/fedcausal/blob/main/CITATION.cff) carries both, for GitHub's "Cite this repository" button.
+[`CITATION.cff`](https://github.com/ptorrijos99/fedcausal/blob/main/CITATION.cff) carries both, for GitHub's "Cite this repository" button. The software itself is archived on Zenodo under [10.5281/zenodo.24603527](https://doi.org/10.5281/zenodo.24603527), which resolves to the latest version; every release also has its own DOI.
 
 ## License
 
