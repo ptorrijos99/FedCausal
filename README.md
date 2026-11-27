@@ -1,17 +1,29 @@
 # fedcausal
 
-Causal structure learning from data spread across sites that cannot share it.
+[![CI](https://github.com/ptorrijos99/fedcausal/actions/workflows/ci.yml/badge.svg)](https://github.com/ptorrijos99/fedcausal/actions/workflows/ci.yml)
+[![Docs](https://github.com/ptorrijos99/fedcausal/actions/workflows/docs.yml/badge.svg)](https://ptorrijos99.github.io/fedcausal/)
+[![PyPI](https://img.shields.io/pypi/v/fedcausal.svg)](https://pypi.org/project/fedcausal/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/ptorrijos99/fedcausal/blob/main/LICENSE)
+
+Federated Bayesian network structure learning and causal discovery in Python: fedcausal learns causal structure from data spread across sites that cannot share it, and only what each method needs crosses the network.
 
 | Estimator | Data | What crosses the network |
 |---|---|---|
 | `FedGES` | Discrete or continuous, across sites | Structures and scores |
 | `FedRCD` | Continuous, linear non-Gaussian, across sites | Additive moment sums |
 
-Both follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. Learning from data in one place (GES, XGES, the scores, graphs and metrics the federated methods build on) is the job of [causalbase](https://github.com/ptorrijos99/causalbase), which fedcausal depends on.
+Both follow scikit-learn's conventions: hyperparameters go to the constructor, `fit` learns, and results end in an underscore. They run in one process for experiments, or over [Flower](https://flower.ai) across real machines with the same round loop. Learning from data in one place (GES, XGES, the order and exact searches, and the scores, graphs and metrics the federated methods build on) is the job of [causalbase](https://github.com/ptorrijos99/causalbase), which fedcausal depends on.
+
+## Installation
 
 ```bash
 pip install fedcausal
 ```
+
+This installs causalbase with it. The Flower transport is an extra, `pip install "fedcausal[federated]"`, and Flower's simulation engine, which runs on Ray, another one, `pip install "fedcausal[federated-simulation]"`.
+
+## Quick start
 
 ```python
 from causalbase.datasets import load_alarm
@@ -43,31 +55,39 @@ The methods never import Flower, and `tests/test_layout.py` checks that, along w
 
 ## Upgrading from 0.x
 
-fedcausal 0.x also held the core of structure learning, which is now causalbase. The old paths (`fedcausal.graph`, `fedcausal.GES`, `fedcausal.data.DiscreteDataset`, ...) still work, as aliases of the causalbase objects, and warn with the path to use instead; they go in 2.0. See the [changelog](CHANGELOG.md).
+fedcausal 0.x also held the core of structure learning, which is now causalbase. The old paths (`fedcausal.graph`, `fedcausal.GES`, `fedcausal.data.DiscreteDataset`, ...) still work, as aliases of the causalbase objects, and warn with the path to use instead; they go in 2.0. See the [changelog](https://github.com/ptorrijos99/fedcausal/blob/main/CHANGELOG.md).
 
 ## Documentation
 
-The user guide, the API reference and a gallery of examples that run with no setup build with Sphinx:
+- [Installation and quick start](https://ptorrijos99.github.io/fedcausal/quickstart.html)
+- [FedGES](https://ptorrijos99.github.io/fedcausal/algorithms.html) and [FedRCD](https://ptorrijos99.github.io/fedcausal/fedrcd.html): what each method does and what its options change.
+- [Deployment](https://ptorrijos99.github.io/fedcausal/deployment.html): FedGES or FedRCD across real machines with Flower.
+- [API reference](https://ptorrijos99.github.io/fedcausal/api.html) and [examples](https://ptorrijos99.github.io/fedcausal/auto_examples/index.html).
+- [causalbase's documentation](https://ptorrijos99.github.io/causalbase/), for the data, scores, searches, graphs and metrics.
+
+## Development
 
 ```bash
-pip install -e ".[docs]"
-sphinx-build -b html docs docs/_build/html
+git clone https://github.com/ptorrijos99/fedcausal
+cd fedcausal
+pip install -e ".[dev,federated]"
+pytest
 ```
 
-[Deployment](docs/deployment.md) explains how to run FedGES or FedRCD across real machines with [Flower](https://flower.ai) (`pip install "fedcausal[federated]"`).
+[CONTRIBUTING.md](https://github.com/ptorrijos99/fedcausal/blob/main/CONTRIBUTING.md) has the checks a pull request must pass; the documentation builds with `pip install -e ".[docs,federated]"` and `sphinx-build -b html docs docs/_build/html`.
 
 ## Citing
 
-FedGES:
+If you use FedGES, please cite:
 
 > Torrijos, P., Gámez, J.A. & Puerta, J.M. FedGES: A Federated Learning Approach for Bayesian Network Structure Learning. *Machine Learning* **115**, 9 (2026). https://doi.org/10.1007/s10994-025-06939-2
 
-FedRCD:
+and for FedRCD:
 
 > Torrijos, P., Stella, F., Gámez, J.A. & Puerta, J.M. Federated Causal Discovery via Regression-Directed Cumulants. Probabilistic Graphical Models (PGM), 2026.
 
-`CITATION.cff` carries both, for GitHub's "Cite this repository" button.
+[`CITATION.cff`](https://github.com/ptorrijos99/fedcausal/blob/main/CITATION.cff) carries both, for GitHub's "Cite this repository" button.
 
 ## License
 
-MIT. Pablo Torrijos Arenas, Universidad de Castilla-La Mancha.
+MIT. See [LICENSE](https://github.com/ptorrijos99/fedcausal/blob/main/LICENSE).

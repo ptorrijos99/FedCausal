@@ -1,0 +1,51 @@
+{
+  "title": "fedcausal: federated Bayesian network structure learning and causal discovery",
+  "upload_type": "software",
+  "description": "<p>A Python library for learning causal structure from data spread across sites that cannot share it. FedGES learns Bayesian network structure from discrete or continuous data: each site runs greedy equivalence search on the data it holds, a coordinator fuses the resulting graphs, and only graphs and scores cross the network. FedRCD learns a causal order and linear coefficients from continuous data under a linear non-Gaussian model, from additive moment sums that each site computes on its own rows. Both run in one process for experiments and over Flower across machines. Learning from data in one place is the job of causalbase, which fedcausal builds on.</p>",
+  "creators": [
+    {
+      "name": "Torrijos, Pablo",
+      "affiliation": "Universidad de Castilla-La Mancha",
+      "orcid": "0000-0002-8395-3848"
+    },
+    {
+      "name": "Gámez, José A.",
+      "affiliation": "Universidad de Castilla-La Mancha",
+      "orcid": "0000-0003-1188-1117"
+    },
+    {
+      "name": "Puerta, José M.",
+      "affiliation": "Universidad de Castilla-La Mancha",
+      "orcid": "0000-0002-9164-5191"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "causal discovery",
+    "structure learning",
+    "Bayesian networks",
+    "federated learning",
+    "greedy equivalence search",
+    "LiNGAM",
+    "cumulants"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/ptorrijos99/fedcausal",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "10.1007/s10994-025-06939-2",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.24594415",
+      "relation": "requires",
+      "resource_type": "software",
+      "scheme": "doi"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 What each estimator does, what its options change, and how it is made fast. The measurements behind the defaults are in [Benchmarks](benchmarks.md).
 
-GES and XGES, which every site runs, and their score options are documented in [causalbase](https://github.com/ptorrijos99/causalbase).
+GES and XGES, which every site runs, and their score options are documented in [causalbase](https://ptorrijos99.github.io/causalbase/algorithms.html).
 
 ## FedGES
 

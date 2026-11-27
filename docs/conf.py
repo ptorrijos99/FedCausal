@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from fedcausal import __version__  # noqa: E402
 
 project = "fedcausal"
-author = "Pablo Torrijos Arenas"
-copyright = "2026, Pablo Torrijos Arenas"  # noqa: A001
+author = "Pablo Torrijos, José A. Gámez, José M. Puerta"
+copyright = "2026, fedcausal developers"  # noqa: A001
 version = __version__
 release = __version__
 
@@ -31,23 +31,30 @@ extensions = [
     "sphinx.ext.viewcode",
     "numpydoc",
     "myst_parser",
+    "sphinx_design",
     "sphinx_gallery.gen_gallery",
     "sphinx_copybutton",
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "_templates", "Thumbs.db", ".DS_Store"]
 
 # -- Autodoc / numpydoc -----------------------------------------------------
 
 autodoc_default_options = {
     "members": True,
-    "imported-members": True,
-    "show-inheritance": True,
+    "inherited-members": True,
     "member-order": "bysource",
 }
-autodoc_typehints = "description"
+autodoc_typehints = "none"
 autosummary_generate = True
+# fedrcd and FedRCD, consensus and Consensus, intersection and Intersection
+# would share one stub file on a case-insensitive file system.
+autosummary_filename_map = {
+    "fedcausal.lingam.fedrcd": "fedcausal.lingam.fedrcd_function",
+    "fedcausal.fusion.consensus": "fedcausal.fusion.consensus_function",
+    "fedcausal.fusion.intersection": "fedcausal.fusion.intersection_function",
+}
 
 # numpydoc would otherwise emit a second, undocumented entry for every class
 # attribute and method, which autodoc has already rendered.
@@ -59,6 +66,8 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "pandas": ("https://pandas.pydata.org/docs", None),
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
+    "sklearn": ("https://scikit-learn.org/stable", None),
+    "causalbase": ("https://ptorrijos99.github.io/causalbase", None),
 }
 
 # -- Gallery ----------------------------------------------------------------
@@ -71,7 +80,7 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "show_signature": False,
     "download_all_examples": False,
-    # The examples draw no figures, so the build does not need matplotlib.
+    # The examples draw no figures.
     "image_scrapers": (),
 }
 
@@ -83,9 +92,16 @@ html_theme_options = {
     "github_url": "https://github.com/ptorrijos99/fedcausal",
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "show_prev_next": False,
+    "show_toc_level": 2,
     "footer_start": ["copyright"],
 }
-html_context = {"default_mode": "auto"}
+html_context = {
+    "default_mode": "auto",
+    "github_user": "ptorrijos99",
+    "github_repo": "fedcausal",
+    "github_version": "main",
+    "doc_path": "docs",
+}
 
 myst_enable_extensions = ["colon_fence", "deflist"]
 # The Markdown pages carry their own top-level heading, so let MyST turn the

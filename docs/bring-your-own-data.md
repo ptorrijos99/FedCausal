@@ -2,7 +2,7 @@
 
 `GES` and `FedGES` take fully observed categorical data; `FedRCD` takes numeric data. Neither handles missing values.
 
-Each site's table is read and encoded as [causalbase](https://github.com/ptorrijos99/causalbase) reads any table (its guide covers tables, CSV files and how levels are numbered). What federation adds is below.
+Each site's table is read and encoded as [causalbase](https://ptorrijos99.github.io/causalbase/bring-your-own-data.html) reads any table (its guide covers tables, CSV files and how levels are numbered). What federation adds is below.
 
 ## Encoding several sites at once
 

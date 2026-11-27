@@ -1,6 +1,6 @@
 # Benchmarks
 
-GES and XGES on their own, and how they compare with other implementations, are in [causalbase](https://github.com/ptorrijos99/causalbase)'s benchmarks.
+GES and XGES on their own, and how they compare with other implementations, are in [causalbase's benchmarks](https://ptorrijos99.github.io/causalbase/benchmarks.html).
 
 ## What federating costs
 

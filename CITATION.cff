@@ -1,17 +1,30 @@
 cff-version: 1.2.0
-title: "fedcausal: federated causal discovery"
-message: "If you use this software, please cite the FedGES paper below."
+title: "fedcausal: federated Bayesian network structure learning and causal discovery"
+message: "If you use this software, please cite the FedGES paper below, and the FedRCD paper for FedRCD."
 type: software
 authors:
-  - family-names: "Torrijos"
-    given-names: "Pablo"
+  - family-names: Torrijos
+    given-names: Pablo
+    email: pablo.torrijos@uclm.es
     affiliation: "Universidad de Castilla-La Mancha"
+    orcid: "https://orcid.org/0000-0002-8395-3848"
+  - family-names: Gámez
+    given-names: José A.
+    affiliation: "Universidad de Castilla-La Mancha"
+    orcid: "https://orcid.org/0000-0003-1188-1117"
+  - family-names: Puerta
+    given-names: José M.
+    affiliation: "Universidad de Castilla-La Mancha"
+    orcid: "https://orcid.org/0000-0002-9164-5191"
+version: "1.0.0"
+date-released: "2026-11-27"
 repository-code: "https://github.com/ptorrijos99/fedcausal"
+url: "https://ptorrijos99.github.io/fedcausal/"
 license: MIT
-version: 1.0.0
 abstract: >-
   A Python implementation of federated causal discovery over two data regimes.
-  FedGES learns Bayesian network structure from discrete data: each site runs
+  FedGES learns Bayesian network structure from discrete or continuous data:
+  each site runs
   greedy equivalence search on the data it holds, a coordinator combines the
   resulting graphs by structural consensus fusion, and only graphs and scores
   cross the network. FedRCD learns a causal order and linear coefficients from

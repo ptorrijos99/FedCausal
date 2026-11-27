@@ -1,6 +1,6 @@
 # Quickstart
 
-Learning from one table, measuring the result against a known network and tuning the estimators are covered by [causalbase](https://github.com/ptorrijos99/causalbase).
+Learning from one table, measuring the result against a known network and tuning the estimators are covered by [causalbase's quickstart](https://ptorrijos99.github.io/causalbase/quickstart.html).
 
 ## Learn across sites
 

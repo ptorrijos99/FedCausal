@@ -2,7 +2,7 @@
 
 This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, what the [API reference](docs/api.rst) lists changes incompatibly only in a major release; the exact structure learned when several score the same, up to rounding, may still change in a minor one.
 
-## 1.0.0 (unreleased)
+## 1.0.0 (2026-11-27)
 
 ### Changed (breaking)
 
