@@ -67,7 +67,7 @@ def test_sites_learn_with_the_search_they_are_given() -> None:
             if search == "ges"
             else xges(own_score, extended=search == "xges")
         )
-        assert own.dag == expected.to_dag()
+        assert own.dag == expected.cpdag.to_dag()
         learned.add(tuple(sorted(own.dag.edges())))
         history = FedGES(n_rounds=1, search=search).fit(sites).history_  # type: ignore[arg-type]
         assert history.loc[history["site"] == 0, "score"].iloc[0] == pytest.approx(own.score)

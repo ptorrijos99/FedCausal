@@ -142,7 +142,7 @@ class Site:
                 max_t_size=self.max_t_size,
                 knowledge=self.knowledge,
                 max_parents=self.max_parents,
-            )
+            ).cpdag
         else:
             cpdag = xges(
                 self.score,
@@ -151,7 +151,7 @@ class Site:
                 max_t_size=self.max_t_size,
                 knowledge=self.knowledge,
                 max_parents=self.max_parents,
-            )
+            ).cpdag
         self.model = self._model(cpdag.to_dag())
         return self.model
 
@@ -181,7 +181,7 @@ class Site:
                 knowledge=self.knowledge,
                 max_parents=self.max_parents,
                 backward=False,
-            )
+            ).cpdag
         if self.refinement in ("backward", "both"):
             cpdag = ges(
                 self.score,
@@ -189,6 +189,6 @@ class Site:
                 candidates=_new_adjacencies(own, fused),
                 knowledge=self.knowledge,
                 forward=False,
-            )
+            ).cpdag
         self.model = self._model(cpdag.to_dag())
         return self.model
