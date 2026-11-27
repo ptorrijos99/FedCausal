@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/ptorrijos99/fedcausal/blob/main/LICENSE)
 
-Federated Bayesian network structure learning and causal discovery in Python: fedcausal learns causal structure from data spread across sites that cannot share it, and only what each method needs crosses the network.
+fedcausal learns causal structure from data split across sites that cannot share them. The sites send only what each method needs, never their rows:
 
 | Estimator | Data | What crosses the network |
 |---|---|---|

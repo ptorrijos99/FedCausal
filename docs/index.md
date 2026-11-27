@@ -2,7 +2,7 @@
 
 [Source](https://github.com/ptorrijos99/fedcausal) | [Issues](https://github.com/ptorrijos99/fedcausal/issues) | [Changelog](https://github.com/ptorrijos99/fedcausal/blob/main/CHANGELOG.md) | [Citing](citing.md) | [causalbase](https://ptorrijos99.github.io/causalbase/)
 
-fedcausal learns causal structure from data spread across sites that cannot share it. Only what each method needs crosses the network:
+fedcausal learns causal structure from data split across sites that cannot share them. The sites send only what each method needs, never their rows:
 
 | Estimator | Data | What crosses the network |
 |---|---|---|

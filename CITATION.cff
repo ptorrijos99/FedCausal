@@ -22,15 +22,13 @@ repository-code: "https://github.com/ptorrijos99/fedcausal"
 url: "https://ptorrijos99.github.io/fedcausal/"
 license: MIT
 abstract: >-
-  A Python implementation of federated causal discovery over two data regimes.
-  FedGES learns Bayesian network structure from discrete or continuous data:
-  each site runs
-  greedy equivalence search on the data it holds, a coordinator combines the
-  resulting graphs by structural consensus fusion, and only graphs and scores
-  cross the network. FedRCD learns a causal order and linear coefficients from
-  continuous data under a linear non-Gaussian model: each site reduces its
-  rows to cumulant statistics, and only those statistics cross the network.
-  Runs in-process for experiments and over Flower for deployment.
+  fedcausal learns causal structure from data split across sites that cannot
+  share them. In FedGES each site runs greedy equivalence search on its own
+  data, a coordinator fuses the resulting graphs, and only graphs and scores
+  leave the sites; it takes discrete and continuous data. FedRCD recovers a
+  causal order and linear coefficients under a linear non-Gaussian model from
+  moment sums that each site computes on its own rows. Both run in one process
+  for experiments or over Flower across machines.
 keywords:
   - causal discovery
   - structure learning
