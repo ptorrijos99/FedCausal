@@ -2,6 +2,13 @@
 
 This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, what the [API reference](docs/api.rst) lists changes incompatibly only in a major release; the exact structure learned when several score the same, up to rounding, may still change in a minor one.
 
+## 1.1.0 (unreleased)
+
+### Changed
+
+- The cumulants, the tau discriminators, the solvers and the coefficient estimates of `fedcausal.lingam` now come from causalbase 0.2 (`causalbase.lingam`), which fedcausal requires. causalbase also has `RCD`, the estimator for data held in one place, where HC-LiNGAM is `RCD(method="sort")` and HC `RCD(method="exact")`.
+- Nothing in the API changes: `FedRCD`, `fedrcd`, `fedrcd_exact`, `moment_sums`, `cumulants_from_sums`, `RCDResult` and the rest keep their names, signatures and results, and the modules `fedcausal.lingam.cumulants`, `tau` and `solvers` still import what they did.
+
 ## 1.0.0 (2026-11-27)
 
 ### Changed (breaking)

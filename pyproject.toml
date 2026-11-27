@@ -38,7 +38,7 @@ classifiers = [
 dependencies = [
   # Learning in one place, the scores, graphs and data the federated methods
   # build on.
-  "causalbase>=0.1",
+  "causalbase>=0.2",
   "numba>=0.59",
   "numpy>=1.24",
   "pandas>=2.0",

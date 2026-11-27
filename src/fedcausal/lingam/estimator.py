@@ -53,7 +53,8 @@ class FedRCD(Estimator):
         kurtosis, the third-order one skew. FedISHC is
         ``FedRCD(method="ratio", order=3)`` and FedHC
         ``FedRCD(method="sort", order=3)``; with a single site, HC-LiNGAM is
-        ``method="sort"`` and HC ``method="exact"``.
+        ``method="sort"`` and HC ``method="exact"``. For data held in one
+        place, :class:`causalbase.lingam.RCD` takes the same options.
     pruning : {"adaptive_lasso", None}, default="adaptive_lasso"
         How coefficients are estimated on the order. ``None`` is ordinary
         least squares, which keeps every predecessor as a parent.

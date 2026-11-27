@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from causalbase.data import ContinuousDataset
+from causalbase.lingam.solvers import _coefficients
 from flwr.client import ClientApp
 from flwr.common import ArrayRecord, ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid, ServerApp
@@ -42,7 +43,7 @@ from fedcausal.flower.serde import (
     sums_to_record,
 )
 from fedcausal.lingam.cumulants import cumulants_from_sums, moment_sums
-from fedcausal.lingam.rcd import RCDResult, _coefficients, exact_order, fedrcd
+from fedcausal.lingam.rcd import RCDResult, exact_order, fedrcd
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

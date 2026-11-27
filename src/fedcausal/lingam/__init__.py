@@ -2,8 +2,9 @@
 
 Each site sends moment sums; the server turns them into cumulants and a tau
 discriminator recovers the causal order. Every solver is a pure function of
-those statistics and needs only numpy. The Flower transport is
-:mod:`fedcausal.flower.lingam`.
+those statistics, and the solvers are causalbase's (:mod:`causalbase.lingam`),
+whose :class:`~causalbase.lingam.RCD` runs them on data held in one place.
+The Flower transport is :mod:`fedcausal.flower.lingam`.
 
 The published baselines are settings of the same solvers:
 
@@ -11,8 +12,9 @@ The published baselines are settings of the same solvers:
 - FedRCD-Exact: ``fedrcd_exact(sites)``, ``p - 1`` rounds.
 - FedISHC: ``fedrcd(stats, method="ratio", order=3)``, one round.
 - FedHC: ``fedrcd(stats, method="sort", order=3)``, one round.
-- HC-LiNGAM: ``fedrcd(stats, method="sort")`` over a single site.
-- HC: ``fedrcd_exact([x])``.
+- HC-LiNGAM: ``fedrcd(stats, method="sort")`` over a single site, which is
+  ``causalbase.lingam.RCD(method="sort")``.
+- HC: ``fedrcd_exact([x])``, which is ``causalbase.lingam.RCD(method="exact")``.
 
 References
 ----------

@@ -2,6 +2,8 @@
 
 `FedRCD` learns a causal order and a linear coefficient matrix from continuous data spread across sites. Each site reduces its rows to a handful of moment sums, the server aggregates those into unbiased cumulant estimates, and a tau discriminator applied to them gives the causal order. FedGES federates by exchanging graphs; this family federates by exchanging sufficient statistics.
 
+The cumulants, the tau discriminator and the solvers come from [causalbase](https://ptorrijos99.github.io/causalbase/algorithms.html#rcd), whose `RCD` estimator runs them on data held in one place, with the same options; fedcausal adds the sites, the server and the transport. For data in one table, use `causalbase.lingam.RCD` directly.
+
 ```python
 from fedcausal import FedRCD
 
@@ -57,9 +59,9 @@ The methods FedRCD is usually compared against are settings of the same two func
 |---|---|---|
 | FedISHC | `fedrcd(stats, method="ratio", order=3)` | Chen et al., "FedISHC: Federated Causal Discovery via Higher-Order Cumulants", 2025 |
 | FedHC | `fedrcd(stats, method="sort", order=3)` | the same |
-| HC-LiNGAM | `fedrcd(stats, method="sort")` over one site | Chen et al., "Higher Order Cumulants-Based Method for Direct and Efficient Causal Discovery", IEEE TNNLS 2025 |
-| HC | `fedrcd_exact([x])` | the same |
+| HC-LiNGAM | `fedrcd(stats, method="sort")` over one site, or `causalbase.lingam.RCD(method="sort")` | Chen et al., "Higher Order Cumulants-Based Method for Direct and Efficient Causal Discovery", IEEE TNNLS 2025 |
+| HC | `fedrcd_exact([x])`, or `causalbase.lingam.RCD(method="exact")` | the same |
 
-HC-LiNGAM and HC give the orders and coefficients of the original implementation, and FedHC its orders, which `tests/lingam/test_reference_implementation.py` checks. FedISHC's original divides `Cum(x_j, x_j, x_s)` by `Cum(x_s, x_s, x_s)`, which estimates the square of the coefficient of `x_s` in `x_j`; `method="ratio"` divides `Cum(x_s, x_s, x_j)` instead, which estimates the coefficient. The arXiv version of the FedISHC paper writes the ratio this way; the AAAI version swaps the arguments, as the original code does. The ratio is set to zero when the source's third cumulant is below 1e-6 and clipped to ±10, as in the original code. Every remaining variable is deflated, where the paper deflates only those it judges dependent on the source, and the coefficient matrix comes from the covariance like every other method's, not from the inverted mixing matrix of the original. FedHC sorts once by the tau row sums, as the original code does; the paper's description also allows recomputing the sums over the remaining variables at each step.
+HC-LiNGAM and HC give the orders and coefficients of the original implementation, and FedHC its orders, which `tests/lingam/test_reference_implementation.py` checks here and in causalbase. FedISHC's original divides `Cum(x_j, x_j, x_s)` by `Cum(x_s, x_s, x_s)`, which estimates the square of the coefficient of `x_s` in `x_j`; `method="ratio"` divides `Cum(x_s, x_s, x_j)` instead, which estimates the coefficient. The arXiv version of the FedISHC paper writes the ratio this way; the AAAI version swaps the arguments, as the original code does. The ratio is set to zero when the source's third cumulant is below 1e-6 and clipped to ±10, as in the original code. Every remaining variable is deflated, where the paper deflates only those it judges dependent on the source, and the coefficient matrix comes from the covariance like every other method's, not from the inverted mixing matrix of the original. FedHC sorts once by the tau row sums, as the original code does; the paper's description also allows recomputing the sums over the remaining variables at each step.
 
 Every call returns the same `RCDResult` (`causal_order`, `coef`, `to_dag(threshold)`), and takes the estimator's `pruning` and `lambda_selection` with the same defaults; the comparison with the original implementations uses `pruning=None`, the OLS they used.
