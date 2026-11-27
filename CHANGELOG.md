@@ -2,18 +2,12 @@
 
 This project follows [Semantic Versioning](https://semver.org/). From 1.0.0, what the [API reference](docs/api.rst) lists changes incompatibly only in a major release; the exact structure learned when several score the same, up to rounding, may still change in a minor one.
 
-## 1.1.0 (unreleased)
-
-### Changed
-
-- The cumulants, the tau discriminators, the solvers and the coefficient estimates of `fedcausal.lingam` now come from causalbase 0.2 (`causalbase.lingam`), which fedcausal requires. causalbase also has `RCD`, the estimator for data held in one place, where HC-LiNGAM is `RCD(method="sort")` and HC `RCD(method="exact")`.
-- Nothing in the API changes: `FedRCD`, `fedrcd`, `fedrcd_exact`, `moment_sums`, `cumulants_from_sums`, `RCDResult` and the rest keep their names, signatures and results, and the modules `fedcausal.lingam.cumulants`, `tau` and `solvers` still import what they did.
-
 ## 1.0.0 (2026-11-27)
 
 ### Changed (breaking)
 
-- Learning from data in one place moved to its own package, [causalbase](https://github.com/ptorrijos99/causalbase), which fedcausal now depends on: `fedcausal.data` (the datasets and their encoding), `graph`, `scores`, `search`, `metrics`, `io` and `datasets`, with `GES` and `XGES`. fedcausal keeps the federated methods (`fedges`, `fusion`, `lingam`), their transport (`flower`) and the site splitters (`fedcausal.data.contiguous_split`, `dirichlet_split`).
+- Learning from data in one place moved to its own package, [causalbase](https://github.com/ptorrijos99/causalbase), which fedcausal now depends on (0.2 or later): `fedcausal.data` (the datasets and their encoding), `graph`, `scores`, `search`, `metrics`, `io` and `datasets`, with `GES` and `XGES`. fedcausal keeps the federated methods (`fedges`, `fusion`, `lingam`), their transport (`flower`) and the site splitters (`fedcausal.data.contiguous_split`, `dirichlet_split`).
+- The cumulants, the tau discriminators, the order solvers and the coefficient estimates behind `FedRCD` are causalbase's too (`causalbase.lingam`, from 0.2), where `RCD` runs them on data held in one place; HC-LiNGAM is `RCD(method="sort")` and HC `RCD(method="exact")`. `fedcausal.lingam` keeps every name it had (`FedRCD`, `fedrcd`, `fedrcd_exact`, `moment_sums`, `cumulants_from_sums`, `RCDResult`, ...), with the same signatures and results, and its modules `cumulants`, `tau` and `solvers` still import what they did.
 - The old paths still work: `fedcausal.graph`, `fedcausal.scores.bdeu`, ... (every submodule) are aliases of the causalbase modules, and `fedcausal.GES`, `fedcausal.DAG`, `fedcausal.data.DiscreteDataset`, ... the causalbase objects themselves, so `isinstance` and `except` work across both names. Each warns with a `DeprecationWarning` naming the new path; they go in 2.0.
 - `FedCausalError` is causalbase's `CausalBaseError`, so one `except` still catches every error either package raises; `ConfigurationError`, `CycleError` and `NotFittedError` are causalbase's too.
 
