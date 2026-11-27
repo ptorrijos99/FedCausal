@@ -72,7 +72,7 @@ class Site:
         to them, and they are imposed again after each fusion.
     search : {"ges", "xges0", "xges"}, default="ges"
         What :meth:`learn` runs: GES, XGES-0, or XGES with its forced
-        deletions; see :class:`~fedcausal.XGES`. Refinement always uses GES's
+        deletions; see :class:`~causalbase.search.XGES`. Refinement always uses GES's
         phases, restricted to the edges the fusion changed.
 
     Attributes

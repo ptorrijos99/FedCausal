@@ -53,10 +53,6 @@ model.causal_order_, model.coef_
 
 The methods never import Flower, and `tests/test_layout.py` checks that, along with a run with Flower made unimportable. Importing `fedcausal.flower` without the extra fails with a message naming it.
 
-## Upgrading from 0.x
-
-fedcausal 0.x also held the core of structure learning, which is now causalbase. The old paths (`fedcausal.graph`, `fedcausal.GES`, `fedcausal.data.DiscreteDataset`, ...) still work, as aliases of the causalbase objects, and warn with the path to use instead; they go in 2.0. See the [changelog](https://github.com/ptorrijos99/fedcausal/blob/main/CHANGELOG.md).
-
 ## Documentation
 
 - [Installation and quick start](https://ptorrijos99.github.io/fedcausal/quickstart.html)

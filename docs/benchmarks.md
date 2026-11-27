@@ -15,4 +15,4 @@ Mean SHD against the true network over three samples. The first column learns fr
 | alarm | 37 | 10.0 | 5.0 | 5.0 | 6.7 |
 | hepar2 | 70 | 62.7 | 76.7 | 96.7 | 109.7 |
 
-Each site sees less data the more sites there are, and on most networks the error grows with the number of sites; `hepar2` goes from 63 learning centrally to 110 across twenty sites. `alarm` is the exception: the fused structure is closer to the truth than the one learned from all the data at once, as it already was with 0.1.0.
+Each site sees less data the more sites there are, and on most networks the error grows with the number of sites; `hepar2` goes from 63 learning centrally to 110 across twenty sites. `alarm` is the exception: the fused structure is closer to the truth than the one learned from all the data at once.

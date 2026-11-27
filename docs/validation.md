@@ -16,7 +16,7 @@ No downloads and no environment variables: everything the tests need ships with 
 | FedRCD | The solvers and the cumulants against the original implementation's recorded output; the cumulants of sites' sums against the pooled k-statistics |
 | Flower transports | The same models as the in-process loop, round by round, over a stub grid that hands each message to the real site handler; failed sites and mismatched variables stop the run; the app in `flower_app/` runs both families and writes its result |
 | Estimators | Hyperparameters round-trip through `get_params`, `set_params` and `sklearn.base.clone`; `FedRCD` gives what its solver gives over the pooled statistics; a single table, an empty one or an out-of-range setting is refused with an error that names it |
-| Layout | fedcausal reaches the core through causalbase and never through its old paths, which stay as deprecated aliases (each one tested); the methods never import Flower and run without it; the transport names the extra it needs |
+| Layout | The methods never import Flower and run without it; the transport names the extra it needs |
 | Documentation | Every `from fedcausal... import ...` shown in the docs runs, and every example in a docstring prints what it shows |
 
 ## Test selection

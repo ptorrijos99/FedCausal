@@ -1,9 +1,7 @@
 """fedcausal is the federated layer over causalbase, and only its transport needs Flower.
 
-Its code reaches the core of structure learning (data, graphs, scores, search,
-metrics, io, datasets) through causalbase, never through the old
-``fedcausal.<core>`` paths, which are kept only as deprecated aliases. The
-method packages (fedges, fusion, lingam) never import Flower.
+The method packages (fedges, fusion, lingam) never import Flower, and run
+without it.
 """
 
 from __future__ import annotations
@@ -15,16 +13,6 @@ import textwrap
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent / "src" / "fedcausal"
-MOVED = [
-    "graph",
-    "scores",
-    "search",
-    "metrics",
-    "io",
-    "datasets",
-    "data.dataset",
-    "data.continuous",
-]
 METHODS = ["fedges", "fusion", "lingam"]
 
 
@@ -36,22 +24,6 @@ def _imported_modules(path: Path) -> set[str]:
         elif isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
     return names
-
-
-def _old_paths(path: Path) -> set[str]:
-    return {
-        n
-        for n in _imported_modules(path)
-        if any(n == f"fedcausal.{m}" or n.startswith(f"fedcausal.{m}.") for m in MOVED)
-    }
-
-
-def test_the_core_is_reached_through_causalbase() -> None:
-    """Not even under TYPE_CHECKING does fedcausal's own code use an old path."""
-    files = sorted(SRC.rglob("*.py"))
-    offenders = {p.name: sorted(i) for p in files if (i := _old_paths(p))}
-    assert not offenders
-    assert len(files) > 20  # the walk found the package
 
 
 def test_the_methods_never_import_flower() -> None:

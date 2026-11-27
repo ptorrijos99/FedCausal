@@ -81,7 +81,7 @@ class FedGES(Estimator):
         direction of a required edge is still learned.
     search : {"ges", "xges0", "xges"}, default="ges"
         The search each site learns with: GES, XGES-0, or XGES; see
-        :class:`~fedcausal.XGES`.
+        :class:`~causalbase.search.XGES`.
     n_jobs : int or None, default=None
         Processes to spread the sites over. ``None`` or 1 runs them one after
         another in this process; -1, or any negative value, uses one process

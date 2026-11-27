@@ -3,7 +3,7 @@
 The errors of a federation derive from causalbase's base error, as do a cycle
 in a :class:`~causalbase.graph.DAG` and reading an estimator's results before
 ``fit``, so callers can catch all of them with one ``except``:
-:class:`FedCausalError` is that base error under its fedcausal 0.x name. An
+:class:`FedCausalError` is that base error under fedcausal's name. An
 invalid argument or input raises :class:`ValueError` (or
 :class:`ConfigurationError`, which is one), and a wrong kind of input
 :class:`TypeError`.
